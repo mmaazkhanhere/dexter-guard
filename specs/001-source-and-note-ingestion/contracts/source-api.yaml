@@ -1,0 +1,336 @@
+openapi: 3.1.0
+info:
+  title: Source and Note Ingestion API
+  version: 1.0.0
+  description: >-
+    Foundational API for accepting, versioning, persisting, retrieving, and
+    referencing one German nursing transcript for one synthetic resident.
+    This API performs schema and format validation only. It does not perform
+    medical reasoning, clinical accuracy checks, or LLM-backed processing.
+
+servers:
+  - url: /
+
+tags:
+  - name: Sources
+    description: Immutable source documents and their versions.
+  - name: Evidence
+    description: Source-span validation and resolution.
+
+paths:
+  /sources:
+    post:
+      tags: [Sources]
+      operationId: createSource
+      summary: Submit a new German transcript
+      description: >-
+        Creates a new source document at version 1. Each initial submission
+        receives a new unique source_id. The transcript is persisted exactly
+        as submitted and is not normalized, summarized, translated, or
+        medically evaluated.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSourceRequest'
+            examples:
+              valid:
+                value:
+                  resident_test_id: resident-test-001
+                  language: de-DE
+                  transcript_text: |-
+                    Frau Müller berichtet über unruhigen Schlaf.
+                    Die Pflegekraft beobachtet Müdigkeit.
+      responses:
+        '201':
+          description: Source document version 1 was created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceDocument'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '415':
+          $ref: '#/components/responses/UnsupportedInputType'
+
+  /sources/{source_id}/versions:
+    post:
+      tags: [Sources]
+      operationId: createSourceVersion
+      summary: Create the next immutable source version
+      description: >-
+        Creates the next version for an existing source_id. Existing versions
+        remain retrievable and are never overwritten. The resident_test_id
+        must match the existing source document.
+      parameters:
+        - $ref: '#/components/parameters/SourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSourceVersionRequest'
+      responses:
+        '201':
+          description: A new immutable source version was created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceDocument'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/SourceNotFound'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+        '415':
+          $ref: '#/components/responses/UnsupportedInputType'
+
+  /sources/{source_id}/versions/{source_version}:
+    get:
+      tags: [Sources]
+      operationId: getSourceVersion
+      summary: Retrieve an exact source version
+      description: Returns the immutable source document identified by source_id and source_version.
+      parameters:
+        - $ref: '#/components/parameters/SourceId'
+        - $ref: '#/components/parameters/SourceVersion'
+      responses:
+        '200':
+          description: The requested source document version.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceDocument'
+        '404':
+          $ref: '#/components/responses/SourceVersionNotFound'
+
+  /source-spans/resolve:
+    post:
+      tags: [Evidence]
+      operationId: resolveSourceSpan
+      summary: Validate and resolve a source span
+      description: >-
+        Validates a character range against the exact referenced transcript
+        version and returns the derived excerpt. The source/version reference
+        remains authoritative; the returned text is not an independent source.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SourceSpan'
+      responses:
+        '200':
+          description: The span is valid and was resolved against the referenced version.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResolvedSourceSpan'
+        '400':
+          $ref: '#/components/responses/InvalidSourceSpan'
+        '404':
+          $ref: '#/components/responses/SourceVersionNotFound'
+
+components:
+  parameters:
+    SourceId:
+      name: source_id
+      in: path
+      required: true
+      description: Globally unique logical source identifier.
+      schema:
+        type: string
+        minLength: 1
+    SourceVersion:
+      name: source_version
+      in: path
+      required: true
+      description: Positive immutable version number within the source.
+      schema:
+        type: integer
+        minimum: 1
+
+  schemas:
+    CreateSourceRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - resident_test_id
+        - language
+        - transcript_text
+      properties:
+        resident_test_id:
+          $ref: '#/components/schemas/ResidentTestId'
+        language:
+          $ref: '#/components/schemas/Language'
+        transcript_text:
+          $ref: '#/components/schemas/TranscriptText'
+
+    CreateSourceVersionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - resident_test_id
+        - language
+        - transcript_text
+      properties:
+        resident_test_id:
+          $ref: '#/components/schemas/ResidentTestId'
+        language:
+          $ref: '#/components/schemas/Language'
+        transcript_text:
+          $ref: '#/components/schemas/TranscriptText'
+
+    SourceDocument:
+      type: object
+      additionalProperties: false
+      required:
+        - source_id
+        - source_version
+        - resident_test_id
+        - language
+        - transcript_text
+        - created_at
+      properties:
+        source_id:
+          type: string
+          minLength: 1
+          description: Globally unique logical source identifier.
+        source_version:
+          type: integer
+          minimum: 1
+          description: Immutable version number within source_id.
+        resident_test_id:
+          $ref: '#/components/schemas/ResidentTestId'
+        language:
+          $ref: '#/components/schemas/Language'
+        transcript_text:
+          $ref: '#/components/schemas/TranscriptText'
+        created_at:
+          type: string
+          format: date-time
+          description: Time at which this immutable source version was accepted.
+
+    SourceSpan:
+      type: object
+      additionalProperties: false
+      required:
+        - source_id
+        - source_version
+        - start
+        - end
+      properties:
+        source_id:
+          type: string
+          minLength: 1
+          description: Source containing the referenced transcript version.
+        source_version:
+          type: integer
+          minimum: 1
+          description: Exact transcript version containing the span.
+        start:
+          type: integer
+          minimum: 0
+          description: Inclusive zero-based character offset.
+        end:
+          type: integer
+          minimum: 1
+          description: Exclusive zero-based character offset.
+      description: >-
+        A valid span satisfies 0 <= start < end <= character_length of the
+        exact referenced transcript version. JSON Schema cannot verify the
+        source-dependent upper bound; the API must enforce it at runtime.
+
+    ResolvedSourceSpan:
+      allOf:
+        - $ref: '#/components/schemas/SourceSpan'
+        - type: object
+          required:
+            - text
+          properties:
+            text:
+              type: string
+              description: Derived excerpt from the referenced immutable transcript version.
+
+    ResidentTestId:
+      type: string
+      minLength: 1
+      pattern: '^[A-Za-z0-9][A-Za-z0-9._-]*$'
+      description: Exactly one synthetic resident test identifier.
+
+    Language:
+      type: string
+      enum: [de-DE]
+      description: German language/locale supported by this proof of concept.
+
+    TranscriptText:
+      type: string
+      minLength: 1
+      description: >-
+        Original non-blank German transcript text. Whitespace, punctuation,
+        casing, line breaks, and non-ASCII characters must be preserved.
+
+    Error:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable error code.
+          enum:
+            - INVALID_REQUEST
+            - INVALID_TRANSCRIPT
+            - INVALID_RESIDENT_TEST_ID
+            - UNSUPPORTED_INPUT_TYPE
+            - SOURCE_NOT_FOUND
+            - SOURCE_VERSION_NOT_FOUND
+            - DUPLICATE_SOURCE_VERSION
+            - INVALID_SOURCE_SPAN
+        message:
+          type: string
+        field:
+          type: string
+          description: Input field or path associated with the error, when applicable.
+
+  responses:
+    ValidationError:
+      description: Request failed schema or format validation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    InvalidSourceSpan:
+      description: Span boundaries or source reference are invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    UnsupportedInputType:
+      description: Audio or another unsupported non-text input type was submitted.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    SourceNotFound:
+      description: The source_id does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    SourceVersionNotFound:
+      description: The requested source version does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ConflictError:
+      description: The requested version operation conflicts with existing source data.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
