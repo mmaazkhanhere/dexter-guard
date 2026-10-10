@@ -102,7 +102,7 @@ Every error also has a non-sensitive `message` and `retryable` boolean. Pydantic
 
 ## Verification handoff boundary
 
-`ClaimExtractionService.get_current_result(note_revision_id)` returns the immutable successful/empty result record, including note provenance, the upstream `validationRunId`, and carried `EvidenceSourceReference`. Spec 004 consumes that typed result before a revision becomes verification-ready. No asynchronous event delivery or outbox is required by this PoC; this typed retrieval is the mandatory handoff mechanism. No evidence alignment or evidence verdict is produced here.
+`ClaimExtractionService.get_current_result(note_revision_id)` returns the immutable successful/empty result record, including note provenance, the upstream `validationRunId`, and carried `EvidenceSourceReference`. Spec 004 consumes that typed result before a revision becomes verification-ready. The detailed consumer boundary is defined in `contracts/claim-handoff.md`. No asynchronous event delivery or outbox is required by this PoC; this typed retrieval is the mandatory handoff mechanism. No evidence alignment or evidence verdict is produced here.
 
 ## Persistence model
 

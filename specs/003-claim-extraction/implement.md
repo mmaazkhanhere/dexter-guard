@@ -2,7 +2,9 @@
 
 ## Current state
 
-Implementation has **not** been started by this specification-artifact task. This record is the execution protocol for `tasks.md`; it is not evidence that code, tests, or an API already exist.
+Implementation is complete for the approved service-only boundary. This record
+summarizes the execution protocol and current implementation evidence for
+`tasks.md`.
 
 ## Mandatory preflight
 
@@ -21,7 +23,9 @@ Execute T001 through T019 in their listed dependency order. Write the failing de
 - No code assigns evidence support, contradiction, truth, or clinical diagnosis.
 - New note revisions are extracted independently.
 - Synthetic-only data, explicit resident-identity state, append-only run provenance, redacted telemetry, and typed timeout/provider failures are maintained.
-- Every successful/empty result carries immutable evidence-source metadata and atomically emits the required Spec 004 handoff event; this is not an evidence verdict.
+- Every successful/empty result carries immutable evidence-source metadata and
+  is available through the typed Spec 004 handoff contract; this is not an
+  evidence verdict and does not emit an asynchronous event.
 
 ## Completion evidence
 
