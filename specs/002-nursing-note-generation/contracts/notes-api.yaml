@@ -1,0 +1,105 @@
+openapi: 3.1.0
+info:
+  title: Nursing Note Generation API
+  version: 1.0.0
+paths:
+  /api/v1/notes/generate:
+    post:
+      operationId: generateNursingNote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateRequest'
+      responses:
+        '201':
+          description: Draft generated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NoteResponse' }
+        '404': { $ref: '#/components/responses/SourceNotFound' }
+        '409': { $ref: '#/components/responses/SourceVersionConflict' }
+        '422': { $ref: '#/components/responses/GenerationRejected' }
+  /api/v1/notes/import:
+    post:
+      operationId: importNursingNote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportRequest'
+      responses:
+        '201':
+          description: External draft registered without generation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NoteResponse' }
+        '404': { $ref: '#/components/responses/SourceNotFound' }
+        '409': { $ref: '#/components/responses/SourceVersionConflict' }
+components:
+  responses:
+    SourceNotFound: { description: Source document or version does not exist }
+    SourceVersionConflict: { description: Requested version is not the exact resolvable evidence version }
+    GenerationRejected: { description: Provider output is malformed, schema-invalid, or fails a limited generation-time guardrail }
+  schemas:
+    SourceReference:
+      type: object
+      required: [sourceId, sourceVersion]
+      properties:
+        sourceId: { type: string, minLength: 1 }
+        sourceVersion: { type: string, minLength: 1 }
+    GenerateRequest:
+      allOf:
+        - $ref: '#/components/schemas/SourceReference'
+        - type: object
+          required: [requestedBy]
+          properties:
+            requestedBy: { type: string, minLength: 1 }
+    ExternalOrigin:
+      type: object
+      required: [system, externalNoteId]
+      properties:
+        system: { type: string, minLength: 1 }
+        externalNoteId: { type: string, minLength: 1 }
+    ImportRequest:
+      allOf:
+        - $ref: '#/components/schemas/SourceReference'
+        - type: object
+          required: [content, externalOrigin, requestedBy]
+          properties:
+            content: { type: string, minLength: 1 }
+            externalOrigin: { $ref: '#/components/schemas/ExternalOrigin' }
+            requestedBy: { type: string, minLength: 1 }
+            facts:
+              type: array
+              items: { $ref: '#/components/schemas/NursingFact' }
+    NursingFact:
+      type: object
+      required: [type, statement, provenance]
+      properties:
+        type: { type: string, enum: [OBSERVATION, SYMPTOM, MEASUREMENT, ACTION] }
+        statement: { type: string, minLength: 1 }
+        sourceAnchor: { type: object, additionalProperties: true }
+        polarity: { type: string, enum: [AFFIRMED, NEGATED] }
+        certainty: { type: string, enum: [CERTAIN, UNCERTAIN] }
+        attribution: { type: string }
+        numericValue: { type: string }
+        unit: { type: string }
+        provenance: { type: string, enum: [GENERATED_FROM_SOURCE, EXTERNALLY_SUPPLIED] }
+    NoteResponse:
+      type: object
+      required: [noteId, revision, content, status, origin, sourceId, sourceVersion, facts]
+      properties:
+        noteId: { type: string }
+        revision: { type: integer, minimum: 1 }
+        content: { type: string }
+        status: { type: string, const: DRAFT }
+        origin: { type: string, enum: [GENERATED, IMPORTED] }
+        sourceId: { type: string }
+        sourceVersion: { type: string }
+        externalOrigin: { $ref: '#/components/schemas/ExternalOrigin' }
+        facts:
+          type: array
+          items: { $ref: '#/components/schemas/NursingFact' }
