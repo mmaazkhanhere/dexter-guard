@@ -8,6 +8,7 @@
 
 - Every generated or imported note has a resolvable `sourceId` and exact `sourceVersion`.
 - Every fact has a resident identifier or explicit `UNKNOWN`, atomic source meaning, and valid source-offset semantics.
+- Generated fact anchors are bounded to one source sentence, and explicit temporal qualifiers are preserved by deterministic guardrails; neither rule claims general semantic verification.
 - Imported `externalOrigin` identifies candidate provenance only; it is not evidence.
 - Every successful result starts in `DRAFT` and is neither verified nor approved.
 - Guardrail success means only that the generation contract was accepted; it is not evidence verification.
@@ -36,6 +37,7 @@
 - All successful creation paths return `DRAFT`; no approval or verification transition is implemented.
 - T022 observability tests verify bounded timeout/retry behavior, stable run IDs, rejection counters, and content-free metrics.
 - Reviewer remediation tests cover SQLite round-trip/append-only history, API schema alignment, changed units, material source-span omission, draft-to-source mismatch, complete external provenance, and non-overlapping timeout behavior.
+- Final checklist remediation tests cover temporal-qualifier retention, sentence-bounded fact anchors, mutually exclusive source/external anchors, and the Spec 001 `transcript_text` contract name.
 
 ## Bounded limitation
 

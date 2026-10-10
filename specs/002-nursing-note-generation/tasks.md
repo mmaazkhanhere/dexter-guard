@@ -53,3 +53,5 @@
 - [x] R002 Align the OpenAPI contract and runtime response/error behavior.
 - [x] R003 Add unit-mutation, material source-span omission, and draft-to-source mismatch fixtures.
 - [x] R004 Strengthen fact provenance/atomicity validation and make provider timeout/retry execution non-overlapping.
+- [x] R005 Add bounded temporal-qualifier preservation and sentence-bounded fact atomicity checks with regression fixtures.
+- [x] R006 Align the Spec 001 transcript field name and OpenAPI source-anchor alternatives with runtime contracts.

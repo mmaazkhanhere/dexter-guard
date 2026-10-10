@@ -102,6 +102,22 @@ components:
             facts:
               type: array
               items: { $ref: '#/components/schemas/CandidateNursingFact' }
+    SourceAnchor:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [sourceId, sourceVersion, start, end]
+          properties:
+            sourceId: { type: string, minLength: 1 }
+            sourceVersion: { type: integer, minimum: 1 }
+            start: { type: integer, minimum: 0 }
+            end: { type: integer, minimum: 1 }
+        - type: object
+          additionalProperties: false
+          required: [externalSystem, externalFactId]
+          properties:
+            externalSystem: { type: string, minLength: 1 }
+            externalFactId: { type: string, minLength: 1 }
     CandidateNursingFact:
       type: object
       required: [type, statement, residentSubject, sourceAnchor, provenance]
@@ -109,16 +125,7 @@ components:
         type: { type: string, enum: [OBSERVATION, SYMPTOM, MEASUREMENT, ACTION] }
         statement: { type: string, minLength: 1 }
         residentSubject: { type: string, minLength: 1, description: Resident identifier or UNKNOWN }
-        sourceAnchor:
-          type: object
-          additionalProperties: false
-          properties:
-            sourceId: { type: string, minLength: 1 }
-            sourceVersion: { type: integer, minimum: 1 }
-            start: { type: integer, minimum: 0 }
-            end: { type: integer, minimum: 1 }
-            externalSystem: { type: string, minLength: 1 }
-            externalFactId: { type: string, minLength: 1 }
+        sourceAnchor: { $ref: '#/components/schemas/SourceAnchor' }
         polarity: { type: string, enum: [AFFIRMED, NEGATED] }
         certainty: { type: string, enum: [CERTAIN, UNCERTAIN] }
         attribution: { type: string }
@@ -136,16 +143,7 @@ components:
         type: { type: string, enum: [OBSERVATION, SYMPTOM, MEASUREMENT, ACTION] }
         statement: { type: string, minLength: 1 }
         residentSubject: { type: string, minLength: 1, description: Resident identifier or UNKNOWN }
-        sourceAnchor:
-          type: object
-          additionalProperties: false
-          properties:
-            sourceId: { type: string, minLength: 1 }
-            sourceVersion: { type: integer, minimum: 1 }
-            start: { type: integer, minimum: 0 }
-            end: { type: integer, minimum: 1 }
-            externalSystem: { type: string, minLength: 1 }
-            externalFactId: { type: string, minLength: 1 }
+        sourceAnchor: { $ref: '#/components/schemas/SourceAnchor' }
         polarity: { type: string, enum: [AFFIRMED, NEGATED] }
         certainty: { type: string, enum: [CERTAIN, UNCERTAIN] }
         attribution: { type: string }

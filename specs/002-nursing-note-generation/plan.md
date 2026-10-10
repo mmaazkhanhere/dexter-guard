@@ -56,7 +56,7 @@ The service operates on synthetic German data only. It records a validation-run 
 
 ## Guardrail boundaries
 
-The service validates contract shape and deterministic properties of fixed fixtures. It can prove that referenced spans exist, identifiers resolve, values/units match anchored source text, and explicitly represented fields have expected values. It cannot generally prove that free German prose is semantically equivalent to a source or that no clinical inference is implied. Therefore:
+The service validates contract shape and deterministic properties of fixed fixtures. It can prove that referenced spans exist, identifiers resolve, values/units and explicitly represented temporal qualifiers match anchored source text, and generated fact anchors stay within one source sentence. It cannot generally prove that free German prose is semantically equivalent to a source or that no clinical inference is implied. Therefore:
 
 - validation success means **generation contract accepted**, never evidence-verified;
 - GEN-010 is a fixed prohibited-output regression guardrail, not diagnosis detection in the general case;
