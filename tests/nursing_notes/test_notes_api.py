@@ -164,6 +164,54 @@ def test_gen_004_uncertainty_is_not_converted_to_certainty(note_context):
     assert response.status_code == 422
 
 
+def test_temporal_qualifier_is_preserved_and_not_invented(note_context):
+    client = note_context["client"]
+    text = "Die Bewohnerin berichtet seit gestern über Schwindel."
+    source = create_source(client, text)
+    source_model = note_context["source_service"].get_source_version(source["source_id"], 1)
+    temporal = fact(
+        source_model,
+        text,
+        fact_type="SYMPTOM",
+        attribution="RESIDENT_REPORTED",
+        temporalQualifier="seit gestern",
+    )
+    note_context["adapter"].factory = result_factory(temporal)
+    accepted = client.post(
+        "/api/v1/notes/generate",
+        json={"sourceId": source["source_id"], "sourceVersion": 1, "requestedBy": "tester"},
+    )
+    assert accepted.status_code == 201
+    assert accepted.json()["facts"][0]["temporalQualifier"] == "seit gestern"
+
+    missing = fact(source_model, text, fact_type="SYMPTOM", attribution="RESIDENT_REPORTED")
+    note_context["adapter"].factory = result_factory(missing)
+    rejected = client.post(
+        "/api/v1/notes/generate",
+        json={"sourceId": source["source_id"], "sourceVersion": 1, "requestedBy": "tester"},
+    )
+    assert rejected.status_code == 422
+    assert rejected.json()["code"] == "GENERATION_REJECTED"
+
+
+def test_fact_anchor_cannot_span_multiple_source_sentences(note_context):
+    client = note_context["client"]
+    text = "Die Bewohnerin ruht. Die Haut ist trocken."
+    source = create_source(client, text)
+    source_model = note_context["source_service"].get_source_version(source["source_id"], 1)
+    compound = fact(source_model, text)
+    note_context["adapter"].factory = result_factory(compound)
+
+    response = client.post(
+        "/api/v1/notes/generate",
+        json={"sourceId": source["source_id"], "sourceVersion": 1, "requestedBy": "tester"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "GENERATION_REJECTED"
+    assert note_context["note_repository"].count() == 0
+
+
 def test_gen_005_resident_reported_information_retains_attribution(note_context):
     client = note_context["client"]
     text = "Die Bewohnerin berichtet über Übelkeit."

@@ -62,6 +62,8 @@ class SourceAnchor(_Contract):
         has_external = self.external_system is not None and self.external_fact_id is not None
         if not has_source and not has_external:
             raise ValueError("sourceAnchor must identify a source span or external provenance")
+        if has_source and has_external:
+            raise ValueError("sourceAnchor must use either a source span or external provenance")
         if (self.external_system is None) != (self.external_fact_id is None):
             raise ValueError("external provenance requires both externalSystem and externalFactId")
         if any(value is not None for value in source_fields) and not has_source:

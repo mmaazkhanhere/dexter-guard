@@ -23,6 +23,11 @@ _RESIDENT_REPORT = re.compile(
 _CAREGIVER_OBSERVATION = re.compile(r"\b(?:pflegekraft|beobachtet)\b", re.IGNORECASE)
 _TOKEN = re.compile(r"[\wÄÖÜäöüß]+", re.UNICODE)
 _MEASUREMENT = re.compile(r"\d+(?:[.,]\d+)?\s*(?:°C|mmHg|kg|cm|ml|bpm|g|l|%)", re.IGNORECASE)
+_TEMPORAL = re.compile(
+    r"\b(?:heute|gestern|morgen|seit\s+\w+|vor\s+\w+|nach\s+\w+|nachts|morgens|abends|aktuell|derzeit|momentan)\b",
+    re.IGNORECASE,
+)
+_MULTI_SENTENCE = re.compile(r"[.!?].*[.!?]|[\r\n;]", re.DOTALL)
 
 
 def _reject(message: str, field: str | None = None) -> None:
@@ -91,6 +96,11 @@ class GenerationGuardrails:
             _reject("A generated fact has an out-of-range source anchor.", f"facts.{index}.sourceAnchor")
 
         excerpt = source.transcript_text[anchor.start : anchor.end]
+        if _MULTI_SENTENCE.search(excerpt):
+            _reject(
+                "A candidate fact must be bounded to one source sentence.",
+                f"facts.{index}.sourceAnchor",
+            )
         if not _tokens(fact.statement).intersection(_tokens(excerpt)):
             _reject("A generated fact is not anchored to its stated source text.", f"facts.{index}.statement")
 
@@ -106,6 +116,14 @@ class GenerationGuardrails:
             _reject("Explicit source uncertainty was not preserved.", f"facts.{index}.certainty")
         if not has_uncertainty and fact.certainty == "UNCERTAIN":
             _reject("An uncertain fact is not supported by its source anchor.", f"facts.{index}.certainty")
+
+        temporal_matches = [match.group(0) for match in _TEMPORAL.finditer(excerpt)]
+        if temporal_matches:
+            qualifier = fact.temporal_qualifier or ""
+            if any(match.casefold() not in qualifier.casefold() for match in temporal_matches):
+                _reject("Source temporal information was not preserved.", f"facts.{index}.temporalQualifier")
+        elif fact.temporal_qualifier is not None:
+            _reject("A temporal qualifier is not supported by the source anchor.", f"facts.{index}.temporalQualifier")
 
         if _RESIDENT_REPORT.search(excerpt):
             if fact.attribution != "RESIDENT_REPORTED":
