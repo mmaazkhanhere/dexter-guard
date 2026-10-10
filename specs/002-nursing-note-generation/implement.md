@@ -20,14 +20,14 @@
 - Provider boundary and offline CI adapter: `src/nursing_notes/adapters.py`.
 - Source-anchor and bounded fidelity guardrails: `src/nursing_notes/guardrails.py`.
 - Generated/imported draft services and revision lineage: `src/nursing_notes/service.py`.
-- Atomic in-memory note revision/fact persistence: `src/nursing_notes/repository.py`.
+- Atomic SQLite note revision/fact persistence, with an explicit in-memory test double: `src/nursing_notes/repository.py`.
 - FastAPI endpoints and error mapping: `src/source_ingestion/app.py`.
 - Contract and acceptance coverage: `tests/nursing_notes/`.
 - Boundary decision record: `docs/adr/002-nursing-note-generation-boundaries.md`.
 
 ## Verification record
 
-- `uv run pytest`: **48 passed**, 0 failed, 0 skipped.
+- `uv run pytest`: **56 passed**, 0 failed, 0 skipped.
 - `uv run python -m compileall -q src tests`: passed.
 - `notes-api.yaml` parsed successfully with PyYAML.
 - `git diff --check`: passed.
@@ -35,6 +35,7 @@
 - GEN-008 and provider-failure cases verify controlled errors with zero persisted notes/facts.
 - All successful creation paths return `DRAFT`; no approval or verification transition is implemented.
 - T022 observability tests verify bounded timeout/retry behavior, stable run IDs, rejection counters, and content-free metrics.
+- Reviewer remediation tests cover SQLite round-trip/append-only history, API schema alignment, changed units, material source-span omission, draft-to-source mismatch, complete external provenance, and non-overlapping timeout behavior.
 
 ## Bounded limitation
 
