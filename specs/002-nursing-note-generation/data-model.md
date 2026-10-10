@@ -7,7 +7,7 @@
 | `sourceId` | Yes | Stable source-document identifier. |
 | `sourceVersion` | Yes | Exact immutable version used as evidence. |
 | `language` | Yes | Must be German for generation. |
-| `content` | Yes | Transcript content resolved by Spec 001. |
+| `transcript_text` | Yes | Exact transcript content resolved by Spec 001. |
 
 ## NoteRevision
 
@@ -47,4 +47,4 @@ Constraint: `externalOrigin` is required when `origin=IMPORTED` and absent when 
 | `numericValue`, `unit` | Together when stated | Strings preserving the source representation. |
 | `provenance` | Yes | `GENERATED_FROM_SOURCE` or `EXTERNALLY_SUPPLIED`. |
 
-Externally supplied facts may use a declared external anchor/provenance but are never represented as model-extracted facts. Missing fields remain null/absent rather than inferred. Every cited source anchor must match the stored source text under `normalizationPolicy`; invalid offsets are rejected.
+Externally supplied facts may use a declared external anchor/provenance but are never represented as model-extracted facts. A declared external anchor contains both `externalSystem` and `externalFactId`; partial external provenance is invalid, and a source span cannot be mixed with external provenance. Missing fields remain null/absent rather than inferred. Generated fact anchors are bounded to one source sentence as a deterministic atomicity guardrail; this does not establish general semantic atomicity. Every cited source anchor must match the stored source text under `normalizationPolicy`; invalid offsets are rejected.
