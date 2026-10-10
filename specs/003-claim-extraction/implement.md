@@ -25,4 +25,4 @@ Execute T001 through T019 in their listed dependency order. Write the failing de
 
 ## Completion evidence
 
-Before marking implementation complete, retain the commands/results for formatting, static analysis, all Spec 003 automated tests, CLM-001 through CLM-016, failure/outbox tests, input-size/security checks, and the scope/redaction review. Retain the 100+ benchmark report with all required metrics and denominators. Then run the convergence audit. If it appends work, return to the relevant task phase rather than declaring completion.
+Before marking implementation complete, retain the commands/results for formatting, static analysis, all Spec 003 automated tests, CLM-001 through CLM-016, failure and persisted-result tests, extraction-metric results, and the scope/redaction review. Then run the convergence audit. If it appends work, return to the relevant task phase rather than declaring completion.

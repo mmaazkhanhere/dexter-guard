@@ -42,9 +42,11 @@ For example, if a note states `Temperatur 37,8 °C` while a source later states 
 
 A request identifies one existing, immutable `noteRevisionId` and the exact stored note text for that revision. The stored body is synthetic-only, retained as immutable UTF-8 text with no normalization applied after storage; the body hash and declared language are part of the revision record. A revision is extracted independently; an edit creates a new revision and requires a new extraction before re-verification.
 
-## Data contract
+## Contract boundary
 
-All identifiers are opaque strings. Timestamps use ISO-8601 UTC strings. Character offsets are zero-based, end-exclusive Unicode code-point offsets over the immutable, stored UTF-8 note text. The persisted contract also retains the exact UTF-16 offsets needed by browser editors when their indexing differs; both coordinate systems must refer to the same substring. Raw note text is not transformed before span validation; the backend verifies every span against the stored body under this no-normalization policy.
+The output is a set of individually addressable `Claim` records associated with one immutable note revision and its already-associated source reference. Detailed field shapes, persistence records, serialization choices, and error-code enums are normative in `data-model.md`; they are not feature requirements in this specification.
+
+Each claim carries its note-revision provenance, its note location, the source reference already associated with the note, and the semantic attributes required for downstream verification. The extractor does not locate or assess supporting source evidence.
 
 ### `ClaimCategory`
 
@@ -109,7 +111,7 @@ Normalizing a German decimal comma to `.` is representational only; `raw` remain
 Claim {
   id: string,
   noteRevisionId: string,
-  residentIdentity: { id: string?, status: "IDENTIFIED" | "UNKNOWN" | "AMBIGUOUS" },
+  residentTestId: string,
   ordinal: integer >= 1,
   category: ClaimCategory,
   statementSpan: TextSpan,
@@ -144,7 +146,7 @@ Claim {
 ```text
 ExtractionSucceeded | ExtractionEmpty {
   status: "SUCCEEDED" | "EMPTY",
-  validationRunId: string,
+  extractionRunId: string,
   noteRevisionId: string,
   noteBodyHash: string,
   evidenceSourceReference: { sourceId: string, sourceVersion: integer, sourceTextHash: string, normalizationPolicy: string },
@@ -159,7 +161,7 @@ ExtractionSucceeded | ExtractionEmpty {
 
 ExtractionFailed {
   status: "FAILED",
-  validationRunId: string,
+  extractionRunId: string,
   noteRevisionId: string?,
   noteBodyHash: string?,
   extractorVersion: string,
@@ -179,7 +181,7 @@ ExtractionFailed {
 
 `SUCCEEDED` requires one or more valid claims. `EMPTY` is successful only when the supplied text contains no factual assertion. `FAILED` contains no partial claims and a required typed error. Pydantic shall enforce this discriminated union: success/empty results cannot carry `error`, and failed results cannot omit it. A note revision has one current successful result for a specific extractor version; a changed revision is never silently associated with an older result.
 
-`validationRunId` is idempotent for one extraction attempt and is retained in the append-only logical history with its version metadata, timestamps, status, and revision/body-hash reference. These fields are provenance metadata, not source-evidence references or verification verdicts.
+`extractionRunId` identifies one auditable extraction attempt. It is distinct from any verification run. Cached successful/empty results are immutable for their note revision and extractor version; repeated attempts are recorded rather than silently replacing prior results.
 
 `evidenceSourceReference` is copied from the immutable note-revision metadata and is required for every successful/empty result. It identifies the transcript version that Spec 004 must use; it does not assert that any claim is supported.
 
@@ -204,7 +206,7 @@ The normative field definitions and persistence invariants are in `data-model.md
 5. **SEM-003-05:** The system shall preserve stated temporal context and may not infer a date, duration, sequence, or recurrence that is absent.
 6. **SEM-003-06:** The system shall extract a stated clinical conclusion as a claim without treating it as valid or evidence-backed.
 7. **SEM-003-07:** The system shall preserve medication names and directly stated administration details without inferring indication, dose, route, frequency, or completion.
-8. **SEM-003-08:** The system shall populate `residentIdentity` from immutable note-revision metadata or explicitly return `UNKNOWN`/`AMBIGUOUS`; it shall not infer a resident identity from note wording.
+8. **SEM-003-08:** The system shall carry the single required synthetic `residentTestId` from immutable note/source metadata. It shall not infer, identify, or disambiguate residents from note wording; a missing association is an explicit failure.
 
 ### Location and revision requirements
 
@@ -212,7 +214,7 @@ The normative field definitions and persistence invariants are in `data-model.md
 2. **LOC-003-02:** The system shall validate each span against the stored note before returning or persisting a result.
 3. **LOC-003-03:** An extraction request for an altered note body or obsolete revision shall fail explicitly rather than reuse prior claims.
 4. **LOC-003-04:** A newly edited note revision shall require a new extraction result before it is presented for downstream verification.
-5. **HOF-003-01:** Every `SUCCEEDED` or `EMPTY` extraction result shall be persisted with its `evidenceSourceReference` and an append-only `ClaimExtractionCompleted` handoff event containing `noteRevisionId`, `validationRunId`, result version, and status. Spec 004 shall consume this event/result before any approval workflow can regard the revision as verification-ready.
+5. **HOF-003-01:** Every `SUCCEEDED` or `EMPTY` extraction result shall be available to Spec 004 through the typed extraction service or persisted result record, together with its note and source provenance. Spec 004 shall consume that result before any approval workflow can regard the revision as verification-ready.
 
 ### Failure and boundary requirements
 
@@ -223,15 +225,14 @@ The normative field definitions and persistence invariants are in `data-model.md
 
 ## Non-functional requirements
 
-- **NFR-003-01:** Outputs must be deterministic for an identical revision and extractor version, or any nondeterminism must be detected by validation and surfaced as failure rather than silently persisted.
-- **NFR-003-02:** Pydantic models shall validate all cross-component payloads. If the optional public HTTP endpoint is exposed, a versioned OpenAPI contract shall validate its payloads.
+- **NFR-003-01:** Extraction attempts, extractor/prompt/model versions, and cached results shall be immutable and auditable. Variation across repeated attempts shall be measured in regression evaluation; it is not itself an extraction failure.
+- **NFR-003-02:** Cross-component contracts shall be versioned and validated. If a public HTTP endpoint is exposed, its contract shall be versioned and validated.
 - **NFR-003-03:** Claims must be serializable in a versioned schema that preserves unknown future categories without breaking consumers.
 - **NFR-003-04:** Only synthetic data may be used in requests, fixtures, logs, screenshots, demonstrations, and evaluations for this PoC.
 - **NFR-003-05:** Logging/telemetry shall record only redacted run metadata, latency, cost/token usage where applicable, rejection reason codes, and warning counts; it shall not log note, prompt, claim, or transcript content.
-- **NFR-003-06:** Provider calls shall use defined timeouts, bounded retries, and idempotent `validationRunId` behavior; timeout or unavailable-provider outcomes are explicit failures.
+- **NFR-003-06:** Provider calls shall use defined timeouts, bounded retries, and idempotent `extractionRunId` behavior; timeout or unavailable-provider outcomes are explicit failures.
 - **NFR-003-07:** The service must make no network call to source evidence systems.
-- **NFR-003-08:** The versioned 100+ synthetic German evaluation corpus shall store candidate/source text, expected claim-level outcomes, source/evidence references, materiality/severity, annotation provenance, and held-out membership. Evaluation shall report denominators and claim-extraction precision/recall, critical-error recall, false-positive rate, completeness, latency, inference cost, reviewer workload, raw counts, and representative failures. Spec 008 defines release thresholds and repeated-run/small-sample handling.
-- **NFR-003-09:** Requests shall reject a note body exceeding 50,000 Unicode code points before provider invocation. Secret scanning and dependency-vulnerability checks are mandatory release checks.
+- **NFR-003-08:** Spec 003 shall contribute labeled synthetic extraction cases to the shared Spec 008 benchmark. Its feature-level evaluation measures atomic-claim precision and recall, span validity, semantic-attribute accuracy, and failure handling. End-to-end verification, completeness, reviewer-workload, and system-cost metrics are owned by Spec 008.
 
 ## Acceptance scenarios
 
@@ -250,8 +251,9 @@ The normative field definitions and persistence invariants are in `data-model.md
 | CLM-011 | A note is edited after initial extraction. | Old claims remain tied only to old revision; latest revision has a newly extracted result. |
 | CLM-012 | Model returns invalid JSON or a span that does not match text. | `FAILED`, explicit error, no partial claims persisted/returned. |
 | CLM-013 | `---` (valid note body with no factual assertion). | `EMPTY`, empty claims, no failure. |
+| CLM-013a | A bounded independent empty-result safeguard finds a possible assertion. | Typed extraction failure; do not return `EMPTY`. |
 | CLM-014 | `Metoprolol 25 mg oral verabreicht.` | Medication name, dose, unit, route, and stated administration are preserved; no indication/frequency inferred. |
-| CLM-015 | Revision metadata has no resident assignment. | Every claim has `residentIdentity.status = UNKNOWN`; no resident is inferred. |
+| CLM-015 | Note/source metadata has no required resident test ID. | Typed extraction failure; no resident is inferred. |
 | CLM-016 | Provider call times out or is unavailable. | Typed `FAILED` result with run id; no claims; bounded retry behavior is observable. |
 
 ## Success measures
@@ -259,5 +261,5 @@ The normative field definitions and persistence invariants are in `data-model.md
 - Every claim returned by the service has a unique `id`, a valid revision reference, and validated spans.
 - Acceptance scenarios CLM-001 through CLM-016 pass structural and semantic-fidelity assertions.
 - No extraction output contains an evidence-verification, contradiction, support, or diagnosis field.
-- Every successful/empty extraction has the immutable evidence-source reference and `ClaimExtractionCompleted` handoff required for Spec 004; this does not assign an evidence verdict.
-- A versioned synthetic German claim-extraction benchmark contains at least 100 labeled scenarios, including the constitution-required fabrication, numerical, negation, uncertainty, omission, resident-mixing, and unjustified-inference classes, with all NFR-003-08 fields and reported metrics.
+- Every successful/empty extraction is available to Spec 004 through the typed service or persisted record with immutable note and carried source provenance; this does not assign an evidence verdict.
+- Labeled synthetic extraction cases contribute to the shared Spec 008 benchmark. Spec 003 reports atomic-claim precision/recall, span validity, semantic-attribute accuracy, and failure-handling results.

@@ -21,14 +21,9 @@ Spec 003 creates claims from the immutable candidate nursing-note revision. It r
 
 This reference comes from immutable note-revision metadata. It is a verification input, not proof that a claim is supported.
 
-### `ResidentIdentity`
+### `residentTestId`
 
-| Field | Required | Constraint |
-| --- | --- | --- |
-| `status` | Yes | `IDENTIFIED`, `UNKNOWN`, or `AMBIGUOUS`. |
-| `id` | Conditional | Required only when `status=IDENTIFIED`; forbidden otherwise. |
-
-Identity is taken only from immutable revision metadata. Text extraction must never infer it from the note body.
+Every Spec 003 input carries the single non-empty synthetic `residentTestId` from immutable note/source metadata. Extraction does not identify, infer, or disambiguate residents. A missing or mismatched test ID is a typed failure.
 
 ### `TextSpan`
 
@@ -74,7 +69,7 @@ Spans resolve against the immutable stored candidate-note body: UTF-8 text store
 | --- | --- | --- |
 | `id` | Yes | Unique within one extraction result; stable only within its note revision/result. |
 | `noteRevisionId` | Yes | Exact immutable candidate-note revision. |
-| `residentIdentity` | Yes | `ResidentIdentity` value object. |
+| `residentTestId` | Yes | Single non-empty synthetic test ID from immutable metadata. |
 | `ordinal` | Yes | Positive, deterministic order within result. |
 | `category` | Yes | `ClaimCategory`. `CLINICAL_CONCLUSION` does not imply validity. |
 | `statementSpan`, `claimText` | Yes | `claimText == statementSpan.text`. |
@@ -91,7 +86,7 @@ Nested cue/value spans must resolve exactly and lie inside the statement span un
 
 ## Extraction-result union
 
-All result variants include `validationRunId`, `extractorVersion`, `outputSchemaVersion`, and `extractedAt`. Provider/model/prompt versions are included when a provider was invoked. `validationRunId` is idempotent for one attempt.
+All result variants include `extractionRunId`, `extractorVersion`, `outputSchemaVersion`, and `extractedAt`. Provider/model/prompt versions are included when a provider was invoked. `extractionRunId` is idempotent for one attempt and distinct from a verification run.
 
 | Variant | Required fields | Forbidden fields |
 | --- | --- | --- |
@@ -105,38 +100,23 @@ All result variants include `validationRunId`, `extractorVersion`, `outputSchema
 
 Every error also has a non-sensitive `message` and `retryable` boolean. Pydantic discriminated-union validation rejects any invalid variant, including a failed result without an error or a successful result with one.
 
-## Handoff event
+## Verification handoff boundary
 
-### `ClaimExtractionCompleted`
-
-| Field | Required | Constraint |
-| --- | --- | --- |
-| `eventId` | Yes | Unique, append-only event id. |
-| `eventType` | Yes | Constant `ClaimExtractionCompleted`. |
-| `noteRevisionId` | Yes | Immutable candidate-note revision. |
-| `validationRunId` | Yes | Exact successful/empty extraction run. |
-| `resultStatus` | Yes | `SUCCEEDED` or `EMPTY` only. |
-| `evidenceSourceReference` | Yes | Immutable reference required by Spec 004. |
-| `resultSchemaVersion` | Yes | Versioned result contract. |
-| `occurredAt` | Yes | ISO-8601 UTC timestamp. |
-| `deliveryState` | Yes | `PENDING`, `DELIVERED`, or `FAILED`; delivery failure is observable and retryable. |
-
-The result and event are written atomically. Spec 004 must consume this durable event/result before another workflow can treat the revision as verification-ready. The event itself does not establish evidence support.
+`ClaimExtractionService.get_current_result(note_revision_id)` returns the immutable successful/empty result record, including note provenance and carried `EvidenceSourceReference`. Spec 004 consumes that typed result before a revision becomes verification-ready. No asynchronous event delivery, outbox, evidence alignment, or evidence verdict is required by this PoC.
 
 ## Persistence model
 
 | Record | Required fields |
 | --- | --- |
-| `claim_extraction_result` | result id, validation run id, revision id, note body hash, evidence source reference, extractor/provider/model/prompt/schema versions, discriminated status/error, timestamps |
+| `claim_extraction_result` | result id, extraction run id, revision id, note body hash, evidence source reference, extractor/provider/model/prompt/schema versions, discriminated status/error, timestamps |
 | `claim` | id, result id, ordinal, semantic fields, exact spans, raw values, warnings |
-| `claim_extraction_outbox` | event id, result/revision/run ids, source-reference version, event payload/version, delivery state, timestamps |
 
-Use one SQLite transaction for a successful/empty result, its claims, append-only provenance record, and outbox event. A failed result persists no claims but retains its append-only run/error record. New note revisions never reuse an older extraction result or claim identity.
+Use one SQLite transaction for a successful/empty result, its claims, and append-only provenance record. A failed result persists no claims but retains its append-only run/error record. New note revisions never reuse an older extraction result or claim identity.
 
 ## Cross-model invariants
 
 1. Every returned/persisted span matches the immutable note body exactly in both coordinate systems.
 2. Every claim belongs to the exact result revision and has a unique id/ordinal within that result.
-3. Every successful/empty result carries immutable source-reference metadata and emits exactly one completion event.
+3. Every successful/empty result carries immutable source-reference metadata and is retrievable through the typed service/persisted record for Spec 004.
 4. No Spec 003 model contains an evidence verdict, transcript span, diagnosis, approval state, or severity decision.
 5. Request note bodies over 50,000 Unicode code points fail with `REQUEST_TOO_LARGE` before a provider call.

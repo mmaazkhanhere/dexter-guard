@@ -17,7 +17,7 @@
 - [ ] `Claim`, `TextSpan`, category, polarity, certainty, attribution, numeric, and result-state fields have clear meanings.
 - [ ] Required versus optional fields are distinguishable without implementation guesswork.
 - [ ] Revision ownership, id scope, and result status semantics are specified.
-- [ ] Resident identity has explicit `IDENTIFIED`, `UNKNOWN`, and `AMBIGUOUS` handling.
+- [ ] A single immutable synthetic resident test ID is carried without identity inference or ambiguity handling.
 - [ ] Validation-run, body-hash, schema, and provider/model/prompt version provenance is specified.
 - [ ] The discriminated result contract requires typed errors for `FAILED` and forbids errors for `SUCCEEDED`/`EMPTY`.
 - [ ] Offset conventions and substring-validation requirements are unambiguous.

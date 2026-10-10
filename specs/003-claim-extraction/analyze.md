@@ -19,7 +19,7 @@
 | Security | Covered | Protected logging is a requirement, architecture constraint, and T016 validation task. |
 | Constitution stack | Covered | The plan requires Python, FastAPI, Pydantic, SQLite, dependency injection, and ADRs for material design trade-offs. |
 | Synthetic-only/privacy | Covered | NFR-003-04, clarification decision, plan constraints, T002/T013/T016, and the checklist prohibit real data. |
-| Provenance/evidence handoff | Covered | Body hash, explicit resident identity, immutable evidence-source reference, run id, append-only history/outbox event, and provider/model/prompt/schema versions are defined and tasked. |
+| Provenance/evidence handoff | Covered | Body hash, single resident test ID, immutable evidence-source reference, extraction run id, append-only history, and provider/model/prompt/schema versions are defined and tasked. |
 | Test-first/evaluation | Covered | T004–T007 precede T008–T012, and the plan/T006/T017 require 100+ versioned synthetic scenarios with required corpus fields, metrics, denominators, and a held-out policy. |
 | Operational failures/security | Covered | Typed discriminated failures, provider timeout/bounded retry, idempotent run ids, input-size guard, secret/dependency checks, and redacted metrics are specified and tested. |
 
