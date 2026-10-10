@@ -1,8 +1,14 @@
-# Implementation Plan: Source and Note Ingestion
+# Implementation Plan: Source Transcript Ingestion and Evidence Reference Foundation
+
+Feature Branch: `001-source-and-note-ingestion`
+
+Spec: `specs/001-source-and-note-ingestion/spec.md`
+
+Status: Draft
 
 ## Objective
 
-Implement the smallest reliable foundation for accepting, validating, identifying, versioning, persisting, retrieving, and referencing one German nursing transcript for one synthetic resident.
+Implement the smallest reliable foundation for accepting, validating, identifying, versioning, persisting, retrieving, and referencing one German nursing transcript for one synthetic resident. External nursing-note ingestion is deferred to the later specification that owns `NursingNote`; this feature owns source documents and reusable source spans only.
 
 ## Design principles
 
@@ -155,3 +161,64 @@ Required test groups:
 ## Completion definition
 
 Implementation is complete when the contracts are documented, the API/demo supports the required operations, persistence preserves immutable source versions, span validation is version-aware, and all in-scope tests pass without an LLM provider.
+
+## Technical context
+
+### Confirmed technical choices
+
+- Public contract format: OpenAPI 3.1 at `specs/001-source-and-note-ingestion/contracts/source-api.yaml`.
+- Canonical source identity: `(source_id, source_version)`.
+- Source text representation: the exact stored Unicode string; no normalization before persistence or indexing.
+- Span indexing: zero-based Unicode scalar values/code points, inclusive `start`, exclusive `end`.
+- Version concurrency: caller-provided `expected_source_version`, atomic check-and-insert, uniqueness on `(source_id, source_version)`, and stable `VERSION_CONFLICT` on stale/concurrent writes.
+- Test boundary: validation and persistence tests run without an LLM provider or network dependency.
+
+### Repository details requiring confirmation
+
+The application runtime, framework, persistence library, package layout, and test runner were not available for verification during this review. The task plan therefore names the intended implementation paths `src/source_ingestion/` and `tests/source_ingestion/`; T001 must confirm or correct those paths before application implementation begins.
+
+## Constitution check
+
+This gate is evaluated against the observable requirements and the constitution file path requested by the project. The exact local constitution text could not be read because the repository shell was unavailable during this review; entries marked “verify” remain unresolved.
+
+| Gate | Status | Evidence or follow-up |
+| --- | --- | --- |
+| Feature scope is narrow and independently implementable | PASS | Source documents and spans only; external `NursingNote` ingestion is deferred. |
+| User-facing behavior is specified before implementation | PASS | `spec.md` contains P1 user stories, independent tests, and Given/When/Then scenarios. |
+| Contracts are explicit and cross-artifact traceable | PASS | `data_model.md`, `contracts/source-api.yaml`, and `tasks.md` use the same source/version/span rules. |
+| Evidence integrity is preserved | PASS | Immutable versions, exact source text, Unicode scalar-value spans, and no cross-version redirection. |
+| Validation is deterministic and non-clinical | PASS | Structured schema validation only; no resident inference, clinical reasoning, or LLM call. |
+| Tests are required for acceptance-critical behavior | PASS | API, repository, concurrency, round-trip, and span tests are mapped to acceptance scenarios. |
+| Tests-first or constitution-specific testing wording | VERIFY | Confirm the exact constitution principle and adapt task ordering if it mandates a stricter TDD sequence. |
+| Required language/runtime/framework conventions | VERIFY | Confirm from the repository once the local toolchain is readable. |
+
+No application code is being changed in this review.
+
+## Design decisions
+
+### D-001: Source-ingestion feature name
+
+Use “Source Transcript Ingestion and Evidence Reference Foundation” as the feature name. Keep the existing directory slug for compatibility, but do not assign external nursing-note ingestion to this feature. The later note specification owns `NursingNote` fields and behavior.
+
+### D-002: Unicode scalar-value offsets
+
+Use Unicode scalar values/code points rather than bytes, UTF-16 code units, or grapheme clusters. Preserve the original string without normalization, and document that a valid span may split a grapheme cluster. This makes offsets deterministic across supported implementations and prevents language/runtime-specific UTF-16 behavior from becoming the source contract.
+
+### D-003: Structured single-resident input
+
+Require exactly one scalar `resident_test_id` field in the structured request. Do not inspect transcript semantics to identify or disambiguate residents. This is enforceable at the API/schema boundary and preserves the out-of-scope boundary for multi-resident processing.
+
+### D-004: Optimistic concurrency for revisions
+
+Require `expected_source_version` for revisions. The repository must atomically compare the expected version and insert the next version under a unique composite key. A stale request or uniqueness race returns `VERSION_CONFLICT` and leaves persistence unchanged.
+
+### D-005: Contract-first downstream integration
+
+Downstream artifacts retain `(source_id, source_version)` and use `SourceSpan` for evidence. They do not create alternate source identities or treat copied excerpts as authoritative.
+
+## Known ambiguities and follow-ups
+
+- Confirm the exact FR-01 wording in `docs/functional_requirements.md`; this plan maps FR-01 to structured single-transcript acceptance based on the supplied source-ingestion requirements.
+- Confirm the constitution's exact named principles and whether it requires a specific test-first ordering.
+- Confirm the repository's actual runtime, package paths, persistence technology, and test command before executing T001.
+- Confirm whether API conflict responses use `409 VERSION_CONFLICT` exactly or an existing project-wide error envelope with the same semantic code.

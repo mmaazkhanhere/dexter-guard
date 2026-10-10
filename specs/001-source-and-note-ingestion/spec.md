@@ -1,4 +1,12 @@
-# Spec 001: Source and Note Ingestion
+# Feature Specification: Source Transcript Ingestion and Evidence Reference Foundation
+
+Feature Branch: `001-source-and-note-ingestion`
+
+Created: 2026-10-09
+
+Status: Draft
+
+Input: Establish an immutable, versioned source of truth for German nursing transcripts and shared evidence-reference contracts.
 
 ## Goal
 
@@ -26,6 +34,80 @@ The proof of concept supports text transcripts only. It does not support audio i
 
 Input validation in this specification means validating the accepted format and schema. It does not mean validating the clinical truth of the submitted observations.
 
+## User Scenarios & Testing
+
+### User Story 1 - Submit an identifiable German transcript (Priority: P1)
+
+As a client of the demo/API, I want to submit one structured German transcript for one synthetic resident so that the system creates an identifiable source of truth.
+
+Why this priority: This is the minimum source-ingestion capability. Every downstream artifact depends on a persisted source identity and exact source text.
+
+Independent Test: Submit a valid JSON request containing one `resident_test_id`, `language: de-DE`, and non-blank `transcript_text`; verify a successful response with a unique `source_id`, version `1`, and an exact text round trip.
+
+Acceptance Scenarios:
+
+1. Given a well-formed request with one scalar `resident_test_id` and non-blank German text, when the client submits it, then the API persists the transcript as version `1` and returns a unique `source_id`.
+2. Given a missing, blank, non-string, or structurally malformed transcript, when the client submits it, then the API returns a structured validation error and persists nothing.
+3. Given a request with an array or multiple resident identifiers, when the client submits it, then the API rejects the request as structurally invalid without attempting resident disambiguation.
+4. Given accepted transcript text containing German diacritics, combining marks, punctuation, whitespace, or line breaks, when the client retrieves it, then the returned text is unchanged.
+
+### User Story 2 - Preserve and retrieve source versions (Priority: P1)
+
+As a source maintainer, I want revisions to create immutable, retrievable versions so that evidence never silently moves to different transcript text.
+
+Why this priority: Version identity is required for reliable provenance and for every evidence-bearing downstream contract.
+
+Independent Test: Create a source, create a revision with the expected current version, retrieve both versions, and verify that the first record is unchanged. Attempt a concurrent or stale revision and verify a conflict response.
+
+Acceptance Scenarios:
+
+1. Given an existing source at version `v`, when a revision is submitted with `expected_source_version: v`, then the system atomically creates version `v + 1` and leaves version `v` unchanged.
+2. Given two revisions based on the same expected version, when both attempt creation, then exactly one succeeds and the other receives `409 VERSION_CONFLICT` or an equivalent stable conflict error.
+3. Given a source ID and version, when a client retrieves them, then the exact immutable `SourceDocument` is returned; missing IDs or versions return structured not-found errors.
+
+### User Story 3 - Reference exact evidence spans (Priority: P1)
+
+As a downstream verifier, I want to reference an exact Unicode source range in an exact source version so that evidence findings remain reproducible.
+
+Why this priority: Evidence references are the shared foundation for facts, findings, reviews, and benchmark cases.
+
+Independent Test: Create a transcript containing non-ASCII and combining Unicode characters, submit valid and invalid spans, and verify that resolution uses the documented scalar-value indexing semantics.
+
+Acceptance Scenarios:
+
+1. Given a valid `(source_id, source_version)` and `0 <= start < end <= scalar_value_length(transcript_text)`, when the span is resolved, then the API returns the derived substring for that exact version.
+2. Given a negative, empty, reversed, or out-of-range span, when it is resolved, then the API rejects it with `INVALID_SOURCE_SPAN`.
+3. Given a span for a missing source or version, when it is resolved, then the API returns a structured not-found error.
+4. Given a span calculated against one version but submitted with another version, when it is resolved, then the API validates it against the referenced version and does not silently redirect it.
+
+## Functional requirements
+
+| ID | Requirement |
+| --- | --- |
+| FR-01 | The system shall accept one structured German text transcript with exactly one scalar `resident_test_id` and persist it as an immutable source version. |
+| FR-02 | The system shall reject blank, non-text, malformed, unsupported, and structurally invalid submissions with structured validation errors. |
+| FR-03 | The system shall assign a unique `source_id` to every initial accepted transcript. |
+| FR-04 | The system shall preserve the original transcript text exactly. |
+| FR-05 | The system shall create revisions atomically and preserve all prior versions. |
+| FR-06 | The system shall detect stale or concurrent revisions and return a stable conflict response without overwriting data. |
+| FR-07 | The system shall retrieve a source by `source_id` and `source_version`. |
+| FR-08 | The system shall validate `SourceSpan` references against the exact Unicode source version. |
+| FR-09 | The system shall expose the documented source contracts to downstream components. |
+
+## Unicode source-span indexing
+
+Offsets are zero-based indices over Unicode scalar values (Unicode code points), not UTF-8 bytes, UTF-16 code units, or user-perceived grapheme clusters. `start` is inclusive and `end` is exclusive.
+
+The stored transcript is not Unicode-normalized before indexing or persistence. Each Unicode scalar value in the exact stored string contributes one index position. A base character and a combining mark therefore occupy separate positions; a grapheme cluster may be split by a technically valid span. Newline characters are indexed exactly as stored: a CRLF sequence contributes two scalar values, while LF contributes one. Implementations must not normalize line endings or apply NFC/NFD normalization before calculating offsets.
+
+For a transcript `T`, a span is valid only when:
+
+```text
+0 <= start < end <= number_of_unicode_scalar_values(T)
+```
+
+The resolved excerpt is the substring from scalar-value index `start` through `end - 1`. The API, persistence layer, and tests must use this same convention.
+
 ## Capabilities
 
 ### 1. Transcript acceptance
@@ -46,13 +128,13 @@ At minimum, validation must reject:
 - a blank transcript, including whitespace-only text;
 - a non-text transcript value;
 - a missing, blank, or malformed synthetic resident test ID;
-- a submission that does not represent exactly one resident;
+- a missing, repeated, array-valued, or otherwise schema-invalid `resident_test_id` field;
 - unsupported audio or other non-text input;
 - malformed structured requests.
 
 Validation failures use a structured error shape with a stable error code, a human-readable message, and the field or path that failed when applicable. Validation must be deterministic and must not call an LLM.
 
-Validation does not assess whether the transcript's observations are medically accurate.
+Validation does not inspect transcript meaning to infer, disambiguate, or verify residents, and does not assess whether observations are medically accurate.
 
 ### 3. Source identification
 
@@ -81,7 +163,7 @@ A source span contains:
 
 Offsets are zero-based character offsets into the stored transcript text. The span text is derived from the referenced immutable transcript version and is not an independently authoritative copy.
 
-Valid spans satisfy `0 <= start < end <= character_length(transcript)`. The referenced source ID and version must exist, and the boundaries must be valid for that exact transcript version. Invalid, reversed, empty, out-of-range, or cross-version spans are rejected.
+Valid spans satisfy `0 <= start < end <= unicode_scalar_value_length(transcript)`. The referenced source ID and version must exist, and the boundaries must be valid for that exact transcript version. Invalid, reversed, empty, out-of-range, or cross-version spans are rejected.
 
 The implementation must document its character-offset convention and apply it consistently across API responses, persistence, tests, and downstream consumers.
 
@@ -112,7 +194,7 @@ Required fields:
 
 Implementations may add persistence metadata, but additions must not change the meaning of the required fields or make the source text mutable.
 
-The source identity is the pair `(source_id, source_version)`. Every initial submission creates a new unique `source_id` at `source_version = 1`. A later revision is allowed only through an explicit versioned operation for that `source_id`, which creates the next version and preserves every prior version. A normal submission must never overwrite an existing source or version.
+The source identity is the pair `(source_id, source_version)`. Every initial submission creates a new unique `source_id` at `source_version = 1`. A later revision is allowed only through an explicit versioned operation for that `source_id`, which creates the next version and preserves every prior version. Version creation atomically checks the expected current version and inserts the next version under a uniqueness constraint on `(source_id, source_version)`. A stale or concurrent revision fails with `409 VERSION_CONFLICT` (or the equivalent stable conflict code) and persists nothing. A normal submission must never overwrite an existing source or version.
 
 ### `SourceSpan`
 
@@ -124,8 +206,8 @@ Required fields:
 | --- | --- | --- |
 | `source_id` | string | Must identify an existing source. |
 | `source_version` | version value | Must identify an existing version of `source_id`. |
-| `start` | non-negative integer | Inclusive character offset. |
-| `end` | positive integer | Exclusive character offset; must be greater than `start`. |
+| `start` | non-negative integer | Inclusive zero-based Unicode scalar-value/code-point offset. |
+| `end` | positive integer | Exclusive zero-based Unicode scalar-value/code-point offset; must be greater than `start`. |
 
 Consumers may resolve a span to its source text, but must not treat a copied excerpt as authoritative without retaining the source reference.
 
@@ -170,6 +252,10 @@ Given a `SourceSpan`, verify that its source/version exists and that its boundar
 
 The exact transport (HTTP, CLI, or in-process demo API) may follow the repository's existing conventions, but the documented contract and behaviors must remain transport-independent.
 
+### Atomic versioning requirements
+
+The versioned write operation accepts an `expected_source_version` and performs the expected-version check plus insertion of the next immutable version in one transaction. Persistence must enforce uniqueness of `(source_id, source_version)`. If the expected version is stale, or a concurrent revision wins the uniqueness race, the operation returns `409 VERSION_CONFLICT` (or an equivalent stable conflict code), persists no partial record, and leaves all prior versions unchanged. The resident test ID and language are inherited from the existing source and are not mutable through revision input.
+
 ## Error contract
 
 All rejected requests use a structured error response with:
@@ -178,7 +264,7 @@ All rejected requests use a structured error response with:
 - a human-readable `message`;
 - a `field` or `path` when the failure is tied to an input location.
 
-At minimum, the implementation should distinguish blank or invalid transcript input, invalid resident ID, unsupported input type, malformed request, source not found, version not found, and invalid source span.
+At minimum, the implementation should distinguish blank or invalid transcript input, invalid resident ID, unsupported input type, malformed request, source not found, version not found, invalid source span, and stale or concurrent version creation (`VERSION_CONFLICT`).
 
 Errors must not expose a partially persisted document and must not be used to silently coerce invalid input into a valid source.
 
@@ -198,6 +284,19 @@ Errors must not expose a partially persisted document and must not be used to si
 | AC-010 | Downstream components can consume the documented source contract. |
 | AC-011 | Audio input and multiple-resident processing are not supported. |
 | AC-012 | API validation and persistence tests run without calling an LLM. |
+
+## Requirement and evidence-integrity traceability
+
+| Requirement or invariant | Acceptance coverage |
+| --- | --- |
+| FR-01: one structured German transcript and one scalar resident test ID | AC-001, AC-004, AC-011; User Story 1 scenarios 1 and 3 |
+| Exact source text preservation | AC-005; User Story 1 scenario 4 |
+| Immutable `(source_id, source_version)` identity | AC-003, AC-006, AC-009; User Story 2 scenarios 1 and 3 |
+| Atomic version creation and stale-write rejection | User Story 2 scenario 2; AC-012 persistence/API test requirement |
+| Unicode scalar-value, inclusive/exclusive span semantics | AC-007, AC-008; User Story 3 scenarios 1 and 2 |
+| Source/version existence before evidence resolution | AC-007, AC-009; User Story 3 scenario 3 |
+| No silent cross-version evidence redirection | User Story 3 scenario 4 |
+| No LLM dependency for validation or persistence | AC-012; User Story 1 and 2 independent tests |
 
 ## Verification requirements
 
