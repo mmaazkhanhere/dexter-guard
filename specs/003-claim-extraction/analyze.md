@@ -2,7 +2,7 @@
 
 **Mode:** Read-only requirements analysis  
 **Artifacts reviewed:** `spec.md`, `data-model.md`, `clarify.md`, `plan.md`, `tasks.md`  
-**Result:** No unresolved internal conflicts, constitutional violations, or planning gaps remain after the remediation pass recorded below.
+**Result:** No unresolved internal contract conflicts remain after the remediation pass. Downstream verifier/UI contracts are external dependencies and are not invented by Spec 003.
 
 ## Consistency findings
 
@@ -45,13 +45,13 @@ The reviewer-owned checklist is intentionally not marked by this analysis. Its r
   earlier plan sentence names `EMPTY_RESULT_UNCERTAIN`; no new enum value was
   added. The bounded empty-result safeguard returns
   `INTERNAL_VALIDATION_ERROR` when it detects a possible assertion.
-- `implement.md` mentions a mandatory handoff event, while the normative data
-  model explicitly rejects asynchronous delivery/outbox scope. Typed persisted
-  results and `get_current_result()` are the handoff mechanism.
-- Specs 004, 006, and 008 currently contain no contracts in this repository.
-  Spec 003 therefore provides the typed handoff and feature-level synthetic
-  fixture/metric functions, but cannot validate a downstream verifier or
-  register a shared benchmark threshold that does not yet exist.
+- The normative data model rejects asynchronous delivery/outbox scope. The
+  typed handoff contract in `contracts/claim-handoff.md` and
+  `get_current_result()` are the handoff mechanism.
+- Specs 004, 006, and 008 currently contain no consumer contracts in this
+  repository. Spec 003 therefore provides its typed handoff contract and
+  feature-level synthetic fixture/metric functions, but does not invent or
+  validate downstream verifier/UI behavior or shared benchmark thresholds.
 
 ## Final requirement traceability
 

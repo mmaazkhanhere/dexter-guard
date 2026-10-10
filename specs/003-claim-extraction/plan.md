@@ -64,8 +64,8 @@ No transcript or evidence-system connector is introduced.
 3. Parse provider output as untrusted data.
 4. Validate result schema, claim uniqueness, required claim text, enum values, source spans, cue/value spans, numeric raw-text fidelity, and revision identity.
 5. Reject the whole result on invalid JSON, invalid invariants, or any mismatched location. Do not return partial claims.
-6. If candidate output is empty, run a bounded independent factual-assertion safeguard. Persist/return `EMPTY` only when it also finds none; otherwise return typed `EMPTY_RESULT_UNCERTAIN` failure.
-7. Transactionally persist the validated result, immutable evidence-source reference, and append-only extraction-run provenance with extractor/provider/model/prompt/schema versions. Make it the current extraction only for the exact revision/version policy.
+6. If candidate output is empty, run a bounded independent factual-assertion safeguard. Persist/return `EMPTY` only when it also finds none; otherwise return typed `INTERNAL_VALIDATION_ERROR` failure.
+7. Transactionally persist the validated result, immutable evidence-source reference, upstream validation-run ID, and append-only extraction-run provenance with extractor/provider/model/prompt/schema versions. Make it the current extraction only for the exact revision/version policy.
 8. Return the typed persisted result to callers. Spec 004 consumes it before a later workflow may treat the revision as verification-ready; this service does not call Spec 004 or assign an evidence verdict.
 
 ## Persistence model
@@ -75,7 +75,7 @@ Minimum logical records:
 | Record | Key fields |
 |---|---|
 | `note_revision` | `id`, single resident test ID, immutable synthetic UTF-8 body, body hash, revision number, language |
-| `claim_extraction_result` | `id`, `extraction_run_id`, `note_revision_id`, body hash, immutable evidence-source reference, extractor/provider/model/prompt/schema versions, discriminated status/error metadata, timestamps |
+| `claim_extraction_result` | `id`, `extraction_run_id`, `note_revision_id`, upstream validation-run ID, body hash, immutable evidence-source reference, extractor/provider/model/prompt/schema versions, discriminated status/error metadata, timestamps |
 | `claim` | `id`, result id, ordinal, category, semantic fields, spans, raw claim text |
 
 Use a SQLite transaction so a `FAILED` result does not leave claim rows and a successful result cannot point to a different body hash. Retain an append-only extraction-run record even for failures. Retain raw strings used for fidelity; normalized decimal values are supplementary.
@@ -103,6 +103,7 @@ The service interface—not this route—is the acceptance-test target.
 - Each `NumericValue.raw`, value span, and unit span match the note exactly; normalized decimals are decimal strings, not binary floats.
 - `FAILED` contains no claims and requires a typed error; `EMPTY` contains no claims and forbids an error.
 - Every `SUCCEEDED`/`EMPTY` result has an immutable source reference and is retrievable by typed service/persisted record for Spec 004.
+- Every `SUCCEEDED`/`EMPTY` result carries the exact upstream validation-run ID.
 - Contract contains no evidence verdict, source transcript, diagnostic result, or support/contradiction field.
 - Pydantic rejects invalid external/provider data before it enters the domain; FastAPI OpenAPI schema is versioned and contract-tested if exposed.
 

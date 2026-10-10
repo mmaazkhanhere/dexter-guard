@@ -63,7 +63,7 @@ T001–T003 foundation --> T004–T007 test-first contracts/fixtures
 
 - [x] T015 Run service acceptance in `tests/claim_extraction/test_service.py` for CLM-001–CLM-016 and failure paths; add API contract tests in `tests/claim_extraction/test_api.py` only if T014 applies. *(Depends on T012, T013, T014 if applicable; acceptance coverage is in `test_acceptance.py`.)*
 - [x] T016 [P] Verify synthetic-only fixtures and redacted telemetry in `tests/claim_extraction/test_observability.py`. *(Depends on T012, T013)*
-- [x] T017 Contribute Spec 003 fixtures and extraction metrics to `specs/008-evaluation.md` and its shared benchmark suite. *(Depends on T015, T016; bounded contribution recorded, shared threshold remains owner-controlled.)*
+- [x] T017 Contribute the versioned Spec 003 corpus, source/evidence annotations, denominator policy, and extraction metrics to `specs/008-evaluation.md`; shared benchmark registration and thresholds remain owner-controlled. *(Depends on T015, T016.)*
 - [x] T018 Conduct scope review in `specs/003-claim-extraction/converge.md`, confirming no source-evidence alignment, diagnosis, identity inference, or distributed delivery was introduced. *(Depends on T017)*
 - [x] T019 Update traceability in `specs/003-claim-extraction/analyze.md` and execute convergence review. *(Depends on T018)*
 
