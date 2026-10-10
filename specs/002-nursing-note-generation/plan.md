@@ -43,7 +43,7 @@ strict schema + limited generation-time guardrails
 5. **Import service** persists a supplied candidate and its `externalOrigin` against the same required evidence source, without depending on the generation service.
 6. **Downstream hand-off** exposes only `DRAFT` records; verification and approval remain downstream.
 
-The service operates on synthetic German data only. It records a validation-run ID, source text hash/normalization policy, model ID, prompt version, settings, schema version, and guardrail/ruleset versions. Provider calls have bounded timeouts, bounded retries, and idempotent run identifiers.
+The service operates on synthetic German data only. It records a validation-run ID, source text hash/normalization policy, model ID, prompt version, settings, schema version, and guardrail/ruleset versions. Provider calls have bounded timeouts, bounded retries, and idempotent run identifiers. Because Python cannot safely terminate an already-running provider thread, a timeout is terminal for the request and is never retried; completed provider failures may retry within the configured bound without overlap.
 
 ## API design
 
@@ -56,7 +56,7 @@ The service operates on synthetic German data only. It records a validation-run 
 
 ## Guardrail boundaries
 
-The service validates contract shape and deterministic properties of fixed fixtures. It can prove that referenced spans exist, identifiers resolve, values/units match anchored source text, and explicitly represented fields have expected values. It cannot generally prove that free German prose is semantically equivalent to a source or that no clinical inference is implied. Therefore:
+The service validates contract shape and deterministic properties of fixed fixtures. It can prove that referenced spans exist, identifiers resolve, values/units and explicitly represented temporal qualifiers match anchored source text, and generated fact anchors stay within one source sentence. It cannot generally prove that free German prose is semantically equivalent to a source or that no clinical inference is implied. Therefore:
 
 - validation success means **generation contract accepted**, never evidence-verified;
 - GEN-010 is a fixed prohibited-output regression guardrail, not diagnosis detection in the general case;
@@ -77,3 +77,7 @@ Persist a successful creation as one transaction: note revision, facts, provenan
 - No test may describe a generated note as evidence-verified merely because it passed Spec 002 validation.
 - Add a contract-test gate for invalid span offsets, unsupported resident identity, missing validation-run provenance, and retry idempotency.
 - Add an ADR for the Python/FastAPI/Pydantic/SQLite boundary and adapter trade-offs before implementation.
+
+## Repository mapping
+
+The repository's approved implementation stack is Python/FastAPI/Pydantic with SQLite for note persistence. The planned note components map to `src/nursing_notes/contracts.py`, `adapters.py`, `guardrails.py`, `service.py`, and `repository.py`; the HTTP routes are integrated in `src/source_ingestion/app.py`. The in-memory note repository remains an explicit deterministic test double. No TypeScript or competing persistence stack is introduced.

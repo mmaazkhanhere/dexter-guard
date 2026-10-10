@@ -65,9 +65,33 @@ def _status_for_error(error: SourceError) -> int:
     return status.HTTP_400_BAD_REQUEST
 
 
+def _status_for_note_error(error: Any) -> int:
+    code = error.code.value
+    if code == "NOTE_NOT_FOUND":
+        return status.HTTP_404_NOT_FOUND
+    if code == "NOTE_VERSION_CONFLICT":
+        return status.HTTP_409_CONFLICT
+    if code in {
+        "GENERATION_REJECTED",
+        "EMPTY_MODEL_OUTPUT",
+        "GENERATION_PROVIDER_UNAVAILABLE",
+        "GENERATION_PROVIDER_FAILURE",
+        "GENERATION_PROVIDER_TIMEOUT",
+    }:
+        return status.HTTP_422_UNPROCESSABLE_CONTENT
+    return status.HTTP_400_BAD_REQUEST
+
+
 def _error_response(error: SourceError) -> JSONResponse:
     return JSONResponse(
         status_code=_status_for_error(error),
+        content=error.payload().model_dump(exclude_none=True),
+    )
+
+
+def _note_error_response(error: Any) -> JSONResponse:
+    return JSONResponse(
+        status_code=_status_for_note_error(error),
         content=error.payload().model_dump(exclude_none=True),
     )
 
@@ -79,14 +103,27 @@ def _validation_error_response(error: RequestValidationError) -> JSONResponse:
     return _error_response(SourceError(ErrorCode.INVALID_REQUEST, "The request does not match the source contract.", field))
 
 
-def create_app(service: SourceIngestionService | None = None) -> FastAPI:
+def create_app(
+    service: SourceIngestionService | None = None,
+    note_service: Any | None = None,
+) -> FastAPI:
+    from nursing_notes.contracts import NoteResponse
+    from nursing_notes.errors import NoteError
+    from nursing_notes.service import NursingNoteService
+
     service = service or SourceIngestionService()
+    note_service = note_service or NursingNoteService(service)
     app = FastAPI(title="Source and Note Ingestion API", version="1.0.0")
     app.state.source_service = service
+    app.state.note_service = note_service
 
     @app.exception_handler(SourceError)
     async def handle_source_error(_: Request, error: SourceError) -> JSONResponse:
         return _error_response(error)
+
+    @app.exception_handler(NoteError)
+    async def handle_note_error(_: Request, error: NoteError) -> JSONResponse:
+        return _note_error_response(error)
 
     @app.exception_handler(RequestValidationError)
     async def handle_request_validation_error(_: Request, error: RequestValidationError) -> JSONResponse:
@@ -117,6 +154,24 @@ def create_app(service: SourceIngestionService | None = None) -> FastAPI:
     @app.post("/source-spans/resolve", response_model=ResolvedSourceSpan)
     async def resolve_source_span(request: Request) -> ResolvedSourceSpan:
         return service.resolve_span(await _json_object(request))
+
+    @app.post(
+        "/api/v1/notes/generate",
+        response_model=NoteResponse,
+        response_model_exclude_none=True,
+        status_code=status.HTTP_201_CREATED,
+    )
+    async def generate_nursing_note(request: Request) -> NoteResponse:
+        return note_service.generate(await _json_object(request))
+
+    @app.post(
+        "/api/v1/notes/import",
+        response_model=NoteResponse,
+        response_model_exclude_none=True,
+        status_code=status.HTTP_201_CREATED,
+    )
+    async def import_nursing_note(request: Request) -> NoteResponse:
+        return note_service.import_note(await _json_object(request))
 
     return app
 

@@ -18,6 +18,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/NoteResponse' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
         '404': { $ref: '#/components/responses/SourceNotFound' }
         '409': { $ref: '#/components/responses/SourceVersionConflict' }
         '422': { $ref: '#/components/responses/GenerationRejected' }
@@ -36,20 +37,46 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/NoteResponse' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
         '404': { $ref: '#/components/responses/SourceNotFound' }
         '409': { $ref: '#/components/responses/SourceVersionConflict' }
 components:
   responses:
-    SourceNotFound: { description: Source document or version does not exist }
-    SourceVersionConflict: { description: Requested version is not the exact resolvable evidence version }
-    GenerationRejected: { description: Provider output is malformed, schema-invalid, or fails a limited generation-time guardrail }
+    InvalidRequest:
+      description: Request is malformed or violates the note contract.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    SourceNotFound:
+      description: Source document or version does not exist.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    SourceVersionConflict:
+      description: Requested version conflicts with the exact evidence-source requirement.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    GenerationRejected:
+      description: Provider output is malformed, schema-invalid, unavailable, or fails a limited generation-time guardrail.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
   schemas:
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code: { type: string, minLength: 1 }
+        message: { type: string, minLength: 1 }
+        field: { type: string, minLength: 1 }
     SourceReference:
       type: object
       required: [sourceId, sourceVersion]
       properties:
         sourceId: { type: string, minLength: 1 }
-        sourceVersion: { type: string, minLength: 1 }
+        sourceVersion: { type: integer, minimum: 1 }
     GenerateRequest:
       allOf:
         - $ref: '#/components/schemas/SourceReference'
@@ -74,15 +101,49 @@ components:
             requestedBy: { type: string, minLength: 1 }
             facts:
               type: array
-              items: { $ref: '#/components/schemas/NursingFact' }
-    NursingFact:
+              items: { $ref: '#/components/schemas/CandidateNursingFact' }
+    SourceAnchor:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [sourceId, sourceVersion, start, end]
+          properties:
+            sourceId: { type: string, minLength: 1 }
+            sourceVersion: { type: integer, minimum: 1 }
+            start: { type: integer, minimum: 0 }
+            end: { type: integer, minimum: 1 }
+        - type: object
+          additionalProperties: false
+          required: [externalSystem, externalFactId]
+          properties:
+            externalSystem: { type: string, minLength: 1 }
+            externalFactId: { type: string, minLength: 1 }
+    CandidateNursingFact:
       type: object
-      required: [type, statement, residentSubject, provenance]
+      required: [type, statement, residentSubject, sourceAnchor, provenance]
       properties:
         type: { type: string, enum: [OBSERVATION, SYMPTOM, MEASUREMENT, ACTION] }
         statement: { type: string, minLength: 1 }
         residentSubject: { type: string, minLength: 1, description: Resident identifier or UNKNOWN }
-        sourceAnchor: { type: object, additionalProperties: true }
+        sourceAnchor: { $ref: '#/components/schemas/SourceAnchor' }
+        polarity: { type: string, enum: [AFFIRMED, NEGATED] }
+        certainty: { type: string, enum: [CERTAIN, UNCERTAIN] }
+        attribution: { type: string }
+        temporalQualifier: { type: string }
+        numericValue: { type: string }
+        unit: { type: string }
+        provenance: { type: string, enum: [GENERATED_FROM_SOURCE, EXTERNALLY_SUPPLIED] }
+    NursingFact:
+      type: object
+      required: [factId, noteId, revision, type, statement, residentSubject, sourceAnchor, provenance]
+      properties:
+        factId: { type: string, minLength: 1 }
+        noteId: { type: string, minLength: 1 }
+        revision: { type: integer, minimum: 1 }
+        type: { type: string, enum: [OBSERVATION, SYMPTOM, MEASUREMENT, ACTION] }
+        statement: { type: string, minLength: 1 }
+        residentSubject: { type: string, minLength: 1, description: Resident identifier or UNKNOWN }
+        sourceAnchor: { $ref: '#/components/schemas/SourceAnchor' }
         polarity: { type: string, enum: [AFFIRMED, NEGATED] }
         certainty: { type: string, enum: [CERTAIN, UNCERTAIN] }
         attribution: { type: string }
@@ -92,17 +153,27 @@ components:
         provenance: { type: string, enum: [GENERATED_FROM_SOURCE, EXTERNALLY_SUPPLIED] }
     NoteResponse:
       type: object
-      required: [noteId, revision, content, status, origin, sourceId, sourceVersion, validationRunId, facts]
+      required: [noteId, revision, content, status, origin, sourceId, sourceVersion, validationRunId, facts, schemaVersion, rulesetVersion, sourceTextHash, normalizationPolicy, createdAt, createdBy]
       properties:
         noteId: { type: string }
         revision: { type: integer, minimum: 1 }
+        previousRevisionId: { type: string, minLength: 1 }
         content: { type: string }
         status: { type: string, const: DRAFT }
         origin: { type: string, enum: [GENERATED, IMPORTED] }
         sourceId: { type: string }
-        sourceVersion: { type: string }
+        sourceVersion: { type: integer, minimum: 1 }
         validationRunId: { type: string }
         externalOrigin: { $ref: '#/components/schemas/ExternalOrigin' }
+        generationRunId: { type: string }
+        modelId: { type: string }
+        promptVersion: { type: string }
+        schemaVersion: { type: string, minLength: 1 }
+        rulesetVersion: { type: string, minLength: 1 }
+        sourceTextHash: { type: string, minLength: 1 }
+        normalizationPolicy: { type: string, minLength: 1 }
+        createdAt: { type: string, format: date-time }
+        createdBy: { type: string, minLength: 1 }
         facts:
           type: array
           items: { $ref: '#/components/schemas/NursingFact' }
