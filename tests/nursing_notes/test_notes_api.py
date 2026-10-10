@@ -38,6 +38,7 @@ def test_gen_001_valid_german_transcript_returns_editable_professional_draft(not
     assert body["sourceVersion"] == 1
     assert body["revision"] == 1
     assert body["facts"]
+    assert "externalOrigin" not in body
 
 
 def test_gen_002_preserves_numeric_values_and_units_and_rejects_changes(note_context):
@@ -232,6 +233,7 @@ def test_gen_007_import_preserves_exact_content_and_never_calls_generation(note_
     assert body["origin"] == "IMPORTED"
     assert body["externalOrigin"]["system"] == "pflege-system-test"
     assert body["facts"] == []
+    assert "generationRunId" not in body
     assert note_context["adapter"].invocation_count == 0
 
 
@@ -303,6 +305,7 @@ def test_gen_010_unsupported_diagnosis_is_rejected(note_context):
 
 def test_missing_source_version_and_invalid_payloads_do_not_persist(note_context):
     client = note_context["client"]
+    source = create_source(client, "Die Bewohnerin ruht.")
     missing = client.post(
         "/api/v1/notes/generate",
         json={"sourceId": "missing", "sourceVersion": 1, "requestedBy": "tester"},
@@ -313,6 +316,20 @@ def test_missing_source_version_and_invalid_payloads_do_not_persist(note_context
     invalid = client.post("/api/v1/notes/generate", json={"sourceId": "missing"})
     assert invalid.status_code == 400
     assert invalid.json()["code"] == "INVALID_NOTE_REQUEST"
+
+    mismatched = client.post(
+        "/api/v1/notes/generate",
+        json={"sourceId": source["source_id"], "sourceVersion": 2, "requestedBy": "tester"},
+    )
+    assert mismatched.status_code == 404
+    assert mismatched.json()["code"] == "SOURCE_VERSION_NOT_FOUND"
+
+    invalid_type = client.post(
+        "/api/v1/notes/generate",
+        json={"sourceId": "missing", "sourceVersion": "1", "requestedBy": "tester"},
+    )
+    assert invalid_type.status_code == 400
+    assert invalid_type.json()["code"] == "INVALID_NOTE_REQUEST"
     assert note_context["note_repository"].count() == 0
 
 
