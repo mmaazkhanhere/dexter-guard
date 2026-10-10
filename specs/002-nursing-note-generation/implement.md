@@ -28,7 +28,7 @@
 
 ## Verification record
 
-- `uv run pytest`: **56 passed**, 0 failed, 0 skipped.
+- `uv run pytest`: **59 passed**, 0 failed, 0 skipped.
 - `uv run python -m compileall -q src tests`: passed.
 - `notes-api.yaml` parsed successfully with PyYAML.
 - `git diff --check`: passed.
