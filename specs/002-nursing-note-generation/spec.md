@@ -24,6 +24,7 @@ This feature converts an existing German caregiver transcript into a professiona
 - Diagnosis, treatment recommendation, clinical evidence verification, claim classification, approval, or dashboards.
 - Fabricating missing observations, values, actors, dates, certainty, or source references.
 - Comprehensive semantic equivalence or clinical-inference judgment; those belong to downstream Specs 004 and 006.
+- Real patient or employee data, production integration, regulatory certification, and nursing-home software integration. The PoC uses synthetic German data only.
 
 FR-01 (source capture and storage) remains owned by Spec 001. This feature requires a resolvable `SourceDocument` and exact `sourceVersion`; it does not create either.
 
@@ -53,6 +54,8 @@ Every note revision shall contain a non-null evidence-source reference (`sourceI
 
 Each fact shall include its parent revision, type (`OBSERVATION`, `SYMPTOM`, `MEASUREMENT`, or `ACTION`), source anchor, readable statement, and any stated polarity, certainty, attribution, value, and unit. Absent source detail stays absent; conflicting source statements remain distinct facts.
 
+Facts are atomic: compound source statements are split when their parts can have different evidence outcomes. Each fact includes a resident subject identifier or explicit `UNKNOWN` state, temporal qualifier when stated, provenance reference, and the declared source-offset normalization policy. Source anchors are checked against the immutable source bytes/text for the validation run.
+
 The normative field definitions are in `data-model.md`; the normative HTTP interface is in `contracts/notes-api.yaml`.
 
 ## Acceptance scenarios
@@ -76,6 +79,7 @@ The normative field definitions are in `data-model.md`; the normative HTTP inter
 - **Source-reference integrity:** 100% of persisted generated and imported revisions contain a `sourceId` and `sourceVersion` that resolve to the exact immutable `SourceDocument` version used for the request. An unknown or mismatched version returns `404`/`409` and persists nothing.
 - **Import isolation:** Across the GEN-007 import test matrix, generation-adapter invocation count is exactly zero and every successful import has `origin=IMPORTED`, `status=DRAFT`, and a non-empty `externalOrigin` distinct from its evidence-source fields.
 - **Fixed semantic-regression coverage:** The suite contains at least one deterministic fixture each for negation, uncertainty, attribution, numeric value, unit, and unsupported diagnosis. For every fixture, the stated expected accept/reject outcome in the table above is asserted; the suite is not a claim of general semantic verification.
+- **Bidirectional fixture coverage:** The fixed fixture set includes one material source-span omission case and one draft-to-source mismatch case; each has an exact expected rejection or flagged outcome. This is a bounded generation guardrail, not comprehensive semantic verification.
 - **Draft-state safety:** 100% of successful creation responses have `status=DRAFT`; no response contains `VERIFIED` or `APPROVED`.
 
 ## Success criteria

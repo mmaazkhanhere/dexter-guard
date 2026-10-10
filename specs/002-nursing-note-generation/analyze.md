@@ -13,6 +13,7 @@
 | Tasks were not story-oriented | `tasks.md` groups independently testable US1 generation, US2 facts, and US3 import tasks, with scenario-specific tests and paths. |
 | Contracts were absent | `data-model.md` and `contracts/notes-api.yaml` are normative artifacts. |
 | Constitution reference was incorrect | All references use `.specify/memory/constitution.md`. |
+| Constitution stack/provenance obligations were missing | Plan now names Python/FastAPI/Pydantic/SQLite and covers resident identity, immutable spans, run/model/prompt provenance, synthetic-only data, observability, and ADR requirements. |
 
 ## Remaining gate
 

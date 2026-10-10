@@ -77,20 +77,22 @@ components:
               items: { $ref: '#/components/schemas/NursingFact' }
     NursingFact:
       type: object
-      required: [type, statement, provenance]
+      required: [type, statement, residentSubject, provenance]
       properties:
         type: { type: string, enum: [OBSERVATION, SYMPTOM, MEASUREMENT, ACTION] }
         statement: { type: string, minLength: 1 }
+        residentSubject: { type: string, minLength: 1, description: Resident identifier or UNKNOWN }
         sourceAnchor: { type: object, additionalProperties: true }
         polarity: { type: string, enum: [AFFIRMED, NEGATED] }
         certainty: { type: string, enum: [CERTAIN, UNCERTAIN] }
         attribution: { type: string }
+        temporalQualifier: { type: string }
         numericValue: { type: string }
         unit: { type: string }
         provenance: { type: string, enum: [GENERATED_FROM_SOURCE, EXTERNALLY_SUPPLIED] }
     NoteResponse:
       type: object
-      required: [noteId, revision, content, status, origin, sourceId, sourceVersion, facts]
+      required: [noteId, revision, content, status, origin, sourceId, sourceVersion, validationRunId, facts]
       properties:
         noteId: { type: string }
         revision: { type: integer, minimum: 1 }
@@ -99,6 +101,7 @@ components:
         origin: { type: string, enum: [GENERATED, IMPORTED] }
         sourceId: { type: string }
         sourceVersion: { type: string }
+        validationRunId: { type: string }
         externalOrigin: { $ref: '#/components/schemas/ExternalOrigin' }
         facts:
           type: array

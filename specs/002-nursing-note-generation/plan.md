@@ -2,7 +2,21 @@
 
 ## Constitution alignment
 
-This design is governed by `.specify/memory/constitution.md`. It introduces no independent approval or verification capability, keeps a source-of-truth reference on every verification-ready note, treats generated material as an editable draft, and uses tests as the acceptance evidence. The implementation must use the repository's constitution-approved runtime, validation, persistence, testing, and provider-adapter conventions; this feature does not introduce a competing technology stack.
+This design is governed by `.specify/memory/constitution.md`. It introduces no independent approval or verification capability, keeps a source-of-truth reference on every verification-ready note, treats generated material as an editable draft, and uses tests as the acceptance evidence.
+
+The mandated PoC stack is **Python, FastAPI, Pydantic, and SQLite**, with React and typed API clients for the review/editing UI. Business logic remains independent of FastAPI handlers; model and storage dependencies are injected behind adapters. PostgreSQL is not required for this feature and may only replace SQLite behind the repository interface.
+
+### Constitution Check
+
+| Principle | Plan response |
+| --- | --- |
+| I. Evidence fidelity | Immutable source/version references, source-span integrity, atomic facts, resident identity/unknown, polarity, certainty, attribution, temporal metadata, and limited two-way fixture checks. |
+| II. Human authority | All results are `DRAFT`; no approval, repair, or silent overwrite; revisions remain immutable. |
+| III. Spec-first | Stable FR/GEN identifiers, normative data/API contracts, acceptance thresholds, and this traceable task plan precede implementation. |
+| IV. Contract-first | Pydantic models and OpenAPI define payloads; generation, extraction, guardrails, persistence, and presentation have separate interfaces; deterministic rules remain code, not LLM judgments. |
+| V. Evaluation gate | Synthetic fixture coverage is required here; the 100-scenario benchmark and release thresholds remain a dependency of `008-evaluation.md`. |
+| VI. Privacy/provenance | Synthetic data only, append-only logical history, source/revision/run/model/prompt/ruleset provenance, and no secrets/content in telemetry. |
+| VII. Observable failure | Typed failures, timeouts, bounded retries, idempotent run IDs, warning/rejection metrics, and accurate pending/failed states are required. |
 
 ## Architecture
 
@@ -28,6 +42,8 @@ strict schema + limited generation-time guardrails
 4. **Note repository** persists revision lineage, evidence-source fields, origin, content, and facts atomically.
 5. **Import service** persists a supplied candidate and its `externalOrigin` against the same required evidence source, without depending on the generation service.
 6. **Downstream hand-off** exposes only `DRAFT` records; verification and approval remain downstream.
+
+The service operates on synthetic German data only. It records a validation-run ID, source text hash/normalization policy, model ID, prompt version, settings, schema version, and guardrail/ruleset versions. Provider calls have bounded timeouts, bounded retries, and idempotent run identifiers.
 
 ## API design
 
@@ -59,3 +75,5 @@ Persist a successful creation as one transaction: note revision, facts, provenan
 - Persistence tests assert source-version integrity, atomic rollback, origin separation, and immutable revision lineage.
 - Import tests spy on the generation adapter and require zero invocations.
 - No test may describe a generated note as evidence-verified merely because it passed Spec 002 validation.
+- Add a contract-test gate for invalid span offsets, unsupported resident identity, missing validation-run provenance, and retry idempotency.
+- Add an ADR for the Python/FastAPI/Pydantic/SQLite boundary and adapter trade-offs before implementation.

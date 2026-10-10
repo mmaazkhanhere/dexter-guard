@@ -8,6 +8,7 @@
 - [ ] T002 [P] Validate and finalize `specs/002-nursing-note-generation/data-model.md` and `specs/002-nursing-note-generation/contracts/notes-api.yaml` against the Spec 001 `SourceDocument` contract.
 - [ ] T003 Create runtime request/result schemas in `src/features/notes/contracts.ts` from `contracts/notes-api.yaml`.
 - [ ] T004 Create immutable revision and fact persistence/migration in `src/features/notes/note-repository.ts` and the repository migration directory; enforce non-null `sourceId` and `sourceVersion`.
+- [ ] T004a [P] Create the Constitution-required ADR in `docs/adr/002-nursing-note-generation-boundaries.md` covering Python/FastAPI/Pydantic/SQLite and adapter trade-offs.
 
 ## User story 1 — Generate an editable draft (FR-02, GEN-001, GEN-009)
 
@@ -28,6 +29,7 @@
 - [ ] T012 [US2] Persist facts atomically with a generated revision in `src/features/notes/note-repository.ts`.
 - [ ] T013 [US2] Add GEN-002–GEN-006 fixture regressions in `test/features/notes/fidelity-fixtures.spec.ts`.
 - [ ] T014 [US2] Add GEN-008 rollback and GEN-010 limited-guardrail regressions in `test/features/notes/generation-failure.spec.ts`.
+- [ ] T014a [US2] Add bidirectional omission/mismatch fixtures, resident `UNKNOWN` handling, source-offset normalization, and validation-run provenance tests in `test/features/notes/source-integrity.spec.ts`.
 
 ## User story 3 — Import an external candidate against its evidence source (FR-04, GEN-007)
 
@@ -43,3 +45,4 @@
 - [ ] T019 Implement revision editing with immutable predecessor linkage in `src/features/notes/note-service.ts` and test it in `test/features/notes/note-revisions.spec.ts`.
 - [ ] T020 Run contract, focused fixture, migration, type/lint, and repository-required test suites; record results in `specs/002-nursing-note-generation/implement.md`.
 - [ ] T021 Re-run `analyze.md`, then `converge.md`; append any discovered dependency-ordered gaps to this file.
+- [ ] T022 Run the synthetic-only observability tests for timeout, bounded retry, idempotent run ID, rejection metrics, and content-free telemetry; link the full 100-scenario evaluation to `008-evaluation.md` rather than claiming it here.
