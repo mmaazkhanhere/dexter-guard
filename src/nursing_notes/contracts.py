@@ -59,9 +59,11 @@ class SourceAnchor(_Contract):
     def require_source_or_external_reference(self) -> "SourceAnchor":
         source_fields = (self.source_id, self.source_version, self.start, self.end)
         has_source = all(value is not None for value in source_fields)
-        has_external = self.external_system is not None or self.external_fact_id is not None
+        has_external = self.external_system is not None and self.external_fact_id is not None
         if not has_source and not has_external:
             raise ValueError("sourceAnchor must identify a source span or external provenance")
+        if (self.external_system is None) != (self.external_fact_id is None):
+            raise ValueError("external provenance requires both externalSystem and externalFactId")
         if any(value is not None for value in source_fields) and not has_source:
             raise ValueError("sourceAnchor source fields must be supplied together")
         if self.start is not None and self.end is not None and self.start >= self.end:

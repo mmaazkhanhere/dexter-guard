@@ -71,6 +71,52 @@ def test_gen_002_preserves_numeric_values_and_units_and_rejects_changes(note_con
     assert rejected.json()["code"] == "GENERATION_REJECTED"
     assert note_context["note_repository"].count() == 1
 
+    changed_unit = fact(source_model, text, fact_type="MEASUREMENT", numericValue="37,5", unit="°F")
+    note_context["adapter"].factory = result_factory(changed_unit)
+    rejected_unit = client.post(
+        "/api/v1/notes/generate",
+        json={"sourceId": source["source_id"], "sourceVersion": 1, "requestedBy": "tester"},
+    )
+    assert rejected_unit.status_code == 422
+    assert rejected_unit.json()["code"] == "GENERATION_REJECTED"
+    assert note_context["note_repository"].count() == 1
+
+
+def test_bidirectional_fixture_rejects_material_source_span_omission(note_context):
+    client = note_context["client"]
+    text = "Die Bewohnerin ruht. Die Haut ist trocken."
+    source = create_source(client, text)
+    source_model = note_context["source_service"].get_source_version(source["source_id"], 1)
+    omitted = fact(source_model, "Die Bewohnerin ruht.")
+    note_context["adapter"].factory = result_factory(omitted)
+
+    response = client.post(
+        "/api/v1/notes/generate",
+        json={"sourceId": source["source_id"], "sourceVersion": 1, "requestedBy": "tester"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "GENERATION_REJECTED"
+    assert note_context["note_repository"].count() == 0
+
+
+def test_bidirectional_fixture_rejects_draft_to_source_mismatch(note_context):
+    client = note_context["client"]
+    text = "Die Bewohnerin berichtet über Schwindel."
+    source = create_source(client, text)
+    source_model = note_context["source_service"].get_source_version(source["source_id"], 1)
+    candidate = fact(source_model, text)
+    note_context["adapter"].factory = result_factory(candidate, content="Pflegedokumentation: Schmerzen.")
+
+    response = client.post(
+        "/api/v1/notes/generate",
+        json={"sourceId": source["source_id"], "sourceVersion": 1, "requestedBy": "tester"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "GENERATION_REJECTED"
+    assert note_context["note_repository"].count() == 0
+
 
 def test_gen_003_negation_is_not_reversed(note_context):
     client = note_context["client"]

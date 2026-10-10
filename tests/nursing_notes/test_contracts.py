@@ -38,3 +38,17 @@ def test_runtime_fact_contract_keeps_unknown_resident_explicit():
         provenance="EXTERNALLY_SUPPLIED",
     )
     assert fact.resident_subject == "UNKNOWN"
+
+
+def test_source_anchor_requires_complete_external_provenance():
+    try:
+        CandidateNursingFact(
+            type="OBSERVATION",
+            statement="Unklare Beobachtung.",
+            residentSubject="UNKNOWN",
+            sourceAnchor={"externalSystem": "synthetic-import"},
+            provenance="EXTERNALLY_SUPPLIED",
+        )
+    except ValueError:
+        return
+    raise AssertionError("partial external provenance must be rejected")

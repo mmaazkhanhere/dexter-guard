@@ -49,7 +49,30 @@ class GenerationGuardrails:
 
         for index, fact in enumerate(result.facts):
             self._validate_fact(fact, source, index)
+        self._validate_material_source_coverage(result, source)
+        self._validate_draft_alignment(result)
         self._reject_new_clinical_conclusions(result, source)
+
+    def _validate_material_source_coverage(self, result: GenerationResult, source: Any) -> None:
+        """Reject the bounded fixture case where a material source sentence is omitted."""
+        ranges = _material_sentence_ranges(source.transcript_text)
+        for start, end in ranges:
+            if not any(
+                fact.source_anchor.start is not None
+                and fact.source_anchor.end is not None
+                and fact.source_anchor.start < end
+                and start < fact.source_anchor.end
+                for fact in result.facts
+            ):
+                _reject("A material source sentence has no candidate fact anchor.", "facts")
+
+    @staticmethod
+    def _validate_draft_alignment(result: GenerationResult) -> None:
+        """Require each structured fact to be represented in the candidate prose."""
+        content_tokens = _tokens(result.content)
+        for index, fact in enumerate(result.facts):
+            if not _tokens(fact.statement).intersection(content_tokens):
+                _reject("The candidate prose does not represent a structured fact.", f"facts.{index}.statement")
 
     def _validate_fact(self, fact: CandidateNursingFact, source: Any, index: int) -> None:
         anchor = fact.source_anchor
@@ -109,3 +132,14 @@ class GenerationGuardrails:
             match = _UNSUPPORTED_DIAGNOSIS.search(candidate)
             if match and match.group(0).casefold() not in source_text:
                 _reject("The generated output adds an unsupported diagnosis or clinical conclusion.", "content")
+
+
+def _material_sentence_ranges(text: str) -> list[tuple[int, int]]:
+    ranges: list[tuple[int, int]] = []
+    sentence_pattern = re.compile(r"[^.!?\r\n]+(?:[.!?]|$)")
+    for match in sentence_pattern.finditer(text):
+        start = match.start()
+        end = match.end()
+        if len(_tokens(text[start:end])) >= 2:
+            ranges.append((start, end))
+    return ranges
