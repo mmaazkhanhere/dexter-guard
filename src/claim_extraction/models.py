@@ -214,6 +214,7 @@ class _ResultBase(_Contract):
 class _SuccessfulBase(_ResultBase):
     note_revision_id: StrictStr = Field(alias="noteRevisionId", min_length=1)
     note_body_hash: StrictStr = Field(alias="noteBodyHash", min_length=1)
+    validation_run_id: StrictStr = Field(alias="validationRunId", min_length=1)
     evidence_source_reference: EvidenceSourceReference = Field(alias="evidenceSourceReference")
 
 
@@ -231,6 +232,7 @@ class ExtractionFailed(_ResultBase):
     status: Literal[ExtractionStatus.FAILED] = ExtractionStatus.FAILED
     note_revision_id: StrictStr | None = Field(default=None, alias="noteRevisionId", min_length=1)
     note_body_hash: StrictStr | None = Field(default=None, alias="noteBodyHash", min_length=1)
+    validation_run_id: StrictStr | None = Field(default=None, alias="validationRunId", min_length=1)
     claims: tuple[Claim, ...] = Field(default_factory=tuple, max_length=0)
     error: ExtractionError
 

@@ -50,4 +50,5 @@ def test_revision_reader_adapts_existing_note_identity_and_carries_source_metada
     context = NursingNoteRevisionReader(note_repository, source_service).read("note-1:r1")
     assert context.note_revision_id == "note-1:r1"
     assert context.resident_test_id == "resident-1"
+    assert context.validation_run_id == "validation-1"
     assert context.source_reference.source_id == "source-1"

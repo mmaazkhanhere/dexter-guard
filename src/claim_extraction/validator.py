@@ -24,6 +24,26 @@ class InvalidClaimSpanError(ClaimValidationError):
 
 _NUMBER_PATTERN = re.compile(r"[-+]?\d+(?:[.,]\d+)?")
 _APPROXIMATION_PATTERN = re.compile(r"(?:\bca\.?\b|\betwa\b|\bungef[aä]hr\b|\bcirca\b|~)", re.IGNORECASE)
+_NEGATION_PATTERN = re.compile(
+    r"\b(?:kein(?:e|en|em|er|es)?|nicht|ohne|verneint(?:e|et)?|nein)\b",
+    re.IGNORECASE,
+)
+_HEDGING_PATTERN = re.compile(
+    r"\b(?:vielleicht|möglicherweise|vermutlich|wahrscheinlich|eventuell|scheinbar|anscheinend)\b",
+    re.IGNORECASE,
+)
+_APPROXIMATION_ONLY_PATTERN = re.compile(
+    r"(?:\bca\.?\b|\betwa\b|\bungef[aä]hr\b|\bcirca\b|~)",
+    re.IGNORECASE,
+)
+_CARE_RECIPIENT_PATTERN = re.compile(
+    r"\b(?:bewohner(?:in|en)?|resident(?:in)?|patient(?:in)?|selbst)\b|\b(?:berichtet|gibt an|äußert)",
+    re.IGNORECASE,
+)
+_CAREGIVER_PATTERN = re.compile(
+    r"\b(?:pflegekraft|pflegepersonal|betreuung|mitarbeiter(?:in)?|schwester)\b|\b(?:beobachtet|versorgt|misst)",
+    re.IGNORECASE,
+)
 
 
 def _context_value(context: NoteRevisionContext | Any, name: str) -> Any:
@@ -79,9 +99,46 @@ def _parse_claim(raw: object, context: NoteRevisionContext | Any, ordinal: int) 
     _validate_nested_span(claim.certainty_cue, claim.statement_span, note_text, "certaintyCue")
     _validate_nested_span(claim.attribution_span, claim.statement_span, note_text, "attributionSpan")
     _validate_nested_span(claim.temporal_span, claim.statement_span, note_text, "temporalSpan")
+    _validate_semantics(claim)
     for numeric in claim.numeric_values:
         _validate_numeric(numeric, claim.statement_span, note_text)
     return claim
+
+
+def _validate_semantics(claim: Claim) -> None:
+    statement = claim.statement_span.text
+    folded = statement.casefold()
+    if claim.polarity.value == "NEGATED":
+        if claim.negation_cue is None or _NEGATION_PATTERN.search(claim.negation_cue.text) is None:
+            raise ClaimValidationError("NEGATED claims require an explicit negation cue")
+    elif _NEGATION_PATTERN.search(statement):
+        raise ClaimValidationError("explicit negation cannot be represented as AFFIRMED")
+
+    if claim.certainty.value == "CERTAIN" and _HEDGING_PATTERN.search(statement):
+        raise ClaimValidationError("explicit hedging cannot be represented as CERTAIN")
+    if claim.certainty.value in {"UNCERTAIN", "POSSIBLE"}:
+        if claim.certainty_cue is None or (
+            _HEDGING_PATTERN.search(claim.certainty_cue.text) is None
+            and _APPROXIMATION_ONLY_PATTERN.search(claim.certainty_cue.text) is None
+        ):
+            raise ClaimValidationError("non-certain claims require an explicit uncertainty or approximation cue")
+
+    if claim.attribution.value == "CARE_RECIPIENT":
+        if claim.attribution_span is None or _CARE_RECIPIENT_PATTERN.search(claim.attribution_span.text) is None:
+            raise ClaimValidationError("CARE_RECIPIENT attribution requires a resident-reported source cue")
+    if claim.attribution.value == "CAREGIVER":
+        if claim.attribution_span is None or _CAREGIVER_PATTERN.search(claim.attribution_span.text) is None:
+            raise ClaimValidationError("CAREGIVER attribution requires a caregiver-observed source cue")
+
+    if claim.medication is not None:
+        for label, value in (
+            ("medication.name", claim.medication.name),
+            ("medication.doseRaw", claim.medication.dose_raw),
+            ("medication.routeRaw", claim.medication.route_raw),
+            ("medication.administrationTemporalText", claim.medication.administration_temporal_text),
+        ):
+            if value is not None and value.casefold() not in folded:
+                raise ClaimValidationError(f"{label} must be directly stated within statementSpan")
 
 
 def _validate_numeric(numeric: NumericValue, statement: TextSpan, note_text: str) -> None:

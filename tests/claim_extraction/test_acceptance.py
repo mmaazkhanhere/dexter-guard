@@ -164,7 +164,8 @@ def test_clm_009_extracts_conclusion_without_evidence_status() -> None:
 def test_clm_010_preserves_report_negation_without_splitting_away_context() -> None:
     note = "Bewohnerin berichtet keine Schmerzen beim Transfer."
     attr_text = "Bewohnerin berichtet"
-    result, _ = _service(note, {"claims": [_claim(note, "c1", "SYMPTOM", polarity="NEGATED", negation=(22, 27), attribution="CARE_RECIPIENT", attribution_text=(attr_text, 0, len(attr_text)))]})
+    negation_start = note.index("keine")
+    result, _ = _service(note, {"claims": [_claim(note, "c1", "SYMPTOM", polarity="NEGATED", negation=(negation_start, negation_start + len("keine")), attribution="CARE_RECIPIENT", attribution_text=(attr_text, 0, len(attr_text)))]})
     assert result.claims[0].polarity.value == "NEGATED"
     assert result.claims[0].attribution.value == "CARE_RECIPIENT"
 
@@ -238,3 +239,43 @@ def test_clm_015_missing_resident_and_clm_016_timeout_are_typed_failures() -> No
     assert result.status is ExtractionStatus.FAILED
     assert result.error.code.value == "PROVIDER_TIMEOUT"
     assert provider.calls == 2
+
+
+def test_semantic_guard_rejects_affirmed_negation_and_certain_hedging() -> None:
+    note = "Keine Schmerzen."
+    result, _ = _service(note, {"claims": [_claim(note, "c1", "SYMPTOM", polarity="AFFIRMED")]})
+    assert result.status is ExtractionStatus.FAILED
+    assert result.error.code.value == "INVALID_SCHEMA"
+
+    note = "Vermutlich Schwindel."
+    result, _ = _service(note, {"claims": [_claim(note, "c1", "SYMPTOM")]})
+    assert result.status is ExtractionStatus.FAILED
+    assert result.error.code.value == "INVALID_SCHEMA"
+
+
+def test_semantic_guard_rejects_mismatched_attribution_and_invented_medication_details() -> None:
+    note = "Pflegekraft beobachtet Husten."
+    result, _ = _service(
+        note,
+        {
+            "claims": [
+                _claim(
+                    note,
+                    "c1",
+                    "OBSERVATION",
+                    attribution="CARE_RECIPIENT",
+                    attribution_text=("Pflegekraft beobachtet", 0, len("Pflegekraft beobachtet")),
+                )
+            ]
+        },
+    )
+    assert result.status is ExtractionStatus.FAILED
+    assert result.error.code.value == "INVALID_SCHEMA"
+
+    note = "Metoprolol verabreicht."
+    result, _ = _service(
+        note,
+        {"claims": [_claim(note, "c1", "MEDICATION", medication={"name": "Aspirin"})]},
+    )
+    assert result.status is ExtractionStatus.FAILED
+    assert result.error.code.value == "INVALID_SCHEMA"

@@ -19,6 +19,7 @@ class Context:
     note_revision_id: str = NOTE_ID
     note_body: str = NOTE
     note_body_hash: str = hashlib.sha256(NOTE.encode("utf-8")).hexdigest()
+    validation_run_id: str = "validation-1"
     resident_test_id: str = "resident-1"
     language: str = "de-DE"
     synthetic: bool = True
@@ -129,6 +130,7 @@ def test_service_extracts_atomic_claims_and_persists_provenance() -> None:
     assert result.claims[1].numeric_values[0].raw == "etwa 300"
     assert result.claims[1].numeric_values[0].normalized_decimal == 300
     assert result.evidence_source_reference.source_id == "source-1"
+    assert result.validation_run_id == "validation-1"
 
 
 @pytest.mark.parametrize(
