@@ -169,7 +169,7 @@ ExtractionFailed {
   outputSchemaVersion: string,
   claims: [],
   error: {
-    code: "MALFORMED_PROVIDER_OUTPUT" | "INVALID_SCHEMA" | "INVALID_SPAN" | "REVISION_NOT_FOUND" | "REVISION_MISMATCH" | "UNSUPPORTED_LANGUAGE" | "NON_SYNTHETIC_INPUT" | "PROVIDER_TIMEOUT" | "PROVIDER_UNAVAILABLE" | "INTERNAL_VALIDATION_ERROR",
+    code: "MALFORMED_PROVIDER_OUTPUT" | "INVALID_SCHEMA" | "INVALID_SPAN" | "REVISION_NOT_FOUND" | "REVISION_MISMATCH" | "UNSUPPORTED_LANGUAGE" | "NON_SYNTHETIC_INPUT" | "REQUEST_TOO_LARGE" | "PROVIDER_TIMEOUT" | "PROVIDER_UNAVAILABLE" | "INTERNAL_VALIDATION_ERROR",
     message: string,
     retryable: boolean
   },
@@ -182,6 +182,8 @@ ExtractionFailed {
 `validationRunId` is idempotent for one extraction attempt and is retained in the append-only logical history with its version metadata, timestamps, status, and revision/body-hash reference. These fields are provenance metadata, not source-evidence references or verification verdicts.
 
 `evidenceSourceReference` is copied from the immutable note-revision metadata and is required for every successful/empty result. It identifies the transcript version that Spec 004 must use; it does not assert that any claim is supported.
+
+The normative field definitions and persistence invariants are in `data-model.md`. `spec.md` remains authoritative for feature behavior and acceptance conditions.
 
 ## Functional requirements
 

@@ -6,7 +6,7 @@ Implementation has **not** been started by this specification-artifact task. Thi
 
 ## Mandatory preflight
 
-1. Read the AI Nursing Documentation Reliability Engine Constitution v1.0.0 and these artifacts: `spec.md`, `clarify.md`, `plan.md`, `tasks.md`, and `analyze.md`.
+1. Read the AI Nursing Documentation Reliability Engine Constitution v1.0.0 and these artifacts: `spec.md`, `data-model.md`, `clarify.md`, `plan.md`, `tasks.md`, and `analyze.md`.
 2. Read `checklist.md` without modifying it.
 3. If any reviewer-owned checkbox is unchecked, ask the reviewer/user whether to proceed. Do not treat unreviewed requirements quality as approval and do not change checkboxes.
 4. Confirm the Python/FastAPI/Pydantic/SQLite stack and update only implementation details consistent with the constitution; create an ADR for a material cross-component trade-off and do not broaden feature scope.
