@@ -18,6 +18,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/NoteResponse' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
         '404': { $ref: '#/components/responses/SourceNotFound' }
         '409': { $ref: '#/components/responses/SourceVersionConflict' }
         '422': { $ref: '#/components/responses/GenerationRejected' }
@@ -36,20 +37,46 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/NoteResponse' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
         '404': { $ref: '#/components/responses/SourceNotFound' }
         '409': { $ref: '#/components/responses/SourceVersionConflict' }
 components:
   responses:
-    SourceNotFound: { description: Source document or version does not exist }
-    SourceVersionConflict: { description: Requested version is not the exact resolvable evidence version }
-    GenerationRejected: { description: Provider output is malformed, schema-invalid, or fails a limited generation-time guardrail }
+    InvalidRequest:
+      description: Request is malformed or violates the note contract.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    SourceNotFound:
+      description: Source document or version does not exist.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    SourceVersionConflict:
+      description: Requested version conflicts with the exact evidence-source requirement.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    GenerationRejected:
+      description: Provider output is malformed, schema-invalid, unavailable, or fails a limited generation-time guardrail.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
   schemas:
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code: { type: string, minLength: 1 }
+        message: { type: string, minLength: 1 }
+        field: { type: string, minLength: 1 }
     SourceReference:
       type: object
       required: [sourceId, sourceVersion]
       properties:
         sourceId: { type: string, minLength: 1 }
-        sourceVersion: { type: string, minLength: 1 }
+        sourceVersion: { type: integer, minimum: 1 }
     GenerateRequest:
       allOf:
         - $ref: '#/components/schemas/SourceReference'
@@ -132,11 +159,12 @@ components:
       properties:
         noteId: { type: string }
         revision: { type: integer, minimum: 1 }
+        previousRevisionId: { type: string, minLength: 1 }
         content: { type: string }
         status: { type: string, const: DRAFT }
         origin: { type: string, enum: [GENERATED, IMPORTED] }
         sourceId: { type: string }
-        sourceVersion: { type: string }
+        sourceVersion: { type: integer, minimum: 1 }
         validationRunId: { type: string }
         externalOrigin: { $ref: '#/components/schemas/ExternalOrigin' }
         generationRunId: { type: string }

@@ -23,6 +23,10 @@ def test_notes_openapi_contract_declares_candidate_and_persisted_fact_shapes():
     ]
     assert "factId" in schemas["NursingFact"]["required"]
     assert schemas["NoteResponse"]["properties"]["status"]["const"] == "DRAFT"
+    assert schemas["SourceReference"]["properties"]["sourceVersion"]["type"] == "integer"
+    assert schemas["NoteResponse"]["properties"]["sourceVersion"]["type"] == "integer"
+    assert "previousRevisionId" in schemas["NoteResponse"]["properties"]
+    assert "ErrorResponse" in schemas
 
 
 def test_runtime_fact_contract_keeps_unknown_resident_explicit():

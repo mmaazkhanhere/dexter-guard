@@ -158,6 +158,7 @@ def create_app(
     @app.post(
         "/api/v1/notes/generate",
         response_model=NoteResponse,
+        response_model_exclude_none=True,
         status_code=status.HTTP_201_CREATED,
     )
     async def generate_nursing_note(request: Request) -> NoteResponse:
@@ -166,6 +167,7 @@ def create_app(
     @app.post(
         "/api/v1/notes/import",
         response_model=NoteResponse,
+        response_model_exclude_none=True,
         status_code=status.HTTP_201_CREATED,
     )
     async def import_nursing_note(request: Request) -> NoteResponse:
