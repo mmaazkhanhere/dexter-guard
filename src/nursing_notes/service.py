@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as ProviderTimeoutError
 from collections.abc import Callable, Mapping
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from pydantic import ValidationError
@@ -21,7 +24,11 @@ from .contracts import (
 )
 from .errors import NoteError, NoteErrorCode
 from .guardrails import GenerationGuardrails
+from .observability import GenerationMetrics
 from .repository import InMemoryNoteRepository, NoteRepository
+
+if TYPE_CHECKING:
+    from source_ingestion.contracts import SourceDocument
 
 
 class NursingNoteService:
@@ -36,13 +43,23 @@ class NursingNoteService:
         guardrails: GenerationGuardrails | None = None,
         id_factory: Callable[[], str] | None = None,
         clock: Callable[[], datetime] | None = None,
+        provider_timeout_seconds: float = 30.0,
+        max_provider_attempts: int = 2,
+        metrics: GenerationMetrics | None = None,
     ) -> None:
+        if provider_timeout_seconds <= 0:
+            raise ValueError("provider_timeout_seconds must be positive")
+        if max_provider_attempts < 1:
+            raise ValueError("max_provider_attempts must be positive")
         self.source_service = source_service
         self.repository = repository or InMemoryNoteRepository()
         self.generation_adapter = generation_adapter or UnavailableGenerationAdapter()
         self.guardrails = guardrails or GenerationGuardrails()
         self._id_factory = id_factory or (lambda: str(uuid4()))
         self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self.provider_timeout_seconds = provider_timeout_seconds
+        self.max_provider_attempts = max_provider_attempts
+        self.metrics = metrics or GenerationMetrics()
 
     def generate(self, payload: GenerateRequest | Mapping[str, object]) -> NoteResponse:
         request = self._parse_request(payload, GenerateRequest, "generate")
@@ -50,14 +67,16 @@ class NursingNoteService:
         validation_run_id = f"validation-{self._id_factory()}"
         generation_run_id = f"generation-{self._id_factory()}"
         try:
-            raw_result = self.generation_adapter.generate(source)
-        except NoteError:
+            raw_result = self._invoke_provider(source, generation_run_id)
+            result = self._validate_generation_result(raw_result)
+            self.guardrails.validate(result, source)
+        except NoteError as error:
+            if error.code in {
+                NoteErrorCode.GENERATION_REJECTED,
+                NoteErrorCode.EMPTY_MODEL_OUTPUT,
+            }:
+                self.metrics.increment("generation_rejections")
             raise
-        except Exception as error:  # provider-specific failures must not leak or persist
-            raise NoteError(NoteErrorCode.GENERATION_PROVIDER_FAILURE, "The generation provider failed.") from error
-
-        result = self._validate_generation_result(raw_result)
-        self.guardrails.validate(result, source)
         note_id = f"note-{self._id_factory()}"
         facts = self._persisted_facts(
             result.facts,
@@ -75,7 +94,7 @@ class NursingNoteService:
             sourceVersion=source.source_version,
             validationRunId=validation_run_id,
             facts=tuple(facts),
-            generationRunId=result.generation_run_id or generation_run_id,
+            generationRunId=generation_run_id,
             modelId=result.model_id,
             promptVersion=result.prompt_version,
             schemaVersion=result.schema_version or self.guardrails.schema_version,
@@ -85,10 +104,13 @@ class NursingNoteService:
             createdAt=now,
             createdBy=request.requested_by,
         )
-        return self.repository.create(record).response()
+        response = self.repository.create(record).response()
+        self.metrics.increment("successful_generations")
+        return response
 
     def import_note(self, payload: ImportRequest | Mapping[str, object]) -> NoteResponse:
         request = self._parse_request(payload, ImportRequest, "import")
+        self.metrics.increment("imports")
         source = self._resolve_source(request.source_id, request.source_version)
         self._validate_external_facts(request.facts, source)
         note_id = f"note-{self._id_factory()}"
@@ -145,6 +167,42 @@ class NursingNoteService:
 
     def _resolve_source(self, source_id: str, source_version: int):
         return self.source_service.get_source_version(source_id, source_version)
+
+    def _invoke_provider(self, source: object, generation_run_id: str) -> object:
+        """Invoke a provider with bounded attempts and timeout using one stable run ID."""
+        last_error: NoteError | None = None
+        for _ in range(self.max_provider_attempts):
+            self.metrics.increment("provider_attempts")
+            executor = ThreadPoolExecutor(max_workers=1)
+            future = executor.submit(self._call_adapter, source, generation_run_id)
+            try:
+                return future.result(timeout=self.provider_timeout_seconds)
+            except ProviderTimeoutError as error:
+                future.cancel()
+                last_error = NoteError(
+                    NoteErrorCode.GENERATION_PROVIDER_TIMEOUT,
+                    "The generation provider exceeded its configured timeout.",
+                )
+            except NoteError as error:
+                last_error = error
+            except Exception as error:  # provider-specific failures must not leak
+                last_error = NoteError(
+                    NoteErrorCode.GENERATION_PROVIDER_FAILURE,
+                    "The generation provider failed.",
+                )
+            finally:
+                executor.shutdown(wait=False, cancel_futures=True)
+        self.metrics.increment("provider_failures")
+        if last_error is not None:
+            raise last_error
+        raise NoteError(NoteErrorCode.GENERATION_PROVIDER_FAILURE, "The generation provider failed.")
+
+    def _call_adapter(self, source: object, generation_run_id: str) -> object:
+        method = self.generation_adapter.generate
+        parameters = inspect.signature(method).parameters
+        if "generation_run_id" in parameters:
+            return method(source, generation_run_id=generation_run_id)
+        return method(source)
 
     @staticmethod
     def _parse_request(payload: object, model: type[GenerateRequest] | type[ImportRequest], operation: str):

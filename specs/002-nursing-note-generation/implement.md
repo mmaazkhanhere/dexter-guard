@@ -12,7 +12,7 @@
 - Every successful result starts in `DRAFT` and is neither verified nor approved.
 - Guardrail success means only that the generation contract was accepted; it is not evidence verification.
 - Import invokes the generation adapter zero times.
-- Only synthetic German data is used; provider failures are explicit, run IDs and content-free provenance are recorded, and live timeout/retry telemetry remains a follow-up.
+- Only synthetic German data is used; provider failures are explicit, provider timeout/retry behavior is bounded, run IDs are idempotent across retries, and telemetry is content-free.
 
 ## Implementation mapping
 
@@ -34,7 +34,8 @@
 - GEN-007 verifies zero generation-adapter invocations on successful import.
 - GEN-008 and provider-failure cases verify controlled errors with zero persisted notes/facts.
 - All successful creation paths return `DRAFT`; no approval or verification transition is implemented.
+- T022 observability tests verify bounded timeout/retry behavior, stable run IDs, rejection counters, and content-free metrics.
 
 ## Bounded limitation
 
-T022 remains open for a future operational-observability slice covering provider timeout/retry instrumentation and content-free metrics. This implementation does not claim live-model reliability, semantic equivalence, evidence verification, diagnosis detection in general, or benchmark completion.
+The live provider remains unconfigured by default, so timeout/retry behavior is exercised with deterministic synthetic adapters. This implementation does not claim live-model reliability, semantic equivalence, evidence verification, diagnosis detection in general, or benchmark completion.

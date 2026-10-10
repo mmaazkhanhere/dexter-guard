@@ -13,13 +13,15 @@ from .errors import NoteError, NoteErrorCode
 class GenerationAdapter(Protocol):
     """The only interface the note service uses for model-backed generation."""
 
-    def generate(self, source: Any) -> GenerationResult | Mapping[str, object]: ...
+    def generate(
+        self, source: Any, *, generation_run_id: str | None = None
+    ) -> GenerationResult | Mapping[str, object]: ...
 
 
 class UnavailableGenerationAdapter:
     """Default production boundary when no live provider is configured."""
 
-    def generate(self, source: Any) -> GenerationResult:
+    def generate(self, source: Any, *, generation_run_id: str | None = None) -> GenerationResult:
         raise NoteError(
             NoteErrorCode.GENERATION_PROVIDER_UNAVAILABLE,
             "No nursing-note generation provider is configured.",
@@ -37,7 +39,7 @@ class DeterministicNursingNoteAdapter:
     def __init__(self) -> None:
         self.invocation_count = 0
 
-    def generate(self, source: Any) -> GenerationResult:
+    def generate(self, source: Any, *, generation_run_id: str | None = None) -> GenerationResult:
         self.invocation_count += 1
         facts: list[CandidateNursingFact] = []
         sentence_pattern = re.compile(r"[^.!?\r\n]+(?:[.!?]|$)")

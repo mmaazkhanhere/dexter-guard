@@ -45,4 +45,4 @@
 - [x] T019 Implement revision editing with immutable predecessor linkage in `src/nursing_notes/service.py` and test it in `tests/nursing_notes/test_notes_api.py`.
 - [x] T020 Run contract, focused fixture, syntax, and repository-required test suites; record results in `specs/002-nursing-note-generation/implement.md`.
 - [x] T021 Re-run the Spec 002 artifact consistency and convergence review; record the result in `implement.md`.
-- [ ] T022 Run the synthetic-only observability tests for timeout, bounded retry, idempotent run ID, rejection metrics, and content-free telemetry; link the full 100-scenario evaluation to `008-evaluation.md` rather than claiming it here.
+- [x] T022 Run the synthetic-only observability tests for timeout, bounded retry, idempotent run ID, rejection metrics, and content-free telemetry; link the full 100-scenario evaluation to `008-evaluation.md` rather than claiming it here.

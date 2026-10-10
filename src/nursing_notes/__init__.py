@@ -14,6 +14,7 @@ from .contracts import (
     NursingFact,
 )
 from .repository import InMemoryNoteRepository, NoteRepository
+from .observability import GenerationMetrics, GenerationMetricsSnapshot
 from .service import NursingNoteService
 
 __all__ = [
@@ -22,6 +23,8 @@ __all__ = [
     "ExternalOrigin",
     "GenerateRequest",
     "GenerationAdapter",
+    "GenerationMetrics",
+    "GenerationMetricsSnapshot",
     "ImportRequest",
     "InMemoryNoteRepository",
     "NoteRepository",

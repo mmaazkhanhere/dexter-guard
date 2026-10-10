@@ -76,6 +76,7 @@ def _status_for_note_error(error: Any) -> int:
         "EMPTY_MODEL_OUTPUT",
         "GENERATION_PROVIDER_UNAVAILABLE",
         "GENERATION_PROVIDER_FAILURE",
+        "GENERATION_PROVIDER_TIMEOUT",
     }:
         return status.HTTP_422_UNPROCESSABLE_CONTENT
     return status.HTTP_400_BAD_REQUEST
