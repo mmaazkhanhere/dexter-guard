@@ -175,9 +175,11 @@ class NursingNoteService:
             self.metrics.increment("provider_attempts")
             executor = ThreadPoolExecutor(max_workers=1)
             future = executor.submit(self._call_adapter, source, generation_run_id)
+            timed_out = False
             try:
                 return future.result(timeout=self.provider_timeout_seconds)
             except ProviderTimeoutError as error:
+                timed_out = True
                 future.cancel()
                 last_error = NoteError(
                     NoteErrorCode.GENERATION_PROVIDER_TIMEOUT,
@@ -191,7 +193,12 @@ class NursingNoteService:
                     "The generation provider failed.",
                 )
             finally:
-                executor.shutdown(wait=False, cancel_futures=True)
+                # Python cannot safely terminate a provider thread that is already
+                # running. A timeout is therefore terminal for this request; the
+                # service never starts a retry that could overlap the timed-out call.
+                executor.shutdown(wait=not timed_out, cancel_futures=True)
+            if timed_out:
+                break
         self.metrics.increment("provider_failures")
         if last_error is not None:
             raise last_error

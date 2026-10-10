@@ -43,7 +43,7 @@ strict schema + limited generation-time guardrails
 5. **Import service** persists a supplied candidate and its `externalOrigin` against the same required evidence source, without depending on the generation service.
 6. **Downstream hand-off** exposes only `DRAFT` records; verification and approval remain downstream.
 
-The service operates on synthetic German data only. It records a validation-run ID, source text hash/normalization policy, model ID, prompt version, settings, schema version, and guardrail/ruleset versions. Provider calls have bounded timeouts, bounded retries, and idempotent run identifiers.
+The service operates on synthetic German data only. It records a validation-run ID, source text hash/normalization policy, model ID, prompt version, settings, schema version, and guardrail/ruleset versions. Provider calls have bounded timeouts, bounded retries, and idempotent run identifiers. Because Python cannot safely terminate an already-running provider thread, a timeout is terminal for the request and is never retried; completed provider failures may retry within the configured bound without overlap.
 
 ## API design
 

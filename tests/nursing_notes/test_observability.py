@@ -84,7 +84,7 @@ def test_provider_timeout_is_controlled_and_does_not_persist(note_context):
     source = create_source(client, "Die Bewohnerin ruht.")
     metrics = GenerationMetrics()
     adapter = SlowAdapter()
-    client = _generate_client(note_context, adapter, timeout=0.001, attempts=1, metrics=metrics)
+    client = _generate_client(note_context, adapter, timeout=0.001, attempts=2, metrics=metrics)
 
     response = client.post(
         "/api/v1/notes/generate",
@@ -93,6 +93,7 @@ def test_provider_timeout_is_controlled_and_does_not_persist(note_context):
 
     assert response.status_code == 422
     assert response.json()["code"] == "GENERATION_PROVIDER_TIMEOUT"
+    assert adapter.calls == 1
     assert note_context["note_repository"].count() == 0
     snapshot = metrics.snapshot()
     assert snapshot.provider_attempts == 1

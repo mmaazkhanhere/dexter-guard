@@ -52,4 +52,4 @@
 - [x] R001 Replace the application-default in-memory note store with SQLite while retaining the in-memory implementation as an explicit test double; cover durable round-trip and append-only revision behavior in `tests/nursing_notes/test_repository.py`.
 - [x] R002 Align the OpenAPI contract and runtime response/error behavior.
 - [x] R003 Add unit-mutation, material source-span omission, and draft-to-source mismatch fixtures.
-- [ ] R004 Strengthen fact provenance/atomicity validation and make provider timeout/retry execution non-overlapping.
+- [x] R004 Strengthen fact provenance/atomicity validation and make provider timeout/retry execution non-overlapping.
