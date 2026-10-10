@@ -77,3 +77,7 @@ Persist a successful creation as one transaction: note revision, facts, provenan
 - No test may describe a generated note as evidence-verified merely because it passed Spec 002 validation.
 - Add a contract-test gate for invalid span offsets, unsupported resident identity, missing validation-run provenance, and retry idempotency.
 - Add an ADR for the Python/FastAPI/Pydantic/SQLite boundary and adapter trade-offs before implementation.
+
+## Repository mapping
+
+The repository's approved implementation stack is Python/FastAPI/Pydantic with the existing in-memory Spec 001 persistence boundary. The planned note components map to `src/nursing_notes/contracts.py`, `adapters.py`, `guardrails.py`, `service.py`, and `repository.py`; the HTTP routes are integrated in `src/source_ingestion/app.py`. No TypeScript or competing persistence stack is introduced.
