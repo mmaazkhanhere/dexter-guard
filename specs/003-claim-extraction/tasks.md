@@ -33,7 +33,7 @@ T001–T003 foundation --> T004–T007 test-first contracts/fixtures
 
 - [x] T004 [P] Write failing contract tests in `tests/claim_extraction/test_models.py` for Claim/result variants, source provenance, resident test ID, and typed failures. *(Depends on T001)*
 - [x] T005 [P] Write failing span/property tests in `tests/claim_extraction/test_spans.py` for German text, decimal commas, overlap, and invalid offsets. *(Depends on T002)*
-- [ ] T006 [P] Create synthetic CLM-001–CLM-016 fixtures in `tests/claim_extraction/fixtures/claims.py` and benchmark-contribution cases in `tests/evaluation/fixtures/spec_003_claims.py`. *(Depends on T001)*
+- [x] T006 [P] Create synthetic CLM-001–CLM-016 fixtures in `tests/claim_extraction/fixtures/claims.py` and benchmark-contribution cases in `tests/evaluation/fixtures/spec_003_claims.py`. *(Depends on T001)*
 - [x] T007 [P] Write fake-provider and persisted-result tests in `tests/claim_extraction/test_provider.py` for malformed output, timeout, retry, and no evidence-system call. *(Depends on T003)*
 
 ## Phase 3 — User Story 1: Extract independently addressable atomic claims
