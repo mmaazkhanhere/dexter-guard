@@ -6,107 +6,78 @@
 
 ## Purpose
 
-Caregiver observations are commonly recorded as informal German transcripts. This feature prepares those observations for clinical documentation by producing a clear, professional German nursing note and a structured representation of the stated nursing information. It is a documentation-generation and preparation component; it is not a reliability verifier, clinical decision-maker, or approval mechanism.
+This feature converts an existing German caregiver transcript into a professional, editable nursing-note draft and structured nursing facts. It may also register an externally authored candidate note against the same source transcript. It prepares documentation for later verification; it neither verifies evidence nor approves documentation.
 
-The feature must retain what the caregiver actually conveyed. In particular, it must not turn a negation into an assertion, uncertainty into certainty, a resident report into an observed fact, or an observation into a diagnosis.
-
-## Scope
+## Scope and boundaries
 
 ### In scope
 
-- Generate an editable professional German nursing-note draft from an existing German source transcript.
-- Extract structured facts for observations, symptoms, measurements, and actions from the same source.
-- Preserve negation, uncertainty, attribution, numerical values, and units in both the prose and structured facts.
-- Accept an externally supplied nursing-note draft without invoking generation.
-- Persist source linkage, note origin, and revision lineage for generated and imported drafts.
-- Surface controlled failures when generation output is unusable or malformed.
+- Generate editable professional German nursing prose from an immutable `SourceDocument` version.
+- Extract source-linked observations, symptoms, measurements, and actions.
+- Preserve source-stated negation, uncertainty, attribution, numerical values, and units.
+- Import an external candidate note against an existing `SourceDocument` version without calling the generation model.
+- Preserve note origin, evidence-source reference, and revision lineage.
+- Reject malformed provider output through controlled errors.
 
-### Dependency boundary
+### Out of scope
 
-FR-01 (source capture/availability) is owned by Spec 001. This feature receives an existing source reference and does not define how it was captured.
+- Diagnosis, treatment recommendation, clinical evidence verification, claim classification, approval, or dashboards.
+- Fabricating missing observations, values, actors, dates, certainty, or source references.
+- Comprehensive semantic equivalence or clinical-inference judgment; those belong to downstream Specs 004 and 006.
 
-### Explicitly out of scope
+FR-01 (source capture and storage) remains owned by Spec 001. This feature requires a resolvable `SourceDocument` and exact `sourceVersion`; it does not create either.
 
-- Diagnosing conditions, recommending treatment, or inventing clinical observations.
-- Independently verifying claims, classifying claims, finding evidence, highlighting evidence, or approving a note.
-- Caregiver approval workflows and benchmark/reporting dashboards.
-- Automatically filling missing source information.
-
-## Functional Requirements
+## Functional requirements
 
 ### FR-02 — Generate professional German documentation
 
-Given a valid German transcript referenced from Spec 001, the system shall create a readable, professionally worded German nursing-note draft. The draft shall be displayed or returned as editable content and shall have status `DRAFT`; it shall never be automatically verified or approved.
+Given an existing German `SourceDocument` and `sourceVersion`, the system shall create a readable, professionally worded German note with initial status `DRAFT`. The returned content shall be editable. Creation shall not verify or approve the draft.
 
 ### FR-03 — Produce structured nursing facts
 
-For a successfully generated draft, the system shall provide structured facts representing source-stated observations, symptoms, measurements, and actions. Every fact shall retain a source anchor, its fact type, and meaning-preservation fields needed to represent negation, uncertainty, attribution, numerical values, and units where present.
+For each successfully generated draft, the system shall expose structured facts for source-stated observations, symptoms, measurements, and actions. Each fact shall retain a source anchor and applicable meaning fields: polarity, certainty, attribution, value, and unit.
 
 ### FR-04 — Accept externally supplied notes
 
-The system shall accept an externally supplied nursing-note draft, store it as a `DRAFT`, attach the supplied origin and provenance metadata, and make it available to the same downstream verification pipeline. Importing shall not invoke the generation model or fabricate structured facts not supplied with the import.
+The system shall import an external candidate note only when it includes a resolvable `sourceId` and exact `sourceVersion`. It shall retain the candidate's external origin separately from its evidence source, store the note as `DRAFT`, and route it to downstream verification without invoking the generation model. Imported facts are optional and retain external provenance; none are generated or inferred by import.
 
-### FR-05 — Preserve meaning
+### FR-05 — Preserve meaning within generation-time guardrails
 
-The generated prose and extracted facts shall preserve the source meaning. Regression tests shall detect changes to negation, uncertainty, attribution, numerical values, and units. If the source does not establish a diagnosis, the generated note shall not state one as a fact.
+Generation shall use limited, deterministic guardrails to reject invalid structured output and detect defined regressions in fixed fixtures: changed numeric values/units, invalid source anchors, and loss or inversion of explicitly represented polarity, uncertainty, or attribution fields. These guardrails do not prove semantic equivalence, clinical truth, or absence of all unsupported inference. A draft that passes them is **not evidence-verified**.
 
-## Conceptual Data Requirements
+## Required record semantics
 
-### Note draft
+Every note revision shall contain a non-null evidence-source reference (`sourceId`, `sourceVersion`), editable content, `DRAFT` initial status, `GENERATED` or `IMPORTED` origin, creation metadata, and predecessor revision linkage when revised.
 
-Each draft shall include:
+`externalOrigin` identifies where an imported candidate came from (for example, external system and external note identifier). It never replaces the evidence-source reference used by downstream verification.
 
-- a stable draft identifier;
-- editable German note content;
-- lifecycle status fixed initially to `DRAFT`;
-- origin: `GENERATED` or `IMPORTED`;
-- the originating source reference when generated, or the declared external source/provenance when imported;
-- creation time and creation actor/process identity;
-- a revision number and a link to the preceding revision when revised;
-- generation metadata only for generated drafts, including model/run identifier sufficient to trace the result without exposing hidden reasoning.
+Each fact shall include its parent revision, type (`OBSERVATION`, `SYMPTOM`, `MEASUREMENT`, or `ACTION`), source anchor, readable statement, and any stated polarity, certainty, attribution, value, and unit. Absent source detail stays absent; conflicting source statements remain distinct facts.
 
-### Structured fact
+The normative field definitions are in `data-model.md`; the normative HTTP interface is in `contracts/notes-api.yaml`.
 
-Each fact shall include:
+## Acceptance scenarios
 
-- a stable fact identifier and its parent draft/revision;
-- type: `OBSERVATION`, `SYMPTOM`, `MEASUREMENT`, or `ACTION`;
-- a normalized, human-readable statement that does not add meaning;
-- source anchor or supplied external provenance;
-- polarity (`AFFIRMED` or `NEGATED` when applicable);
-- certainty (`CERTAIN`, `UNCERTAIN`, or source-equivalent qualifier when applicable);
-- attribution (for example, resident-reported or caregiver-observed) when stated;
-- numeric value and unit exactly as stated when applicable.
-
-Absent information shall remain absent. The feature shall not infer an actor, time, diagnosis, value, unit, or certainty that the source does not provide.
-
-## User Journeys
-
-1. A caregiver transcript is available. A user requests a draft, receives professional German prose and structured facts, edits the draft as needed, and passes it to downstream review. It remains a draft.
-2. A user already has a nursing-note draft. They import it with its source/origin details; it enters the same downstream verification path without a generation-model call.
-3. A generation provider returns output that cannot be parsed or fails schema validation. The user receives a controlled error; no successful draft, structured facts, diagnosis, or substitute content is fabricated.
-
-## Acceptance Scenarios
-
-| ID | Given | Then |
+| ID | Input | Required result |
 | --- | --- | --- |
-| GEN-001 | A valid German caregiver transcript | A readable professional German draft is generated and editable. |
-| GEN-002 | A transcript with numerical measurements | The same numerical values and units appear in the draft and applicable structured facts. |
-| GEN-003 | A transcript containing negation | Negation is retained in the draft and applicable facts. |
-| GEN-004 | A transcript containing an uncertain observation | The uncertainty remains explicit; it is not converted to certainty. |
-| GEN-005 | A resident-reported symptom | The result retains that the resident reported it rather than presenting it as independently observed. |
-| GEN-006 | A transcript with symptoms, actions, and observations | Corresponding structured facts are programmatically available with source anchors. |
-| GEN-007 | An externally supplied nursing note | It is stored as an imported draft and reaches downstream verification without a generation-model call. |
-| GEN-008 | Malformed structured output from the generation provider | The operation fails in a controlled, observable way and does not create fabricated success data. |
-| GEN-009 | A valid generated note | The note is editable and has `DRAFT` status; it is not verified or approved. |
-| GEN-010 | Source language that could tempt an unsupported clinical inference | The note does not invent or assert a diagnosis. |
+| GEN-001 | Valid German source transcript and version | A professional German `DRAFT` is returned and is editable. |
+| GEN-002 | Source contains a numerical measurement | Fixture output preserves the exact value and unit in the corresponding fact; changed values or units are rejected. |
+| GEN-003 | Source contains explicit negation | Fixture output records `NEGATED` polarity and does not assert the opposite. |
+| GEN-004 | Source contains explicit uncertainty | Fixture output retains the uncertainty qualifier/field and does not mark it certain. |
+| GEN-005 | Source contains a resident-reported symptom | Fixture output retains resident attribution and does not relabel it caregiver-observed. |
+| GEN-006 | Source contains symptoms, actions, observations, and a measurement | Structured facts of each applicable type are returned with valid source anchors. |
+| GEN-007 | External note plus valid `sourceId` and `sourceVersion` | Note is imported as `DRAFT`; evidence source and external origin remain distinct; generation adapter call count is zero. |
+| GEN-008 | Provider returns malformed or schema-invalid output | Request returns a controlled error; no note or facts are persisted. |
+| GEN-009 | Valid generated or imported note | Initial status is exactly `DRAFT`; no verified/approved state or transition is produced. |
+| GEN-010 | Source could invite a diagnosis | Fixed fixture output that adds a diagnosis is rejected by the defined guardrail; passing output is still only a draft, not clinical or evidence verification. |
 
-## Success Criteria
+## Measurable acceptance measures
 
-- FR-02 through FR-05 have passing acceptance and regression coverage.
-- A German source transcript yields an editable professional German draft plus programmatically available facts.
-- Imported notes enter the same downstream path without an LLM call.
-- Negation, uncertainty, attribution, measurement values, and units are covered by regression tests.
-- Malformed model output has a controlled failure path.
-- Every generated or imported draft is traceable to source, origin, and revision metadata.
-- No result produced by this feature is automatically verified or approved.
+- **Schema validity:** 100% of valid fixed provider fixtures validate and persist exactly one draft revision; 100% of malformed/schema-invalid fixtures return `422` and persist zero revisions and zero facts.
+- **Source-reference integrity:** 100% of persisted generated and imported revisions contain a `sourceId` and `sourceVersion` that resolve to the exact immutable `SourceDocument` version used for the request. An unknown or mismatched version returns `404`/`409` and persists nothing.
+- **Import isolation:** Across the GEN-007 import test matrix, generation-adapter invocation count is exactly zero and every successful import has `origin=IMPORTED`, `status=DRAFT`, and a non-empty `externalOrigin` distinct from its evidence-source fields.
+- **Fixed semantic-regression coverage:** The suite contains at least one deterministic fixture each for negation, uncertainty, attribution, numeric value, unit, and unsupported diagnosis. For every fixture, the stated expected accept/reject outcome in the table above is asserted; the suite is not a claim of general semantic verification.
+- **Draft-state safety:** 100% of successful creation responses have `status=DRAFT`; no response contains `VERIFIED` or `APPROVED`.
+
+## Success criteria
+
+FR-02 through FR-05 are complete when all acceptance scenarios and measures pass, structured facts are programmatically accessible, imported candidates enter downstream verification with their evidence source intact and no model call, and every note revision has traceable origin, source, and revision metadata. Completion does not include downstream reliability verification.

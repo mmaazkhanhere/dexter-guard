@@ -1,13 +1,14 @@
 # Convergence Review: Nursing Note Generation
 
-**Status:** Pending implementation.
+**Status:** Pending implementation and requirements review.
 
-Convergence cannot determine code/spec completeness until the reviewer completes `checklist.md` and the implementation tasks are executed. When run after T017, evaluate:
+After T020, verify code against `spec.md`, `data-model.md`, `contracts/notes-api.yaml`, and `plan.md`:
 
-- each FR-02–FR-05 against code and passing tests;
-- GEN-001–GEN-010 against executable regression/integration coverage;
-- generated/imported provenance and revision records in persisted data;
-- proof that imports do not invoke the generation adapter;
-- proof that successful notes remain `DRAFT` with no approval/verification transition.
+- all successful revision rows have a non-null source ID and exact source version;
+- import preserves separate external-origin/evidence-source records and makes zero generation calls;
+- the fixed GEN-001–GEN-010 fixtures have their specified result;
+- malformed outputs and source mismatches persist nothing;
+- no successful path returns a verified or approved status;
+- validation success is never presented as evidence verification.
 
-If a gap is found, append a dependency-ordered task to `tasks.md`, implement it, and run convergence again. Report **Converged** only when no required gap remains.
+Append dependency-ordered tasks to `tasks.md` for every gap and rerun convergence until no required gap remains.

@@ -2,20 +2,12 @@
 
 ## Gate status
 
-**Not started.** `checklist.md` is intentionally reviewer-owned and currently has unchecked requirements-quality items. Per the Spec Kit workflow, do not begin implementation or alter checklist markers until a reviewer completes that review.
+**Not started.** The reviewer-owned `checklist.md` remains unchecked. Before implementation, complete T001 by reading `.specify/memory/constitution.md` and align all implementation paths with its required conventions.
 
-## Execution order after the gate
+## Required implementation invariants
 
-1. Complete T001 and T002 to apply the project constitution and existing architectural conventions.
-2. Complete foundation and generation tasks T003–T009.
-3. Complete import/revision tasks T010–T012.
-4. Complete test tasks T013–T017.
-5. Re-run analysis (T018) and convergence (T019).
-
-## Invariants to verify during implementation
-
-- Every successful note starts as `DRAFT` and is editable.
-- Generated content and facts retain source anchors and provenance.
-- No model result is treated as successful before strict validation.
-- Import has no generation-model call path.
-- No generated or imported note is verified or approved here.
+- Every generated or imported note has a resolvable `sourceId` and exact `sourceVersion`.
+- Imported `externalOrigin` identifies candidate provenance only; it is not evidence.
+- Every successful result starts in `DRAFT` and is neither verified nor approved.
+- Guardrail success means only that the generation contract was accepted; it is not evidence verification.
+- Import invokes the generation adapter zero times.
