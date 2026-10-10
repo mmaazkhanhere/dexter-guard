@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import hashlib
 
 import pytest
 
@@ -17,7 +18,7 @@ NOTE = "Bewohnerin berichtet keine Schmerzen. Sie trank etwa 300 ml Wasser."
 class Context:
     note_revision_id: str = NOTE_ID
     note_body: str = NOTE
-    note_body_hash: str = "note-hash"
+    note_body_hash: str = hashlib.sha256(NOTE.encode("utf-8")).hexdigest()
     resident_test_id: str = "resident-1"
     language: str = "de-DE"
     synthetic: bool = True
@@ -56,8 +57,8 @@ def provider_claim(note_id: str = NOTE_ID, resident: str = "resident-1") -> dict
         "residentTestId": resident,
         "ordinal": 1,
         "category": "SYMPTOM",
-        "statementSpan": make_text_span(NOTE, pain_start, NOTE.index(".") ).model_dump(by_alias=True),
-        "claimText": NOTE[pain_start:NOTE.index(".")],
+        "statementSpan": make_text_span(NOTE, 0, NOTE.index(".")).model_dump(by_alias=True),
+        "claimText": NOTE[:NOTE.index(".")],
         "polarity": "NEGATED",
         "negationCue": make_text_span(NOTE, pain_start, pain_start + 5).model_dump(by_alias=True),
         "certainty": "CERTAIN",
@@ -130,7 +131,14 @@ def test_service_extracts_atomic_claims_and_persists_provenance() -> None:
     assert result.evidence_source_reference.source_id == "source-1"
 
 
-@pytest.mark.parametrize("output", ["not json", {"claims": [{"bad": "schema"}]}, {"claims": list(provider_claim())[:-1]}])
+@pytest.mark.parametrize(
+    "output",
+    [
+        "not json",
+        {"claims": [{"bad": "schema"}]},
+        {"claims": [provider_claim()[0], {"bad": "schema"}]},
+    ],
+)
 def test_invalid_or_partially_valid_provider_output_fails_without_claims(output: object) -> None:
     result = service(FakeProvider(output=output)).extract_claims(NOTE_ID)
     assert result.status is ExtractionStatus.FAILED
@@ -156,7 +164,7 @@ def test_empty_output_uses_safeguard() -> None:
     assert empty.status is ExtractionStatus.FAILED
     assert empty.error.code.value == "INTERNAL_VALIDATION_ERROR"
 
-    no_assertion = Context(note_body="---", note_body_hash="empty-hash")
+    no_assertion = Context(note_body="---", note_body_hash=hashlib.sha256(b"---").hexdigest())
     valid_empty = service(FakeProvider(output={"claims": []}), FakeReader(no_assertion)).extract_claims(NOTE_ID)
     assert valid_empty.status is ExtractionStatus.EMPTY
     assert valid_empty.claims == ()
@@ -168,6 +176,18 @@ def test_provider_timeout_is_typed_failure() -> None:
     assert result.status is ExtractionStatus.FAILED
     assert result.error.code.value == "PROVIDER_TIMEOUT"
     assert provider.calls == 2
+
+
+def test_invalid_span_is_a_typed_failure_with_no_partial_claims() -> None:
+    claims = list(provider_claim())
+    claims[0] = dict(claims[0])
+    claims[0]["statementSpan"] = dict(claims[0]["statementSpan"])
+    claims[0]["statementSpan"]["text"] = "not the note"
+    claims[0]["claimText"] = "not the note"
+    result = service(FakeProvider(output={"claims": claims})).extract_claims(NOTE_ID)
+    assert result.status is ExtractionStatus.FAILED
+    assert result.error.code.value == "INVALID_SPAN"
+    assert result.claims == ()
 
 
 def test_current_result_is_revision_bound() -> None:

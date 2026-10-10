@@ -10,9 +10,9 @@ def test_unicode_span_validates_code_points_and_utf16_coordinates() -> None:
     text_span = make_text_span(note, start, start + 1)
 
     assert text_span.text == "😊"
-    assert text_span.startCodePoint == start
-    assert text_span.endCodePointExclusive == start + 1
-    assert text_span.endUtf16Exclusive - text_span.startUtf16 == 2
+    assert text_span.start_code_point == start
+    assert text_span.end_code_point_exclusive == start + 1
+    assert text_span.end_utf16_exclusive - text_span.start_utf16 == 2
     validate_text_span(text_span, note)
 
 
@@ -37,7 +37,7 @@ def test_decimal_comma_span_and_overlapping_spans_are_valid() -> None:
 )
 def test_invalid_offsets_are_rejected(span: dict[str, object]) -> None:
     with pytest.raises(Exception):
-        TextSpan.model_validate(span)
+        validate_text_span(TextSpan.model_validate(span), "x")
 
 
 def test_mismatched_text_and_utf16_coordinates_are_rejected() -> None:
@@ -46,4 +46,4 @@ def test_mismatched_text_and_utf16_coordinates_are_rejected() -> None:
     with pytest.raises(SpanValidationError):
         validate_text_span(valid.model_copy(update={"text": "B"}), note)
     with pytest.raises(SpanValidationError):
-        validate_text_span(valid.model_copy(update={"startUtf16": 3}), note)
+        validate_text_span(valid.model_copy(update={"start_utf16": 1}), note)

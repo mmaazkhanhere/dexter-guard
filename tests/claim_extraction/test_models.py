@@ -3,6 +3,7 @@ from decimal import Decimal
 
 import pytest
 from pydantic import ValidationError
+from pydantic import TypeAdapter
 
 from claim_extraction.models import (
     Attribution,
@@ -90,7 +91,13 @@ def test_numeric_decimal_comma_serializes_as_decimal_string() -> None:
         unitNormalized="C",
         approximation=True,
         valueSpan=span("ca. 37,8", 0, 8),
-        unitSpan=span("°C", 9, 11),
+        unitSpan=TextSpan(
+            startCodePoint=0,
+            endCodePointExclusive=2,
+            startUtf16=0,
+            endUtf16Exclusive=2,
+            text="°C",
+        ),
     )
 
     payload = value.model_dump(mode="json", by_alias=True)
@@ -135,7 +142,7 @@ def test_negated_claim_requires_a_direct_negation_cue() -> None:
 
 
 def test_discriminated_result_forbids_error_on_success_and_claims_on_failure() -> None:
-    result = ExtractionResult.model_validate(
+    result = TypeAdapter(ExtractionResult).validate_python(
         {
             "status": "FAILED",
             "extractionRunId": "run-1",
@@ -154,7 +161,7 @@ def test_discriminated_result_forbids_error_on_success_and_claims_on_failure() -
     assert result.error.code is ExtractionErrorCode.INVALID_SPAN
 
     with pytest.raises(ValidationError):
-        ExtractionResult.model_validate(
+        TypeAdapter(ExtractionResult).validate_python(
             {
                 "status": "FAILED",
                 "extractionRunId": "run-1",
@@ -167,7 +174,7 @@ def test_discriminated_result_forbids_error_on_success_and_claims_on_failure() -
         )
 
     with pytest.raises(ValidationError):
-        ExtractionResult.model_validate(
+        TypeAdapter(ExtractionResult).validate_python(
             {
                 "status": "EMPTY",
                 "extractionRunId": "run-1",
