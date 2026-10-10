@@ -33,6 +33,26 @@
 
 The reviewer-owned checklist is intentionally not marked by this analysis. Its remaining unchecked state is a process gate for implementation, not a requirements inconsistency. Re-run this analysis after implementation tasks change the design or after a reviewer identifies a checklist issue.
 
+## Implementation consistency notes
+
+- The user request named `specs/003-claim-and-source-fact-extraction`, but the
+  repository's approved feature path is `specs/003-claim-extraction`; the latter
+  is used without renaming artifacts.
+- The repository is already on branch `spec-003`. The appended Spec 002 branch
+  and commit-scope instruction was not applied because it is materially
+  unrelated to this feature.
+- `spec.md`/`data-model.md` define a closed `ExtractionErrorCode` enum while an
+  earlier plan sentence names `EMPTY_RESULT_UNCERTAIN`; no new enum value was
+  added. The bounded empty-result safeguard returns
+  `INTERNAL_VALIDATION_ERROR` when it detects a possible assertion.
+- `implement.md` mentions a mandatory handoff event, while the normative data
+  model explicitly rejects asynchronous delivery/outbox scope. Typed persisted
+  results and `get_current_result()` are the handoff mechanism.
+- Specs 004, 006, and 008 currently contain no contracts in this repository.
+  Spec 003 therefore provides the typed handoff and feature-level synthetic
+  fixture/metric functions, but cannot validate a downstream verifier or
+  register a shared benchmark threshold that does not yet exist.
+
 ## Constitution re-check
 
 The remediation pass resolved five prior issues: mandatory evidence-verification handoff, a discriminated typed-failure contract, a genuinely test-first task graph, complete evaluation-corpus/metric requirements, and synchronized CLM-001–CLM-016 references. The re-check confirms that Spec 003 does not weaken the human-approval invariant, uses only synthetic data, and limits its own role to claim extraction while requiring a durable handoff to Spec 004 for transcript evidence. No ADR is required for the documented architecture; an ADR remains required if implementation materially departs from it.

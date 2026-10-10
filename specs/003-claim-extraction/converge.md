@@ -29,3 +29,19 @@
 3. Append only newly discovered concrete gaps to `tasks.md`, with dependencies.
 4. Implement those gaps and repeat the audit.
 5. Report **Converged** only when every applicable check above has evidence and no task remains.
+
+## Post-implementation evidence
+
+The core implementation is partially converged: contracts, revision-bound
+service behavior, fail-safe provider handling, SQLite persistence, and
+deterministic focused/full test evidence exist. Shared Spec 008 registration
+and complete CLM-001â€“016 acceptance execution remain pending because those
+downstream artifacts are not present in this repository.
+
+- `pytest -q tests/claim_extraction`: 31 passed.
+- `pytest -q`: 89 passed, with one pre-existing Starlette/httpx deprecation warning.
+- `src/claim_extraction/evaluation.py` provides reproducible feature-level
+  metric calculations, but no measured benchmark values are claimed without an
+  annotated evaluation run.
+- The optional HTTP adapter was not exposed; the mandatory typed service and
+  current-result repository handoff are implemented.
