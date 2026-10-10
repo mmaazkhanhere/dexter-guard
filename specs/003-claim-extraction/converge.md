@@ -25,7 +25,7 @@
 ## Convergence procedure
 
 1. Complete the dependency-ordered tasks and collect test evidence, including the required test-first fixtures before service implementation.
-2. Compare implementation, tests, and public/internal interfaces to `spec.md`, `clarify.md`, and `plan.md`.
+2. Compare implementation, tests, and public/internal interfaces to `spec.md`, `data-model.md`, `clarify.md`, and `plan.md`.
 3. Append only newly discovered concrete gaps to `tasks.md`, with dependencies.
 4. Implement those gaps and repeat the audit.
 5. Report **Converged** only when every applicable check above has evidence and no task remains.

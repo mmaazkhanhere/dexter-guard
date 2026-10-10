@@ -1,7 +1,7 @@
 # Cross-Artifact Consistency Analysis — Spec 003
 
 **Mode:** Read-only requirements analysis  
-**Artifacts reviewed:** `spec.md`, `clarify.md`, `plan.md`, `tasks.md`  
+**Artifacts reviewed:** `spec.md`, `data-model.md`, `clarify.md`, `plan.md`, `tasks.md`  
 **Result:** No unresolved internal conflicts, constitutional violations, or planning gaps remain after the remediation pass recorded below.
 
 ## Consistency findings
