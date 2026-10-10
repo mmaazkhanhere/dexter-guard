@@ -13,6 +13,7 @@ These decisions remove planning ambiguity. They are requirements decisions, not 
 | Offset convention | Persist zero-based end-exclusive Unicode-code-point offsets plus exact UTF-16 offsets for editor interoperability. | Makes server validation and browser highlighting unambiguous. |
 | Stored text policy | Store synthetic note bodies as immutable UTF-8 text without post-storage normalization; validate each declared span against that exact body. | Makes provenance and location integrity testable. |
 | Numeric representation | Preserve `raw` literally; store normalized decimal text only for a direct German comma-to-dot representation. | Prevents rounding and semantic changes. |
+| Numeric typing | Use Pydantic `Decimal` internally for directly normalized values/ranges and serialize it as a decimal string at JSON boundaries. | Preserves precision while meeting typed-value requirements. |
 | Units | Preserve literal unit text. Normalize only directly unambiguous units and never infer a missing unit. | Maintains numeric fidelity. |
 | Negation | Model negation as a polarity plus the exact cue/span; do not treat missing information as negation. | Preserves scope and avoids hallucinated negatives. |
 | Uncertainty | Record a certainty enum and exact cue/span. Uncertainty is not evidence weakness or contradiction. | Keeps linguistic stance separate from verification. |
@@ -30,6 +31,8 @@ These decisions remove planning ambiguity. They are requirements decisions, not 
 | Provider failures | Defined timeout, bounded retry, malformed-output, and unavailable-provider outcomes are typed failures with no partial claims. | Constitution requires observable, fail-safe degradation. |
 | Data policy | Fixtures, requests, evaluations, logs, screenshots, and demos use synthetic data only. | Real patient/employee data is prohibited in the PoC. |
 | Evaluation corpus | The feature contributes to a versioned, synthetic German benchmark of at least 100 labeled scenarios; held-out cases are not used for prompt tuning. | Evaluation is a release gate, not a demo artifact. |
+| Verification handoff | Each successful/empty result carries immutable source-reference metadata and emits `ClaimExtractionCompleted`; Spec 004 must consume it before a revision can become verification-ready. | Preserves the constitution's end-to-end evidence-traceability invariant without verifying in this feature. |
+| Input boundary | Reject note bodies above 50,000 Unicode code points before a provider call. | Limits resource exposure and prevents an oversized sensitive request. |
 
 ## Resolved assumptions
 

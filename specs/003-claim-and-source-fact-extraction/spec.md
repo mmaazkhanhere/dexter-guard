@@ -91,17 +91,17 @@ TextSpan {
 ```text
 NumericValue {
   raw: string,                 // e.g. "ca. 37,8"
-  normalizedDecimal: string?,  // e.g. "37.8"; decimal string, never float
+  normalizedDecimal: decimal?, // e.g. Decimal("37.8"); serialized as a string in JSON, never float
   unitRaw: string?,            // e.g. "°C"
   unitNormalized: string?,     // e.g. "C" only when directly unambiguous
   approximation: boolean,
-  range: { lower: string, upper: string }?,
+  range: { lower: decimal, upper: decimal }?, // serialized as strings in JSON
   valueSpan: TextSpan,
   unitSpan: TextSpan?
 }
 ```
 
-Normalizing a German decimal comma to `.` is representational only; `raw` remains authoritative. No conversion, rounding, range expansion, or missing-unit inference is permitted.
+Normalizing a German decimal comma to `.` is representational only; `raw` remains authoritative. Pydantic uses exact `Decimal` values internally and serializes them as decimal strings at API boundaries. No conversion, rounding, range expansion, or missing-unit inference is permitted.
 
 ### `Claim`
 
@@ -142,25 +142,46 @@ Claim {
 ### Extraction result
 
 ```text
-ExtractionResult {
-  status: "SUCCEEDED" | "EMPTY" | "FAILED",
+ExtractionSucceeded | ExtractionEmpty {
+  status: "SUCCEEDED" | "EMPTY",
   validationRunId: string,
   noteRevisionId: string,
   noteBodyHash: string,
+  evidenceSourceReference: { sourceId: string, sourceVersion: integer, sourceTextHash: string, normalizationPolicy: string },
   extractorVersion: string,
   providerVersion: string?,
   modelVersion: string?,
   promptVersion: string?,
   outputSchemaVersion: string,
   claims: Claim[],
-  error: { code: string, message: string, retryable: boolean }?,
+  extractedAt: ISO-8601 timestamp
+}
+
+ExtractionFailed {
+  status: "FAILED",
+  validationRunId: string,
+  noteRevisionId: string?,
+  noteBodyHash: string?,
+  extractorVersion: string,
+  providerVersion: string?,
+  modelVersion: string?,
+  promptVersion: string?,
+  outputSchemaVersion: string,
+  claims: [],
+  error: {
+    code: "MALFORMED_PROVIDER_OUTPUT" | "INVALID_SCHEMA" | "INVALID_SPAN" | "REVISION_NOT_FOUND" | "REVISION_MISMATCH" | "UNSUPPORTED_LANGUAGE" | "NON_SYNTHETIC_INPUT" | "PROVIDER_TIMEOUT" | "PROVIDER_UNAVAILABLE" | "INTERNAL_VALIDATION_ERROR",
+    message: string,
+    retryable: boolean
+  },
   extractedAt: ISO-8601 timestamp
 }
 ```
 
-`SUCCEEDED` requires one or more valid claims. `EMPTY` is successful only when the supplied text contains no factual assertion. `FAILED` contains no partial claims and an explicit error. A note revision has one current successful result for a specific extractor version; a changed revision is never silently associated with an older result.
+`SUCCEEDED` requires one or more valid claims. `EMPTY` is successful only when the supplied text contains no factual assertion. `FAILED` contains no partial claims and a required typed error. Pydantic shall enforce this discriminated union: success/empty results cannot carry `error`, and failed results cannot omit it. A note revision has one current successful result for a specific extractor version; a changed revision is never silently associated with an older result.
 
 `validationRunId` is idempotent for one extraction attempt and is retained in the append-only logical history with its version metadata, timestamps, status, and revision/body-hash reference. These fields are provenance metadata, not source-evidence references or verification verdicts.
+
+`evidenceSourceReference` is copied from the immutable note-revision metadata and is required for every successful/empty result. It identifies the transcript version that Spec 004 must use; it does not assert that any claim is supported.
 
 ## Functional requirements
 
@@ -189,6 +210,7 @@ ExtractionResult {
 2. **LOC-003-02:** The system shall validate each span against the stored note before returning or persisting a result.
 3. **LOC-003-03:** An extraction request for an altered note body or obsolete revision shall fail explicitly rather than reuse prior claims.
 4. **LOC-003-04:** A newly edited note revision shall require a new extraction result before it is presented for downstream verification.
+5. **HOF-003-01:** Every `SUCCEEDED` or `EMPTY` extraction result shall be persisted with its `evidenceSourceReference` and an append-only `ClaimExtractionCompleted` handoff event containing `noteRevisionId`, `validationRunId`, result version, and status. Spec 004 shall consume this event/result before any approval workflow can regard the revision as verification-ready.
 
 ### Failure and boundary requirements
 
@@ -200,12 +222,14 @@ ExtractionResult {
 ## Non-functional requirements
 
 - **NFR-003-01:** Outputs must be deterministic for an identical revision and extractor version, or any nondeterminism must be detected by validation and surfaced as failure rather than silently persisted.
-- **NFR-003-02:** Pydantic models and a versioned OpenAPI contract shall validate cross-component and public API payloads.
+- **NFR-003-02:** Pydantic models shall validate all cross-component payloads. If the optional public HTTP endpoint is exposed, a versioned OpenAPI contract shall validate its payloads.
 - **NFR-003-03:** Claims must be serializable in a versioned schema that preserves unknown future categories without breaking consumers.
 - **NFR-003-04:** Only synthetic data may be used in requests, fixtures, logs, screenshots, demonstrations, and evaluations for this PoC.
 - **NFR-003-05:** Logging/telemetry shall record only redacted run metadata, latency, cost/token usage where applicable, rejection reason codes, and warning counts; it shall not log note, prompt, claim, or transcript content.
 - **NFR-003-06:** Provider calls shall use defined timeouts, bounded retries, and idempotent `validationRunId` behavior; timeout or unavailable-provider outcomes are explicit failures.
 - **NFR-003-07:** The service must make no network call to source evidence systems.
+- **NFR-003-08:** The versioned 100+ synthetic German evaluation corpus shall store candidate/source text, expected claim-level outcomes, source/evidence references, materiality/severity, annotation provenance, and held-out membership. Evaluation shall report denominators and claim-extraction precision/recall, critical-error recall, false-positive rate, completeness, latency, inference cost, reviewer workload, raw counts, and representative failures. Spec 008 defines release thresholds and repeated-run/small-sample handling.
+- **NFR-003-09:** Requests shall reject a note body exceeding 50,000 Unicode code points before provider invocation. Secret scanning and dependency-vulnerability checks are mandatory release checks.
 
 ## Acceptance scenarios
 
@@ -233,4 +257,5 @@ ExtractionResult {
 - Every claim returned by the service has a unique `id`, a valid revision reference, and validated spans.
 - Acceptance scenarios CLM-001 through CLM-016 pass structural and semantic-fidelity assertions.
 - No extraction output contains an evidence-verification, contradiction, support, or diagnosis field.
-- A versioned synthetic German claim-extraction benchmark contains at least 100 labeled scenarios, including the constitution-required fabrication, numerical, negation, uncertainty, omission, resident-mixing, and unjustified-inference classes where applicable to extraction.
+- Every successful/empty extraction has the immutable evidence-source reference and `ClaimExtractionCompleted` handoff required for Spec 004; this does not assign an evidence verdict.
+- A versioned synthetic German claim-extraction benchmark contains at least 100 labeled scenarios, including the constitution-required fabrication, numerical, negation, uncertainty, omission, resident-mixing, and unjustified-inference classes, with all NFR-003-08 fields and reported metrics.

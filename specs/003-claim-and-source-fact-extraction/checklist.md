@@ -9,6 +9,7 @@
 - [ ] The upstream/downstream Spec 002, 004, 005, and 007 relationships are clear.
 - [ ] FR-06 has an unambiguous, testable outcome: each factual claim is individually addressable.
 - [ ] The feature records candidate-note provenance without claiming transcript-evidence support before Spec 004.
+- [ ] Each successful/empty result has immutable evidence-source metadata and a mandatory Spec 004 handoff event, without assigning an evidence verdict.
 - [ ] Synthetic-only data and the absence of automatic approval/repair are explicit.
 
 ## Claim contract
@@ -18,6 +19,7 @@
 - [ ] Revision ownership, id scope, and result status semantics are specified.
 - [ ] Resident identity has explicit `IDENTIFIED`, `UNKNOWN`, and `AMBIGUOUS` handling.
 - [ ] Validation-run, body-hash, schema, and provider/model/prompt version provenance is specified.
+- [ ] The discriminated result contract requires typed errors for `FAILED` and forbids errors for `SUCCEEDED`/`EMPTY`.
 - [ ] Offset conventions and substring-validation requirements are unambiguous.
 - [ ] The contract has no field that implies evidence support, contradiction, or clinical validity.
 
@@ -38,18 +40,20 @@
 - [ ] Edited revisions require new extraction before downstream verification.
 - [ ] Sensitive-data logging boundaries are stated.
 - [ ] Timeout, bounded retry, idempotent run, and unavailable-provider behavior is specified.
+- [ ] Input-size limits, secret scanning, and dependency-vulnerability checks are specified.
 
 ## Acceptance coverage
 
-- [ ] CLM-001 through CLM-014 cover the listed functional scenarios.
+- [ ] CLM-001 through CLM-016 cover the listed functional scenarios.
 - [ ] Acceptance tests require semantic fidelity and spans, not merely parseable JSON.
 - [ ] Tests establish independence from Spec 004.
 - [ ] At least one test exercises Unicode-aware offset validation.
-- [ ] A versioned synthetic 100+ scenario evaluation corpus and held-out policy are required.
+- [ ] A versioned synthetic 100+ scenario evaluation corpus includes source/evidence data, severity/materiality, annotation provenance, held-out policy, required metrics, and denominators.
 
 ## Cross-artifact review
 
 - [ ] `plan.md` implements only the responsibilities described in `spec.md`.
 - [ ] `tasks.md` has a dependency-ordered path for every requirement and acceptance scenario.
+- [ ] Test/fixture tasks precede every corresponding implementation task.
 - [ ] `analyze.md` records no unresolved contradiction, gap, or ambiguity.
 - [ ] `plan.md` contains a Constitution Check for every constitutional core principle.

@@ -13,7 +13,7 @@ Implementation has **not** been started by this specification-artifact task. Thi
 
 ## Execution order
 
-Execute T001 through T019 in their listed dependency order. Write the failing deterministic tests/fixtures in T011–T014 before beginning T008. Each task must preserve the following non-negotiable conditions:
+Execute T001 through T019 in their listed dependency order. Write the failing deterministic tests/fixtures in T004–T007 before beginning their corresponding implementation tasks T008–T012. Each task must preserve the following non-negotiable conditions:
 
 - Claim output reflects only the exact candidate-note revision.
 - Structured provider output is untrusted until schema and span validation pass.
@@ -21,7 +21,8 @@ Execute T001 through T019 in their listed dependency order. Write the failing de
 - No code assigns evidence support, contradiction, truth, or clinical diagnosis.
 - New note revisions are extracted independently.
 - Synthetic-only data, explicit resident-identity state, append-only run provenance, redacted telemetry, and typed timeout/provider failures are maintained.
+- Every successful/empty result carries immutable evidence-source metadata and atomically emits the required Spec 004 handoff event; this is not an evidence verdict.
 
 ## Completion evidence
 
-Before marking implementation complete, retain the commands/results for formatting, static analysis, all Spec 003 automated tests, CLM-001 through CLM-014, failure-path tests, and the scope/redaction review. Then run the convergence audit. If it appends work, return to the relevant task phase rather than declaring completion.
+Before marking implementation complete, retain the commands/results for formatting, static analysis, all Spec 003 automated tests, CLM-001 through CLM-016, failure/outbox tests, input-size/security checks, and the scope/redaction review. Retain the 100+ benchmark report with all required metrics and denominators. Then run the convergence audit. If it appends work, return to the relevant task phase rather than declaring completion.
