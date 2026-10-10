@@ -62,7 +62,9 @@ paths:
       description: >-
         Creates the next version for an existing source_id. Existing versions
         remain retrievable and are never overwritten. The resident_test_id
-        must match the existing source document.
+        and language are inherited from the existing source document. The
+        expected_source_version is checked atomically; a stale revision
+        returns 409 VERSION_CONFLICT.
       parameters:
         - $ref: '#/components/parameters/SourceId'
       requestBody:
@@ -172,14 +174,15 @@ components:
       type: object
       additionalProperties: false
       required:
-        - resident_test_id
-        - language
+        - expected_source_version
         - transcript_text
       properties:
-        resident_test_id:
-          $ref: '#/components/schemas/ResidentTestId'
-        language:
-          $ref: '#/components/schemas/Language'
+        expected_source_version:
+          type: integer
+          minimum: 1
+          description: >-
+            The version the caller read before submitting this revision. The
+            write succeeds only if it is still the current version.
         transcript_text:
           $ref: '#/components/schemas/TranscriptText'
 
@@ -233,14 +236,19 @@ components:
         start:
           type: integer
           minimum: 0
-          description: Inclusive zero-based character offset.
+          description: >-
+            Inclusive zero-based Unicode scalar-value/code-point offset; not a
+            UTF-8 byte offset, UTF-16 code-unit offset, or grapheme-cluster index.
         end:
           type: integer
           minimum: 1
-          description: Exclusive zero-based character offset.
+          description: >-
+            Exclusive zero-based Unicode scalar-value/code-point offset; not a
+            UTF-8 byte offset, UTF-16 code-unit offset, or grapheme-cluster index.
       description: >-
-        A valid span satisfies 0 <= start < end <= character_length of the
-        exact referenced transcript version. JSON Schema cannot verify the
+        A valid span satisfies 0 <= start < end <=
+        unicode_scalar_value_length of the exact referenced transcript version.
+        JSON Schema cannot verify the
         source-dependent upper bound; the API must enforce it at runtime.
 
     ResolvedSourceSpan:
@@ -290,6 +298,7 @@ components:
             - SOURCE_NOT_FOUND
             - SOURCE_VERSION_NOT_FOUND
             - DUPLICATE_SOURCE_VERSION
+            - VERSION_CONFLICT
             - INVALID_SOURCE_SPAN
         message:
           type: string
@@ -329,7 +338,10 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
     ConflictError:
-      description: The requested version operation conflicts with existing source data.
+      description: >-
+        The requested version operation conflicts with current source data,
+        typically because expected_source_version is stale or a concurrent
+        revision won the version uniqueness race.
       content:
         application/json:
           schema:
