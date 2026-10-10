@@ -13,7 +13,7 @@ from .contracts import (
     NoteResponse,
     NursingFact,
 )
-from .repository import InMemoryNoteRepository, NoteRepository
+from .repository import InMemoryNoteRepository, NoteRepository, SQLiteNoteRepository
 from .observability import GenerationMetrics, GenerationMetricsSnapshot
 from .service import NursingNoteService
 
@@ -28,6 +28,7 @@ __all__ = [
     "ImportRequest",
     "InMemoryNoteRepository",
     "NoteRepository",
+    "SQLiteNoteRepository",
     "NoteResponse",
     "NursingFact",
     "NursingNoteService",

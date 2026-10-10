@@ -46,3 +46,10 @@
 - [x] T020 Run contract, focused fixture, syntax, and repository-required test suites; record results in `specs/002-nursing-note-generation/implement.md`.
 - [x] T021 Re-run the Spec 002 artifact consistency and convergence review; record the result in `implement.md`.
 - [x] T022 Run the synthetic-only observability tests for timeout, bounded retry, idempotent run ID, rejection metrics, and content-free telemetry; link the full 100-scenario evaluation to `008-evaluation.md` rather than claiming it here.
+
+## Reviewer remediation
+
+- [x] R001 Replace the application-default in-memory note store with SQLite while retaining the in-memory implementation as an explicit test double; cover durable round-trip and append-only revision behavior in `tests/nursing_notes/test_repository.py`.
+- [ ] R002 Align the OpenAPI contract and runtime response/error behavior.
+- [ ] R003 Add unit-mutation, material source-span omission, and draft-to-source mismatch fixtures.
+- [ ] R004 Strengthen fact provenance/atomicity validation and make provider timeout/retry execution non-overlapping.

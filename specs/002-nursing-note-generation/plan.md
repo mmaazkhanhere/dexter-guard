@@ -80,4 +80,4 @@ Persist a successful creation as one transaction: note revision, facts, provenan
 
 ## Repository mapping
 
-The repository's approved implementation stack is Python/FastAPI/Pydantic with the existing in-memory Spec 001 persistence boundary. The planned note components map to `src/nursing_notes/contracts.py`, `adapters.py`, `guardrails.py`, `service.py`, and `repository.py`; the HTTP routes are integrated in `src/source_ingestion/app.py`. No TypeScript or competing persistence stack is introduced.
+The repository's approved implementation stack is Python/FastAPI/Pydantic with SQLite for note persistence. The planned note components map to `src/nursing_notes/contracts.py`, `adapters.py`, `guardrails.py`, `service.py`, and `repository.py`; the HTTP routes are integrated in `src/source_ingestion/app.py`. The in-memory note repository remains an explicit deterministic test double. No TypeScript or competing persistence stack is introduced.

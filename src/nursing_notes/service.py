@@ -25,7 +25,7 @@ from .contracts import (
 from .errors import NoteError, NoteErrorCode
 from .guardrails import GenerationGuardrails
 from .observability import GenerationMetrics
-from .repository import InMemoryNoteRepository, NoteRepository
+from .repository import NoteRepository, SQLiteNoteRepository
 
 if TYPE_CHECKING:
     from source_ingestion.contracts import SourceDocument
@@ -52,7 +52,7 @@ class NursingNoteService:
         if max_provider_attempts < 1:
             raise ValueError("max_provider_attempts must be positive")
         self.source_service = source_service
-        self.repository = repository or InMemoryNoteRepository()
+        self.repository = repository or SQLiteNoteRepository()
         self.generation_adapter = generation_adapter or UnavailableGenerationAdapter()
         self.guardrails = guardrails or GenerationGuardrails()
         self._id_factory = id_factory or (lambda: str(uuid4()))
