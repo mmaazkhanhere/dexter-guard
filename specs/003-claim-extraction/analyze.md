@@ -53,6 +53,18 @@ The reviewer-owned checklist is intentionally not marked by this analysis. Its r
   fixture/metric functions, but cannot validate a downstream verifier or
   register a shared benchmark threshold that does not yet exist.
 
+## Final requirement traceability
+
+| Requirement area | Implementation | Executable evidence |
+|---|---|---|
+| FR-06 atomic claims | `models.py`, `validator.py`, `service.py` | `test_acceptance.py`, `test_service.py` |
+| Semantic fidelity | `models.py`, `validator.py`, prompt v1 | `test_semantics.py`, CLM-004–CLM-010, CLM-014 |
+| Span/revision integrity | `spans.py`, `revision_reader.py`, `service.py` | `test_spans.py`, `test_revision_reader.py`, CLM-011/CLM-015 |
+| Typed failure handling | `provider.py`, `service.py`, `models.py` | `test_provider.py`, CLM-012/CLM-013a/CLM-016 |
+| Persistence/handoff | `repository.py`, `service.py` | `test_repository.py`, `get_current_result` tests |
+| Privacy/observability | `observability.py` | `test_observability.py` |
+| Feature evaluation | `evaluation.py`, `specs/008-evaluation.md` | synthetic fixture contribution and metric API |
+
 ## Constitution re-check
 
 The remediation pass resolved five prior issues: mandatory evidence-verification handoff, a discriminated typed-failure contract, a genuinely test-first task graph, complete evaluation-corpus/metric requirements, and synchronized CLM-001–CLM-016 references. The re-check confirms that Spec 003 does not weaken the human-approval invariant, uses only synthetic data, and limits its own role to claim extraction while requiring a durable handoff to Spec 004 for transcript evidence. No ADR is required for the documented architecture; an ADR remains required if implementation materially departs from it.

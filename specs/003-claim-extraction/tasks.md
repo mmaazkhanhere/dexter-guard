@@ -59,13 +59,13 @@ T001–T003 foundation --> T004–T007 test-first contracts/fixtures
 ## Phase 6 — Polish and cross-cutting quality
 
 - [x] T013 [US3] Implement SQLite result persistence and current-result retrieval in `src/claim_extraction/repository.py`. *(Depends on T002, T008, T012)*
-- [ ] T014 [US3] If HTTP is exposed, add FastAPI adapter `src/claim_extraction/api.py` and `specs/003-claim-extraction/contracts/claims-api.yaml`. *(Depends on T012)*
+- [x] T014 [US3] If HTTP is exposed, add FastAPI adapter `src/claim_extraction/api.py` and `specs/003-claim-extraction/contracts/claims-api.yaml`. *(Depends on T012; not applicable because the approved service-only boundary is used.)*
 
-- [ ] T015 Run service acceptance in `tests/claim_extraction/test_service.py` for CLM-001–CLM-016 and failure paths; add API contract tests in `tests/claim_extraction/test_api.py` only if T014 applies. *(Depends on T012, T013, T014 if applicable)*
+- [x] T015 Run service acceptance in `tests/claim_extraction/test_service.py` for CLM-001–CLM-016 and failure paths; add API contract tests in `tests/claim_extraction/test_api.py` only if T014 applies. *(Depends on T012, T013, T014 if applicable; acceptance coverage is in `test_acceptance.py`.)*
 - [x] T016 [P] Verify synthetic-only fixtures and redacted telemetry in `tests/claim_extraction/test_observability.py`. *(Depends on T012, T013)*
-- [ ] T017 Contribute Spec 003 fixtures and extraction metrics to `specs/008-evaluation.md` and its shared benchmark suite. *(Depends on T015, T016)*
-- [ ] T018 Conduct scope review in `specs/003-claim-extraction/converge.md`, confirming no source-evidence alignment, diagnosis, identity inference, or distributed delivery was introduced. *(Depends on T017)*
-- [ ] T019 Update traceability in `specs/003-claim-extraction/analyze.md` and execute convergence review. *(Depends on T018)*
+- [x] T017 Contribute Spec 003 fixtures and extraction metrics to `specs/008-evaluation.md` and its shared benchmark suite. *(Depends on T015, T016; bounded contribution recorded, shared threshold remains owner-controlled.)*
+- [x] T018 Conduct scope review in `specs/003-claim-extraction/converge.md`, confirming no source-evidence alignment, diagnosis, identity inference, or distributed delivery was introduced. *(Depends on T017)*
+- [x] T019 Update traceability in `specs/003-claim-extraction/analyze.md` and execute convergence review. *(Depends on T018)*
 
 ## Parallelization guidance
 

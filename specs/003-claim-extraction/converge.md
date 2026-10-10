@@ -45,3 +45,11 @@ downstream artifacts are not present in this repository.
   annotated evaluation run.
 - The optional HTTP adapter was not exposed; the mandatory typed service and
   current-result repository handoff are implemented.
+
+## Final convergence decision
+
+The approved Spec 003 scope is converged. CLM-001–CLM-016 service acceptance
+tests pass, the typed handoff is revision-bound, invalid provider results fail
+closed, and the feature-level evaluation contribution is recorded without
+inventing shared benchmark measurements. The optional HTTP adapter remains
+explicitly out of scope for this service-only implementation.
