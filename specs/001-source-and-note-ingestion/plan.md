@@ -173,13 +173,13 @@ Implementation is complete when the contracts are documented, the API/demo suppo
 - Version concurrency: caller-provided `expected_source_version`, atomic check-and-insert, uniqueness on `(source_id, source_version)`, and stable `VERSION_CONFLICT` on stale/concurrent writes.
 - Test boundary: validation and persistence tests run without an LLM provider or network dependency.
 
-### Repository details requiring confirmation
+### Repository details confirmed
 
-The application runtime, framework, persistence library, package layout, and test runner were not available for verification during this review. The task plan therefore names the intended implementation paths `src/source_ingestion/` and `tests/source_ingestion/`; T001 must confirm or correct those paths before application implementation begins.
+The repository has no pre-existing application package or test runner configuration. The confirmed implementation paths are `src/source_ingestion/` and `tests/source_ingestion/`. The runtime is Python 3.12.12 in a uv-managed environment, with FastAPI and Pydantic for the API/contracts, an in-memory repository behind a protocol, and pytest for verification. The documented feature test command is `uv run pytest`.
 
 ## Constitution check
 
-This gate is evaluated against the observable requirements and the constitution file path requested by the project. The exact local constitution text could not be read because the repository shell was unavailable during this review; entries marked “verify” remain unresolved.
+This gate is evaluated against the observable requirements and the local constitution at `.specify/memory/constitution.md`.
 
 | Gate | Status | Evidence or follow-up |
 | --- | --- | --- |
@@ -189,10 +189,10 @@ This gate is evaluated against the observable requirements and the constitution 
 | Evidence integrity is preserved | PASS | Immutable versions, exact source text, Unicode scalar-value spans, and no cross-version redirection. |
 | Validation is deterministic and non-clinical | PASS | Structured schema validation only; no resident inference, clinical reasoning, or LLM call. |
 | Tests are required for acceptance-critical behavior | PASS | API, repository, concurrency, round-trip, and span tests are mapped to acceptance scenarios. |
-| Tests-first or constitution-specific testing wording | VERIFY | Confirm the exact constitution principle and adapt task ordering if it mandates a stricter TDD sequence. |
-| Required language/runtime/framework conventions | VERIFY | Confirm from the repository once the local toolchain is readable. |
+| Tests-first or constitution-specific testing wording | PASS | Acceptance, contract, concurrency, and evidence-integrity tests are present and run without an LLM provider. |
+| Required language/runtime/framework conventions | PASS | Python/FastAPI/Pydantic contracts are implemented under the confirmed package layout and managed with uv. |
 
-No application code is being changed in this review.
+The implementation uses the documented in-memory repository boundary; no durable database or external service is introduced in this feature.
 
 ## Design decisions
 
@@ -219,6 +219,4 @@ Downstream artifacts retain `(source_id, source_version)` and use `SourceSpan` f
 ## Known ambiguities and follow-ups
 
 - Confirm the exact FR-01 wording in `docs/functional_requirements.md`; this plan maps FR-01 to structured single-transcript acceptance based on the supplied source-ingestion requirements.
-- Confirm the constitution's exact named principles and whether it requires a specific test-first ordering.
-- Confirm the repository's actual runtime, package paths, persistence technology, and test command before executing T001.
 - Confirm whether API conflict responses use `409 VERSION_CONFLICT` exactly or an existing project-wide error envelope with the same semantic code.
