@@ -30,6 +30,7 @@ def result(run_id: str, status: str = "SUCCEEDED"):
         "extractedAt": datetime(2026, 1, 1, tzinfo=timezone.utc),
         "noteRevisionId": "note-1:r1",
         "noteBodyHash": "b" * 64,
+        "validationRunId": "validation-1",
         "evidenceSourceReference": {
             "sourceId": "source-1",
             "sourceVersion": 1,

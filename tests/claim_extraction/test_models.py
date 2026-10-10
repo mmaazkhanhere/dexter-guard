@@ -65,6 +65,7 @@ def test_claim_contract_preserves_aliases_and_semantic_fields() -> None:
         extractionRunId="run-1",
         noteRevisionId="note-1:r1",
         noteBodyHash="b" * 64,
+        validationRunId="validation-1",
         evidenceSourceReference=reference(),
         extractorVersion="claim-extractor-v1",
         providerVersion="fake-v1",
@@ -79,6 +80,7 @@ def test_claim_contract_preserves_aliases_and_semantic_fields() -> None:
 
     assert payload["status"] == "SUCCEEDED"
     assert payload["noteRevisionId"] == "note-1:r1"
+    assert payload["validationRunId"] == "validation-1"
     assert payload["claims"][0]["polarity"] == "NEGATED"
     assert payload["claims"][0]["negationCue"]["text"] == "Keine"
 
@@ -195,6 +197,7 @@ def test_empty_result_is_typed_and_has_no_claims() -> None:
         extractionRunId="run-1",
         noteRevisionId="note-1:r1",
         noteBodyHash="b" * 64,
+        validationRunId="validation-1",
         evidenceSourceReference=reference(),
         extractorVersion="v1",
         outputSchemaVersion="v1",

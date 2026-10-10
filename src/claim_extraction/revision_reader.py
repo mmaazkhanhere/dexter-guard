@@ -24,6 +24,7 @@ class NoteRevisionContext:
     note_revision_id: str
     note_body: str
     note_body_hash: str
+    validation_run_id: str
     resident_test_id: str
     language: str
     synthetic: bool
@@ -66,6 +67,7 @@ class NursingNoteRevisionReader:
             note_revision_id=f"{record.note_id}:r{record.revision}",
             note_body=record.content,
             note_body_hash=note_body_hash,
+            validation_run_id=record.validation_run_id,
             resident_test_id=source.resident_test_id,
             language=source.language,
             synthetic=True,

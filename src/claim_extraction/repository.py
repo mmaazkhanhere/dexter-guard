@@ -73,6 +73,7 @@ class SQLiteClaimRepository:
                 CREATE TABLE IF NOT EXISTS claim_extraction_runs (
                     extraction_run_id TEXT PRIMARY KEY,
                     note_revision_id TEXT,
+                    validation_run_id TEXT,
                     status TEXT NOT NULL,
                     extractor_version TEXT NOT NULL,
                     result_json TEXT NOT NULL,
@@ -88,6 +89,11 @@ class SQLiteClaimRepository:
                 );
                 """
             )
+            columns = {
+                row["name"] for row in self._connection.execute("PRAGMA table_info(claim_extraction_runs)").fetchall()
+            }
+            if "validation_run_id" not in columns:
+                self._connection.execute("ALTER TABLE claim_extraction_runs ADD COLUMN validation_run_id TEXT")
 
     def save(self, result: ExtractionResult) -> ExtractionResult:
         payload = result.model_dump(mode="json", by_alias=True)
@@ -106,10 +112,11 @@ class SQLiteClaimRepository:
                     self._connection.commit()
                     return result.model_copy(deep=True)
                 self._connection.execute(
-                    "INSERT INTO claim_extraction_runs (extraction_run_id, note_revision_id, status, extractor_version, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                    "INSERT INTO claim_extraction_runs (extraction_run_id, note_revision_id, validation_run_id, status, extractor_version, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
                     (
                         result.extraction_run_id,
                         note_revision_id,
+                        getattr(result, "validation_run_id", None),
                         result.status.value,
                         result.extractor_version,
                         encoded,

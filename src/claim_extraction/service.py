@@ -260,6 +260,7 @@ class ClaimExtractionService:
                 extractionRunId=run_id,
                 noteRevisionId=context.note_revision_id,
                 noteBodyHash=context.note_body_hash,
+                validationRunId=context.validation_run_id,
                 evidenceSourceReference=context.source_reference,
                 extractorVersion=self.extractor_version,
                 providerVersion=metadata["provider_version"],
@@ -276,6 +277,7 @@ class ClaimExtractionService:
             extractionRunId=run_id,
             noteRevisionId=context.note_revision_id,
             noteBodyHash=context.note_body_hash,
+            validationRunId=context.validation_run_id,
             evidenceSourceReference=context.source_reference,
             extractorVersion=self.extractor_version,
             providerVersion=metadata["provider_version"],
@@ -314,6 +316,7 @@ class ClaimExtractionService:
             note_revision_id=note_revision,
             note_body=getattr(context, "note_body"),
             note_body_hash=getattr(context, "note_body_hash"),
+            validation_run_id=getattr(context, "validation_run_id"),
             resident_test_id=getattr(context, "resident_test_id"),
             language=getattr(context, "language"),
             synthetic=getattr(context, "synthetic"),
@@ -398,6 +401,7 @@ class ClaimExtractionService:
                     "The extraction result could not be persisted.",
                     retryable=True,
                     note_revision_id=getattr(result, "note_revision_id", None),
+                    validation_run_id=getattr(result, "validation_run_id", None),
                     provider_metadata={
                         "provider_version": result.provider_version,
                         "model_version": result.model_version,
@@ -419,6 +423,7 @@ class ClaimExtractionService:
         *,
         context: NoteRevisionContext | None = None,
         note_revision_id: str | None = None,
+        validation_run_id: str | None = None,
         provider_metadata: dict[str, str | None] | None = None,
     ) -> ExtractionFailed:
         metadata = provider_metadata or {}
@@ -426,6 +431,7 @@ class ClaimExtractionService:
             extractionRunId=run_id,
             noteRevisionId=context.note_revision_id if context is not None else note_revision_id,
             noteBodyHash=context.note_body_hash if context is not None else None,
+            validationRunId=context.validation_run_id if context is not None else validation_run_id,
             extractorVersion=self.extractor_version,
             providerVersion=metadata.get("provider_version"),
             modelVersion=metadata.get("model_version"),

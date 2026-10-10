@@ -102,7 +102,7 @@ Every error also has a non-sensitive `message` and `retryable` boolean. Pydantic
 
 ## Verification handoff boundary
 
-`ClaimExtractionService.get_current_result(note_revision_id)` returns the immutable successful/empty result record, including note provenance and carried `EvidenceSourceReference`. Spec 004 consumes that typed result before a revision becomes verification-ready. No asynchronous event delivery, outbox, evidence alignment, or evidence verdict is required by this PoC.
+`ClaimExtractionService.get_current_result(note_revision_id)` returns the immutable successful/empty result record, including note provenance, the upstream `validationRunId`, and carried `EvidenceSourceReference`. Spec 004 consumes that typed result before a revision becomes verification-ready. No asynchronous event delivery or outbox is required by this PoC; this typed retrieval is the mandatory handoff mechanism. No evidence alignment or evidence verdict is produced here.
 
 ## Persistence model
 
@@ -120,3 +120,4 @@ Use one SQLite transaction for a successful/empty result, its claims, and append
 3. Every successful/empty result carries immutable source-reference metadata and is retrievable through the typed service/persisted record for Spec 004.
 4. No Spec 003 model contains an evidence verdict, transcript span, diagnosis, approval state, or severity decision.
 5. Request note bodies over 50,000 Unicode code points fail with `REQUEST_TOO_LARGE` before a provider call.
+6. Every successful/empty result carries the exact upstream `validationRunId`; revision-bound failures carry it when the revision was resolved.
