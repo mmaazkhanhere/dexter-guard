@@ -19,8 +19,8 @@
 | Constitution contract stack | Pydantic contract tests, FastAPI/OpenAPI tests if exposed, SQLite repository tests, and an ADR for any material departure. |
 | Synthetic-only/evaluation gate | Fixture audit plus a versioned 100+ scenario German benchmark, held-out policy, raw counts, configured Spec 008 threshold result, and disclosed regressions. |
 | Run provenance/operability | Append-only run/version/body-hash history, explicit timeout/retry outcomes, idempotency, and permitted telemetry metrics. |
-| Evidence handoff | Every successful/empty result has immutable source-reference metadata and an atomically persisted `ClaimExtractionCompleted` event for Spec 004. |
-| Security bounds | Tests prove the 50,000-code-point guard, synthetic-only enforcement, content redaction, secret scanning, and dependency-vulnerability checks. |
+| Evidence handoff | Every successful/empty result has immutable source-reference metadata and is retrievable by typed service/persisted record for Spec 004. |
+| Extraction evaluation | Shared-benchmark contributions and extraction precision/recall, span-validity, semantic-attribute, and failure-handling results are recorded. |
 
 ## Convergence procedure
 

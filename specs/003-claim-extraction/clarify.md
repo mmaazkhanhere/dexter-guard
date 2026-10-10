@@ -9,7 +9,7 @@ These decisions remove planning ambiguity. They are requirements decisions, not 
 | Overlap | Claim spans may overlap. A parent phrase may support several claims, each with a separate id. | UI and verification need addressability without forced text duplication. |
 | Source of truth | The immutable stored note body identified by `noteRevisionId` is authoritative. | Prevents a client-supplied changed body from being associated with prior claims. |
 | Revision policy | Any edited note is a new revision and must be extracted again before downstream re-verification. | Implements FR-21/FR-22 boundary. |
-| Resident identity | Take resident identity only from immutable revision metadata. Every claim carries `IDENTIFIED`, `UNKNOWN`, or `AMBIGUOUS`; wording is never used to infer identity. | Satisfies the explicit-unknown-state constitutional requirement. |
+| Resident association | Carry the one required synthetic `residentTestId` from immutable note/source metadata. Do not infer, identify, or disambiguate residents; fail when the association is missing. | Matches the single-resident PoC boundary. |
 | Offset convention | Persist zero-based end-exclusive Unicode-code-point offsets plus exact UTF-16 offsets for editor interoperability. | Makes server validation and browser highlighting unambiguous. |
 | Stored text policy | Store synthetic note bodies as immutable UTF-8 text without post-storage normalization; validate each declared span against that exact body. | Makes provenance and location integrity testable. |
 | Numeric representation | Preserve `raw` literally; store normalized decimal text only for a direct German comma-to-dot representation. | Prevents rounding and semantic changes. |
@@ -27,12 +27,11 @@ These decisions remove planning ambiguity. They are requirements decisions, not 
 | Endpoint exposure | A service interface is mandatory; the HTTP endpoint is optional and merely delegates to it. | Keeps extraction independently testable and deployable in a pipeline. |
 | Identifier stability | Claim ids are unique within a revision/result. No stability across revisions is promised. | Edits may change boundaries and offsets. |
 | Contract technology | Cross-component contracts are Pydantic models; any exposed HTTP contract is generated/tested through FastAPI OpenAPI. | Required by the constitution's engineering standards. |
-| Run provenance | Every extraction attempt receives an idempotent validation-run id and records provider/model/prompt/schema versions, input body hash, status, and timestamps in append-only logical history. | Enables auditability without calling an extraction result evidence. |
+| Run provenance | Every extraction attempt receives an idempotent `extractionRunId` and records provider/model/prompt/schema versions, input body hash, status, and timestamps in append-only logical history. | Keeps extraction attempts auditable without confusing them with verification runs. |
 | Provider failures | Defined timeout, bounded retry, malformed-output, and unavailable-provider outcomes are typed failures with no partial claims. | Constitution requires observable, fail-safe degradation. |
 | Data policy | Fixtures, requests, evaluations, logs, screenshots, and demos use synthetic data only. | Real patient/employee data is prohibited in the PoC. |
-| Evaluation corpus | The feature contributes to a versioned, synthetic German benchmark of at least 100 labeled scenarios; held-out cases are not used for prompt tuning. | Evaluation is a release gate, not a demo artifact. |
-| Verification handoff | Each successful/empty result carries immutable source-reference metadata and emits `ClaimExtractionCompleted`; Spec 004 must consume it before a revision can become verification-ready. | Preserves the constitution's end-to-end evidence-traceability invariant without verifying in this feature. |
-| Input boundary | Reject note bodies above 50,000 Unicode code points before a provider call. | Limits resource exposure and prevents an oversized sensitive request. |
+| Evaluation corpus | The feature contributes labeled extraction cases to the shared Spec 008 benchmark; held-out cases are not used for prompt tuning. | End-to-end benchmark ownership remains with Spec 008. |
+| Verification handoff | Each successful/empty result carries immutable source-reference metadata and is retrievable by typed service/persisted result; Spec 004 must consume it before a revision can become verification-ready. | Preserves evidence-traceability without distributed delivery. |
 
 ## Resolved assumptions
 
@@ -41,3 +40,4 @@ These decisions remove planning ambiguity. They are requirements decisions, not 
 3. Structured fields that cannot be reliably recovered are optional. `claimText` and `statementSpan` remain required for every emitted claim.
 4. Warnings never upgrade incomplete extraction to success when a required schema or span invariant fails.
 5. Candidate-note provenance in this feature is not source evidence. Spec 004 alone attaches source transcript evidence and assigns any supported/unsupported/contradicted/uncertain outcome.
+6. An empty provider result is accepted only after a bounded independent factual-assertion safeguard; uncertain cases fail explicitly rather than becoming `EMPTY`.
