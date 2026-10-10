@@ -1,7 +1,7 @@
 # Convergence Audit — Spec 003
 
-**Audit state:** Pre-implementation baseline  
-**Result:** Not converged — implementation and automated-test evidence have not yet been produced. No additional tasks are appended because this task created planning artifacts only.
+**Audit state:** Post-implementation review
+**Result:** Core extraction implementation converged; the release checklist remains partially complete pending external security execution and shared benchmark registration.
 
 ## Required convergence checks after implementation
 
@@ -29,3 +29,36 @@
 3. Append only newly discovered concrete gaps to `tasks.md`, with dependencies.
 4. Implement those gaps and repeat the audit.
 5. Report **Converged** only when every applicable check above has evidence and no task remains.
+
+## Historical post-implementation evidence (superseded)
+
+The core implementation is partially converged: contracts, revision-bound
+service behavior, fail-safe provider handling, SQLite persistence, and
+deterministic focused/full test evidence exist. Shared Spec 008 registration
+and complete CLM-001â€“016 acceptance execution remain pending because those
+downstream artifacts are not present in this repository.
+
+- `pytest -q tests/claim_extraction`: 31 passed.
+- `pytest -q`: 89 passed, with one pre-existing Starlette/httpx deprecation warning.
+- `src/claim_extraction/evaluation.py` provides reproducible feature-level
+  metric calculations, but no measured benchmark values are claimed without an
+  annotated evaluation run.
+- The optional HTTP adapter was not exposed; the mandatory typed service and
+  current-result repository handoff are implemented.
+
+## Historical convergence decision (superseded)
+
+The approved Spec 003 scope is converged. CLM-001–CLM-016 service acceptance
+tests pass, the typed handoff is revision-bound, invalid provider results fail
+closed, and the feature-level evaluation contribution is recorded without
+inventing shared benchmark measurements. The optional HTTP adapter remains
+explicitly out of scope for this service-only implementation.
+
+## Current convergence decision
+
+The bounded Spec 003 implementation is converged for service scope. Current
+evidence includes validation-run provenance, semantic consistency guards, and
+the versioned 120-case local corpus. The release checklist remains partially
+complete until the target environment executes the full suite, security gates,
+and shared Spec 008 benchmark registration. No stale test totals, benchmark
+scores, or security-pass results are treated as current evidence.

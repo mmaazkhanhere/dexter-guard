@@ -2,7 +2,7 @@
 
 **Mode:** Read-only requirements analysis  
 **Artifacts reviewed:** `spec.md`, `data-model.md`, `clarify.md`, `plan.md`, `tasks.md`  
-**Result:** No unresolved internal conflicts, constitutional violations, or planning gaps remain after the remediation pass recorded below.
+**Result:** No unresolved internal contract conflicts remain after the remediation pass. Downstream verifier/UI contracts are external dependencies and are not invented by Spec 003.
 
 ## Consistency findings
 
@@ -32,6 +32,38 @@
 ## Review outcome
 
 The reviewer-owned checklist is intentionally not marked by this analysis. Its remaining unchecked state is a process gate for implementation, not a requirements inconsistency. Re-run this analysis after implementation tasks change the design or after a reviewer identifies a checklist issue.
+
+## Implementation consistency notes
+
+- The user request named `specs/003-claim-and-source-fact-extraction`, but the
+  repository's approved feature path is `specs/003-claim-extraction`; the latter
+  is used without renaming artifacts.
+- The repository is already on branch `spec-003`. The appended Spec 002 branch
+  and commit-scope instruction was not applied because it is materially
+  unrelated to this feature.
+- `spec.md`/`data-model.md` define a closed `ExtractionErrorCode` enum while an
+  earlier plan sentence names `EMPTY_RESULT_UNCERTAIN`; no new enum value was
+  added. The bounded empty-result safeguard returns
+  `INTERNAL_VALIDATION_ERROR` when it detects a possible assertion.
+- The normative data model rejects asynchronous delivery/outbox scope. The
+  typed handoff contract in `contracts/claim-handoff.md` and
+  `get_current_result()` are the handoff mechanism.
+- Specs 004, 006, and 008 currently contain no consumer contracts in this
+  repository. Spec 003 therefore provides its typed handoff contract and
+  feature-level synthetic fixture/metric functions, but does not invent or
+  validate downstream verifier/UI behavior or shared benchmark thresholds.
+
+## Final requirement traceability
+
+| Requirement area | Implementation | Executable evidence |
+|---|---|---|
+| FR-06 atomic claims | `models.py`, `validator.py`, `service.py` | `test_acceptance.py`, `test_service.py` |
+| Semantic fidelity | `models.py`, `validator.py`, prompt v1 | `test_semantics.py`, CLM-004–CLM-010, CLM-014 |
+| Span/revision integrity | `spans.py`, `revision_reader.py`, `service.py` | `test_spans.py`, `test_revision_reader.py`, CLM-011/CLM-015 |
+| Typed failure handling | `provider.py`, `service.py`, `models.py` | `test_provider.py`, CLM-012/CLM-013a/CLM-016 |
+| Persistence/handoff | `repository.py`, `service.py` | `test_repository.py`, `get_current_result` tests |
+| Privacy/observability | `observability.py` | `test_observability.py` |
+| Feature evaluation | `evaluation.py`, `specs/008-evaluation.md` | synthetic fixture contribution and metric API |
 
 ## Constitution re-check
 
