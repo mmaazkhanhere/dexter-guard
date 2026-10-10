@@ -117,3 +117,22 @@ Write tests before each implementation slice. Test through the application servi
 - Version the provider prompt/schema/model/settings and record versions without recording sensitive content.
 - Set explicit provider timeouts, bounded retries, and idempotent run identifiers; map failures without automatic fallback that could change claim semantics or duplicate actions.
 - Add an ADR before implementation if the final design changes a cross-component contract, chooses a non-default provider boundary, or introduces a material trade-off.
+
+## Implementation conventions recorded by T001
+
+- The repository's existing note identity is adapted as `noteRevisionId =
+  <note_id>:r<revision>`. `NursingNoteRevisionReader` resolves that exact
+  immutable revision and carries its source document's resident and language
+  metadata; it does not accept caller-supplied authoritative note text.
+- Spec 003 uses a separate `ClaimExtractionProvider` port because Spec 002's
+  `GenerationAdapter` produces nursing-note drafts rather than claim payloads.
+  Provider responses are untrusted JSON and are rejected atomically on schema or
+  span failure.
+- The mandatory service boundary is implemented. The optional HTTP facade is
+  intentionally not exposed because the current application has separate
+  source/note FastAPI boundaries and no approved claims API contract.
+- Successful and empty results are handed off through the typed result
+  repository/current-result lookup. No event bus or outbox is introduced.
+- The normative closed error enum is used. The plan's earlier
+  `EMPTY_RESULT_UNCERTAIN` wording is represented as
+  `INTERNAL_VALIDATION_ERROR` so the contract is not expanded silently.
