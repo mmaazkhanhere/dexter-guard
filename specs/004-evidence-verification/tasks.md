@@ -1,6 +1,6 @@
 # Spec 004 — Implementation Tasks
 
-**Source artifacts:** [specify.md](specify.md), [clarify.md](clarify.md), [plan.md](plan.md), and [checklist.md](checklist.md)  
+**Source artifacts:** [spec.md](spec.md), [clarify.md](clarify.md), [annotation-policy.md](annotation-policy.md), [contracts/verification-runs.openapi.yaml](contracts/verification-runs.openapi.yaml), [plan.md](plan.md), and [checklist.md](checklist.md)
 **Execution rule:** Do not begin implementation until the reviewer-owned checklist gate is satisfied. Tasks are dependency ordered; [P] means work may proceed in parallel after its listed dependencies.
 
 ## Phase 0 — Architecture and contract baseline
@@ -11,9 +11,9 @@
   **Depends on:** T001
 - [ ] T003 [P] Inspect Specs 005–008 interfaces to confirm numerical/unit checks, omissions, approval, and evaluation remain outside this module.  
   **Depends on:** T001
-- [ ] T004 Define the repository-native public and internal schemas for EvidenceStatus, SourceSpan, EvidenceFinding, VerificationRun, request, and structured failure. Encode enum closure and success/failure exclusivity.  
+- [ ] T004 Define the versioned Pydantic and OpenAPI public/internal schemas for EvidenceStatus, SourceSpan, EvidenceFinding, VerificationRun, request, and structured failure. Use the architecture's canonical SourceSpan fields (`source_id`, `source_version`, `start`, `end`), define the explicit transport mapping if needed, include derived quotations only alongside spans, include the evidence-status-policy version and idempotency key, and encode enum closure and success/failure exclusivity.
   **Depends on:** T001, T002
-- [ ] T005 Write contract tests for the schemas before service implementation, including missing fields, unknown enum, duplicate claim ID, invalid terminal-state combinations, and foreign claim ID.  
+- [ ] T005 Write contract tests for the schemas before service implementation, including missing fields, unknown enum, duplicate claim ID, invalid terminal-state combinations, foreign claim ID, success/failure exclusivity, successful `UNSUPPORTED` findings with no spans, and invalid required-span failure responses.
   **Depends on:** T004
 
 ## Phase 1 — Deterministic integrity foundation
@@ -26,7 +26,7 @@
   **Depends on:** T006
 - [ ] T009 Write integrity tests for valid span, stale source identity, reversed/empty/out-of-range offsets, and mismatched quotation. Cover EV-010.  
   **Depends on:** T008
-- [ ] T010 Implement input and provenance validation against existing source, note, and claim repositories. Enforce non-empty claim set, unique claim IDs, exact source version, exact note revision, and claim ownership.  
+- [ ] T010 Implement input and provenance validation against existing source, note, and claim repositories. Enforce non-empty claim set, unique claim IDs, exact source version, exact note revision, claim ownership, required resident identity/`UNKNOWN` handling, and known-resident equality with the source.
   **Depends on:** T002, T004
 - [ ] T011 Write repository-backed tests for missing transcript, EV-011 source-version mismatch, unknown claim, duplicate claim, and cross-note/cross-revision claim rejection.  
   **Depends on:** T010
@@ -37,11 +37,11 @@
   **Depends on:** T004, T010
 - [ ] T013 Implement advisory candidate-evidence discovery using claim text and upstream normalized attributes. Ensure short transcripts can be supplied in full and retrieval absence never decides status.  
   **Depends on:** T012
-- [ ] T014 Implement the approved model adapter using structured output, configured timeout, safe retry policy, model/prompt version capture, and redacted diagnostics.  
+- [ ] T014 Implement the approved model adapter using structured output, configured timeout, bounded safe retry policy tied to the same idempotent run identifier, model/prompt version capture, and redacted diagnostics.
   **Depends on:** T012, T013
 - [ ] T015 Write adapter contract tests with a deterministic fake for malformed JSON, invalid enum, duplicated/missing/foreign claim IDs, missing explanation, timeout, and provider failure. Cover EV-012.  
   **Depends on:** T014
-- [ ] T016 Implement deterministic response normalization: coverage enforcement, one primary status, required spans by status, precedence, discrepancy validation, and CERTAINTY-v1 handling.  
+- [ ] T016 Implement deterministic response validation and annotation-policy application: enum/contract validation, coverage enforcement, required spans by status, required discrepancy labels, and CERTAINTY-v1 handling. The semantic verifier—not deterministic code—classifies semantic support, contradiction, or uncertainty. Preserve conflicting verifier/rule findings and resolve only documented mechanical policy constraints conservatively.
   **Depends on:** T008, T014
 - [ ] T017 Write policy unit tests for explicit contradiction, absent support, genuine ambiguity, certainty escalation, explicitly unconfirmable certainty claim, patient-report attribution escalation, unsupported clinical inference, negation reversal, and partial negation.  
   **Depends on:** T016
@@ -54,23 +54,23 @@
   **Depends on:** T016, T018
 - [ ] T020 Implement the verification application service in the algorithm order from plan.md: validation, immutable lookup, discovery, verifier call, response validation, span validation, normalization, coverage, atomic persistence.  
   **Depends on:** T019
-- [ ] T021 Write integration tests proving all-or-nothing behavior: one failing claim, invalid evidence in one finding, missing finding, persistence failure, and no approved/authoritative partial output.  
+- [ ] T021 Write integration tests proving all-or-nothing behavior: one failing claim, invalid evidence in one finding, missing finding, persistence failure, and no approved/authoritative partial output. Prove that an invalid required span fails the whole run while a contract-valid `UNSUPPORTED` claim with no span remains a successful finding.
   **Depends on:** T020
 
 ## Phase 4 — HTTP API and end-to-end regression suite
 
-- [ ] T022 Add POST /api/v1/verification-runs to the existing API router, authentication, authorization, error-envelope, idempotency, and correlation conventions.  
+- [ ] T022 Add POST /api/v1/verification-runs to the existing API router, its versioned OpenAPI contract, error-envelope, required idempotency, and correlation conventions. Use a local synthetic-demo access boundary and data minimization; do not add accounts, roles, permissions, authentication, or authorization.
   **Depends on:** T020
-- [ ] T023 Write API contract tests for successful response, invalid HTTP request, identifiable failed run, response-schema stability, findings/failure exclusivity, and minimum authorized evidence exposure.  
+- [ ] T023 Write API contract tests for successful response, invalid HTTP request, identifiable failed run, response-schema stability, findings/failure exclusivity, and minimum evidence exposure at the applicable review boundary.
   **Depends on:** T022
-- [ ] T024 Create versioned German-language fixtures and expected findings for EV-001 through EV-014. Each test asserts claim ID, primary status, discrepancy type where applicable, span boundaries/text where required, and run state.  
+- [ ] T024 Create versioned German-language fixtures and expected findings for EV-001 through EV-014. Each test asserts the `EVIDENCE_ANNOTATION-v1` policy version, claim ID, canonical primary status, required discrepancy labels, span boundaries/text where required, and run state.
   **Depends on:** T017, T023
-- [ ] T025 Add end-to-end tests over immutable source, note revision, extracted claim fixtures, deterministic verifier fake, persistence, and API. Verify all functional requirements FR-07 through FR-13 in scope.  
+- [ ] T025 Add end-to-end tests over immutable source, note revision, extracted claim fixtures, deterministic verifier fake, persistence, and API. Verify all functional requirements FR-07 through FR-13 in scope. Add a separately marked real-configured-verifier development acceptance suite over the fixed synthetic development dataset: assert primary status, discrepancy labels, and evidence integrity, record failures and versions, and never assert exact explanation wording. Held-out evaluation remains Spec 008.
   **Depends on:** T024
 
 ## Phase 5 — Operations, privacy, and evaluation handoff
 
-- [ ] T026 Add structured telemetry for lifecycle, latency, model/prompt/policy version, span-integrity failures, coverage failures, and safe failure codes. Confirm transcripts/prompts/raw model output are redacted according to architecture policy.  
+- [ ] T026 Add structured telemetry for lifecycle, latency, inference cost, token usage, model/prompt/policy versions, rejection reasons, warning counts, span-integrity failures, coverage failures, and safe failure codes. Confirm transcripts/prompts/raw model output are redacted according to architecture policy.
   **Depends on:** T020
 - [ ] T027 Document configuration, approved verifier settings, timeout/retry behavior, run retention, and operational troubleshooting in the project’s standard operations location.  
   **Depends on:** T014, T026

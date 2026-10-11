@@ -1,6 +1,6 @@
 # Spec 004 — Convergence Procedure
 
-**Purpose:** Verify the codebase against specify.md, clarify.md, plan.md, and tasks.md after implementation. This procedure is read-only except that it may append newly discovered implementation tasks to tasks.md. It never changes checklist.md.
+**Purpose:** Verify the codebase against spec.md, clarify.md, annotation-policy.md, contracts/verification-runs.openapi.yaml, plan.md, and tasks.md after implementation. This procedure is read-only except that it may append newly discovered implementation tasks to tasks.md. It never changes checklist.md.
 
 ## Preconditions
 
@@ -10,14 +10,14 @@
 
 ## Verification sequence
 
-1. Re-read the specification, clarification record, technical plan, and task list.
+1. Re-read the specification, clarification record, annotation policy, executable OpenAPI contract, technical plan, and task list.
 2. Inspect implementation code, route registration, schemas, persistence/migrations, configuration, logs/metrics, fixtures, and tests against the repository architecture.
 3. Build a traceability matrix from every functional requirement, acceptance scenario, contract field, lifecycle state, and safety rule to executable code and a passing test.
 4. Confirm source-only evidence: no path allows candidate-note text, other claims, retrieval score, or prior run to ground a result.
 5. Confirm all successful runs have complete, unique claim coverage and one status per claim.
 6. Confirm SourceSpan uses the defined Unicode code-point range and source-derived quotation; exercise corrupted offsets and quotation mismatch.
 7. Confirm failure isolation: stale provenance, invalid span, malformed/unknown model response, timeout, and persistence failure cannot result in SUCCEEDED or authoritative partial findings.
-8. Confirm qualifier treatment against EV-004 through EV-007 and EV-013, including CERTAINTY-v1 decision boundaries.
+8. Confirm qualifier treatment against EV-004 through EV-007 and EV-013 against `EVIDENCE_ANNOTATION-v1`, including certainty, attribution, and partial-negation outcomes.
 9. Confirm Spec 004 has not absorbed Spec 005–008 responsibilities.
 10. Run all required automated checks and inspect their reports.
 

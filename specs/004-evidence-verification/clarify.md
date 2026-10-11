@@ -1,7 +1,7 @@
 # Spec 004 — Clarification Record
 
 **Purpose:** Resolve specification ambiguities before design and task planning.  
-**Status:** Resolved decisions are folded into [specify.md](specify.md).  
+**Status:** Resolved decisions are folded into [spec.md](spec.md).
 **Method:** Decisions below are conservative where unsafe inference could make an ungrounded nursing note appear verified.
 
 ## Resolved decisions

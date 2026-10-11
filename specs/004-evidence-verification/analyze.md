@@ -1,7 +1,7 @@
 # Spec 004 — Consistency Analysis
 
 **Analysis type:** Read-only cross-artifact review  
-**Artifacts reviewed:** specify.md, clarify.md, plan.md, tasks.md  
+**Artifacts reviewed:** spec.md, clarify.md, annotation-policy.md, plan.md, tasks.md
 **Result:** No blocking conflicts found in the specification set. Implementation has not begun; unchecked tasks and reviewer checklist items are expected.
 
 ## Requirement traceability
@@ -19,7 +19,7 @@
 
 | Check | Result | Evidence |
 |---|---|---|
-| Exactly one status per successfully verified claim | Pass | specify.md requires one primary status; plan.md coverage check; T016 and T021 enforce it. |
+| Exactly one status per successfully verified claim | Pass | spec.md requires one primary status; plan.md coverage check; T016 and T021 enforce it. |
 | Failure distinct from evidence status | Pass | clarify CL-003/CL-013, plan lifecycle, and T019 restrict findings to SUCCEEDED runs. |
 | Source is sole evidence authority | Pass | specify scope and plan architecture prohibit candidate-note self-support; T012 constrains the semantic port. |
 | Offsets and quotations independently checkable | Pass | clarify CL-004/CL-005 and plan SourceSpan contract agree; T006–T009 test them. |

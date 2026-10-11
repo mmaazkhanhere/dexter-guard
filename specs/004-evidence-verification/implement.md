@@ -4,7 +4,7 @@
 
 ## Mandatory preflight gate
 
-1. Read specify.md, clarify.md, plan.md, tasks.md, analyze.md, the constitution, and docs/architecture.md.
+1. Read spec.md, clarify.md, annotation-policy.md, contracts/verification-runs.openapi.yaml, plan.md, tasks.md, analyze.md, the constitution, and docs/architecture.md.
 2. Read every checkbox in checklist.md.
 3. If any required checklist item is unchecked, stop before code changes and ask the designated reviewer to complete the requirements-quality review.
 4. Do not edit checklist.md, check checklist items, or treat task completion as reviewer approval.
@@ -16,7 +16,7 @@ At generation time, checklist.md deliberately has unchecked reviewer-owned items
 
 1. Complete Phase 0 in tasks.md and commit/review schema decisions before model integration.
 2. Complete deterministic source-span and provenance controls in Phase 1, with their unit tests passing first.
-3. Complete the structured verifier boundary and deterministic classifier normalization in Phase 2. Treat every model response as untrusted.
+3. Complete the structured verifier boundary and deterministic response validation plus annotation-policy application in Phase 2. Treat every model response as untrusted; deterministic code must not independently infer semantic support or contradiction.
 4. Add immutable run persistence and orchestrate the all-or-nothing lifecycle in Phase 3.
 5. Add the authenticated POST endpoint and the German-language regression suite in Phase 4.
 6. Complete telemetry, privacy checks, operations documentation, and Spec 008 fixture handoff in Phase 5.

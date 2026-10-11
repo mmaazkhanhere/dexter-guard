@@ -1,5 +1,7 @@
 # Spec 004 — Evidence Verification
 
+**Canonical feature specification:** This `spec.md` file is the authoritative behavioral specification for Spec 004.
+
 **Feature:** Evidence-grounded verification of nursing-note claims  
 **Status:** Ready for planning  
 **Input dependencies:** immutable German transcript (Spec 001), candidate note revision (Spec 002), and atomic claims (Spec 003)  
@@ -142,15 +144,20 @@ As an operator, I need bad provenance, evidence, or verifier output to be unmist
 
 Enumeration with exactly: <code>SUPPORTED</code>, <code>UNSUPPORTED</code>, <code>CONTRADICTED</code>, <code>UNCERTAIN</code>.
 
+The definitions and precedence in this specification are versioned as `EVIDENCE_STATUS-v1`. A change to a status definition or precedence requires a new policy version and regression cases.
+
+Canonical ground-truth classification for qualifier-sensitive fixtures is defined in [annotation-policy.md](annotation-policy.md) as `EVIDENCE_ANNOTATION-v1`. The semantic verifier applies that policy; deterministic code validates the resulting contract and evidence integrity without independently deciding semantic support or contradiction.
+
 ### SourceSpan
+
+The canonical domain shape follows `docs/architecture.md`: `source_id`, `source_version`, `start`, and `end`. Transport serializers may map these names to the repository's established API convention, but that mapping MUST be explicit, versioned, and tested. A derived quotation/excerpt is returned alongside the span, not stored as a `SourceSpan` field, and MUST be recomputed from the immutable source.
 
 | Field | Requirement |
 |---|---|
-| sourceId | Required; equals the run source ID. |
-| sourceVersion | Required; equals the run immutable source version. |
-| startOffset | Required non-negative integer; zero-based and inclusive. |
-| endOffset | Required integer greater than start offset, exclusive, and no larger than the source length under the documented character-indexing convention. |
-| text | Required source-derived substring exactly matching the range; validate it, never trust it from the verifier. |
+| source_id | Required; equals the run source ID. |
+| source_version | Required; equals the run immutable source version. |
+| start | Required non-negative integer; zero-based and inclusive. |
+| end | Required integer greater than `start`, exclusive, and no larger than the source length under the documented character-indexing convention. |
 
 ### EvidenceFinding
 
@@ -162,13 +169,15 @@ Enumeration with exactly: <code>SUPPORTED</code>, <code>UNSUPPORTED</code>, <cod
 | sourceSpans | Required array; non-empty for supported, contradicted, and uncertain; may be empty only for unsupported. |
 | discrepancies | Required structured array, with types such as NEGATION, CERTAINTY, ATTRIBUTION, CLINICAL_INFERENCE, and OTHER. |
 | policyVersion | Required for policy-governed certainty treatment; otherwise the run policy version applies. |
+| verifierFinding | Retained normalized verifier recommendation when semantic verification was invoked. It MUST remain available if deterministic checks resolve the public status differently. |
+| deterministicRuleFindings | Structured deterministic check results, including conflicts with the verifier recommendation; they MUST NOT be silently discarded. |
 
 ### VerificationRun
 
 | Field | Requirement |
 |---|---|
 | verificationRunId | Unique immutable run ID. |
-| sourceId, sourceVersion | Exact evidence snapshot. |
+| source_id, source_version | Exact evidence snapshot. |
 | noteId, noteRevision | Exact candidate note revision. |
 | claimSetId or claimSetDigest | Identity of submitted claims. |
 | status | Successful only when all validation and verification obligations complete. |
@@ -176,7 +185,11 @@ Enumeration with exactly: <code>SUPPORTED</code>, <code>UNSUPPORTED</code>, <cod
 | failure | Present for non-success; structured failure code and safe diagnostic detail. |
 | verifier | Model ID/version and prompt version. |
 | annotationPolicyVersion | Classification policy in force. |
+| evidenceStatusPolicyVersion | Version of the definitions and precedence for the four primary evidence statuses. |
+| idempotencyKey | Required request identity used to make retries resolve to the same run. |
 | startedAt, completedAt | Run timestamps. |
+
+The executable HTTP schema is [contracts/verification-runs.openapi.yaml](contracts/verification-runs.openapi.yaml). It defines success/failure exclusivity and makes `UNSUPPORTED` with no source spans a successful finding, while invalid required spans produce a non-successful `FAILED_EVIDENCE_INTEGRITY` run.
 
 ## API
 
@@ -194,16 +207,18 @@ The API neither accepts the candidate note as evidence nor mutates upstream reco
 | EV-002 | Fabricated symptom absent from source | Unsupported. |
 | EV-003 | Explicit contradiction of a symptom | Contradicted with conflicting source span. |
 | EV-004 | Negation removed during rewriting | Contradicted; discrepancy identifies negation. |
-| EV-005 | Uncertainty turned into certainty | Certainty discrepancy; status follows versioned annotation policy. |
-| EV-006 | Patient-reported symptom changed to confirmed observation | Attribution discrepancy; not directly supported by report alone. |
+| EV-005 | Uncertainty turned into certainty | `UNCERTAIN` with a `CERTAINTY` discrepancy under `EVIDENCE_ANNOTATION-v1`; use `CONTRADICTED` only when the source explicitly denies or withholds confirmation. |
+| EV-006 | Patient-reported symptom changed to confirmed observation | `UNCERTAIN` with an `ATTRIBUTION` discrepancy under `EVIDENCE_ANNOTATION-v1`; a report alone cannot support confirmed observation. |
 | EV-007 | Observation turned into unsupported diagnosis | Unsupported; discrepancy identifies clinical inference. |
 | EV-008 | Equivalent German medical and colloquial terms | Supported when material qualifiers remain faithful. |
 | EV-009 | Ambiguous transcript meaning | Uncertain with relevant grounding and explanation. |
 | EV-010 | Evidence quotation does not match source span | Evidence-integrity failure; run non-successful. |
 | EV-011 | Source version mismatch | Verification fails safely; no successful findings. |
 | EV-012 | Verifier timeout or malformed response | Verification fails; candidate note remains unapproved. |
-| EV-013 | “keine starken Schmerzen” used to support “keine Schmerzen” | Not supported; explain partial-negation scope. |
+| EV-013 | “keine starken Schmerzen” used to support “keine Schmerzen” | `UNCERTAIN` with a `NEGATION` discrepancy and relevant source span; explain partial-negation scope. |
 | EV-014 | No pain evidence but claim states pain | Unsupported, not contradicted. |
+
+For EV-013, when the partial-negation span is the only relevant evidence, the required primary status is `UNCERTAIN` with a `NEGATION` discrepancy, as defined by CL-009.
 
 Tests must assert the exact claim ID, primary status, applicable discrepancy type, and valid evidence location—not merely a warning.
 
@@ -213,7 +228,7 @@ Tests must assert the exact claim ID, primary status, applicable discrepancy typ
 - **Deterministic boundary:** Validate inputs, span integrity, contract shape, status normalization, claim coverage, and persistence deterministically. Semantic comparison may use a model through a structured contract.
 - **Traceability:** Reproduce each result to exact source snapshot, note revision, claim set, model/prompt, and annotation policy.
 - **Privacy:** Send only the minimum required transcript and claim material to an approved semantic verifier, following system data handling rules.
-- **Observability:** Expose lifecycle state, safe failure code, model/prompt identity, and correlation identifiers without treating invalid evidence as fact.
+- **Observability:** Expose lifecycle state, safe failure code, model/prompt identity, correlation identifiers, latency, inference cost, token usage, rejection reasons, and warning counts without treating invalid evidence as fact or exposing sensitive text.
 
 ## Dependencies and definition of done
 
