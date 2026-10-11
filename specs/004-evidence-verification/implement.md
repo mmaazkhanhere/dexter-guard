@@ -18,7 +18,7 @@ At generation time, checklist.md deliberately has unchecked reviewer-owned items
 2. Complete deterministic source-span and provenance controls in Phase 1, with their unit tests passing first.
 3. Complete the structured verifier boundary and deterministic response validation plus annotation-policy application in Phase 2. Treat every model response as untrusted; deterministic code must not independently infer semantic support or contradiction.
 4. Add immutable run persistence and orchestrate the all-or-nothing lifecycle in Phase 3.
-5. Add the authenticated POST endpoint and the German-language regression suite in Phase 4.
+5. Add the local synthetic-demo POST endpoint, data-minimization behavior, and German-language regression suite in Phase 4; do not add accounts, roles, permissions, authentication, or authorization.
 6. Complete telemetry, privacy checks, operations documentation, and Spec 008 fixture handoff in Phase 5.
 7. Execute all project-required checks in T029, then ask the reviewer to perform T030.
 8. Run the convergence procedure in converge.md. Implement only tasks appended by that procedure, then repeat until it reports convergence.

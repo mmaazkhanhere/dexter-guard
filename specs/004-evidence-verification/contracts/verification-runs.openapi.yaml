@@ -111,7 +111,7 @@ components:
     EvidenceQuote:
       type: object
       additionalProperties: false
-      required: [span, text]
+      required: [span, text, evidenceRole]
       properties:
         span:
           $ref: '#/components/schemas/SourceSpan'
@@ -119,6 +119,10 @@ components:
           type: string
           minLength: 1
           description: Derived from the immutable source after span validation; never trusted from a verifier.
+        evidenceRole:
+          type: string
+          enum: [SUPPORTING, CONFLICTING, CONTEXT_NON_SUPPORTING]
+          description: CONTEXT_NON_SUPPORTING is optional context for an UNSUPPORTED finding and cannot be presented as support.
     VerifierFinding:
       type: object
       additionalProperties: false
@@ -190,10 +194,12 @@ components:
             required: [status]
           then:
             properties:
-              sourceSpans:
-                maxItems: 0
               evidenceQuotes:
-                maxItems: 0
+                items:
+                  properties:
+                    evidenceRole:
+                      const: CONTEXT_NON_SUPPORTING
+                  required: [evidenceRole]
         - if:
             properties:
               status:
@@ -228,6 +234,13 @@ components:
         - idempotencyKey
         - evidenceStatusPolicyVersion
         - annotationPolicyVersion
+        - modelId
+        - modelVersion
+        - promptVersion
+        - correlationId
+        - createdAt
+        - startedAt
+        - completedAt
         - status
       properties:
         verificationRunId:
@@ -253,6 +266,27 @@ components:
         annotationPolicyVersion:
           type: string
           const: EVIDENCE_ANNOTATION-v1
+        modelId:
+          type: [string, 'null']
+          description: Configured verifier model identity, or null when failure occurred before invocation.
+        modelVersion:
+          type: [string, 'null']
+          description: Configured verifier model version, or null when unavailable.
+        promptVersion:
+          type: [string, 'null']
+          description: Version or hash of the verifier prompt, or null when unavailable.
+        correlationId:
+          type: string
+          minLength: 1
+        createdAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
         status:
           type: string
     VerificationRunSucceeded:

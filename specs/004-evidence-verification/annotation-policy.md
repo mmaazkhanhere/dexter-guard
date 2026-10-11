@@ -16,7 +16,7 @@ Deterministic code MUST reject invalid output, but MUST NOT infer that text sema
 |---|---|---|---|---|
 | AP-001 | Source directly establishes the complete claim and material qualifiers. | `SUPPORTED` | None unless another material qualifier changed. | At least one valid supporting span. |
 | AP-002 | Source explicitly states the opposite proposition, including explicit negation reversal. | `CONTRADICTED` | `NEGATION` when polarity/negation differs. | At least one valid conflicting span. |
-| AP-003 | No relevant source evidence supports the claim and no source evidence explicitly conflicts. | `UNSUPPORTED` | `CLINICAL_INFERENCE` when an unestablished diagnosis is asserted. | No span is required; any supplied span must be valid and must not be presented as support. |
+| AP-003 | No relevant source evidence supports the claim and no source evidence explicitly conflicts. | `UNSUPPORTED` | `CLINICAL_INFERENCE` when an unestablished diagnosis is asserted. | No span is required. An optional valid context span is allowed only when its paired quotation is marked `CONTEXT_NON_SUPPORTING`; it cannot be presented as support or conflict. |
 | AP-004 | Relevant source evidence is qualified or ambiguous, so the asserted claim cannot be established or explicitly contradicted. | `UNCERTAIN` | The applicable qualifier label below. | At least one valid relevant span. |
 | AP-005 | Source says a symptom is possible/unclear; claim asserts it as certain. | `UNCERTAIN` | `CERTAINTY` | At least one valid relevant span. |
 | AP-006 | Source explicitly says confirmation cannot be made or was withheld; claim asserts confirmation. | `CONTRADICTED` | `CERTAINTY`; add `CLINICAL_INFERENCE` for an unsupported diagnosis. | At least one valid conflicting span. |
@@ -25,7 +25,7 @@ Deterministic code MUST reject invalid output, but MUST NOT infer that text sema
 
 ## Run-outcome distinction
 
-`UNSUPPORTED` is a successful evidence finding when the claim has been semantically assessed, the response is contract-valid, and no evidence span is required under AP-003. It is never a verifier failure.
+`UNSUPPORTED` is a successful evidence finding when the claim has been semantically assessed and the response is contract-valid. It may have no span, or optional valid context spans whose paired quotations are explicitly marked `CONTEXT_NON_SUPPORTING`; it is never a verifier failure.
 
 An invalid, mismatched, empty, out-of-range, or unresolvable required source span is an evidence-integrity failure. The verification run is non-successful and must contain no authoritative partial findings. This distinction is mandatory in the OpenAPI contract and test fixtures.
 

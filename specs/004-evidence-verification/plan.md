@@ -85,7 +85,7 @@ Required semantic attributes, when Spec 003 provides them, include subject, pred
 
 Only <code>SUCCEEDED</code> may include authoritative <code>findings</code>. A terminal failure includes a machine-readable failure code, a safe human-readable reason, model/prompt identity when available, and correlation ID. It must not convert errors into <code>UNCERTAIN</code> or any other evidence status.
 
-An invalid required source span is a <code>FAILED_EVIDENCE_INTEGRITY</code> outcome. In contrast, a contract-valid `UNSUPPORTED` finding with no source spans is a successful verification result: it records a semantically assessed hallucination, not a processing failure.
+An invalid required source span is a <code>FAILED_EVIDENCE_INTEGRITY</code> outcome. In contrast, a contract-valid `UNSUPPORTED` finding with no source spans—or only valid quotations marked `CONTEXT_NON_SUPPORTING`—is a successful verification result: it records a semantically assessed hallucination, not a processing failure.
 
 ### Evidence contracts
 
@@ -114,9 +114,10 @@ The source text is held exactly as versioned by Spec 001. Display normalization,
 claimId: input claim identifier
 status: one EvidenceStatus
 explanation: concise reviewer-facing basis
-sourceSpans: validated spans; required except for UNSUPPORTED
+sourceSpans: validated spans; required except for UNSUPPORTED, which may omit them or supply only optional non-supporting context spans
+evidenceQuotes: source-derived quotations paired to spans; unsupported context quotations are marked CONTEXT_NON_SUPPORTING
 discrepancies: zero or more typed semantic changes
-policyVersion: CERTAINTY-v1 for certainty-governed outcome
+policyVersion: EVIDENCE_ANNOTATION-v1 for qualifier-governed outcome
 verifierFinding: normalized verifier recommendation, retained when available
 deterministicRuleFindings: structured deterministic checks, including conflicts
 ~~~
@@ -127,7 +128,7 @@ Discrepancy types are <code>NEGATION</code>, <code>CERTAINTY</code>, <code>ATTRI
 
 The persisted run MUST include the evidence-status-policy version, the required idempotency key, and separate verifier and deterministic-rule findings when they disagree; the resolved public status MUST preserve the conservative blocking outcome.
 
-Persist run ID, input identity/digest, source ID/version, note ID/revision, status, findings or failure, verifier model and version, prompt version/hash, annotation-policy version, evidence-status-policy version, created/started/completed timestamps, correlation ID, and the required idempotency key.
+Persist and return run ID, input identity/digest, source ID/version, note ID/revision, status, findings or failure, verifier model ID/version, prompt version/hash, annotation-policy version, evidence-status-policy version, created/started/completed timestamps, correlation ID, and the required idempotency key. The public HTTP response exposes this execution metadata; only model/prompt values unavailable before invocation may be null.
 
 ## Verification algorithm
 
@@ -135,7 +136,7 @@ Persist run ID, input identity/digest, source ID/version, note ID/revision, stat
 2. **Validate provenance.** Resolve immutable source snapshot, candidate note revision, and claim set. Confirm each claim exists exactly once and belongs to requested note revision. Reject source/version mismatch and stale or cross-note claim references.
 3. **Prepare source representation.** Preserve exact source string and build a Unicode code-point index utility. Do not modify source text or use a normalized derivative for evidence offsets.
 4. **Discover candidate evidence.** Use claim text and normalized attributes to select useful passages. For short transcripts, present the whole source. Discovery scores are advisory and never decide evidence status.
-5. **Perform semantic comparison.** Call structured verifier with claim, only immutable source evidence, candidate passages or full source, status definitions, qualifier rules, and CERTAINTY-v1. Require one candidate result per claim, valid enum status, concise explanation, discrepancy types, and proposed spans.
+5. **Perform semantic comparison.** Call structured verifier with claim, only immutable source evidence, candidate passages or full source, status definitions, qualifier rules, and `EVIDENCE_ANNOTATION-v1`. Require one candidate result per claim, valid enum status, concise explanation, discrepancy types, and proposed spans.
 6. **Validate structured response.** Reject malformed JSON, invalid enums, duplicate/missing/foreign claim IDs, excess findings, missing required reason, unsupported fields that affect meaning, and timeout/provider errors.
 7. **Validate evidence references.** For every proposed span, verify source ID/version equality, integer boundaries, non-empty range, offset range, and exact source-derived quotation. Reject any mismatch. For statuses that require grounding, reject empty spans.
 8. **Validate and apply the annotation policy.** The semantic verifier establishes the proposed evidence relationship: whether the source supports, contradicts, or leaves a claim uncertain. Deterministic code validates enum closure, claim identity and coverage, required discrepancy labels, source-span/quotation integrity, and contract consistency; it MUST NOT independently infer a semantic contradiction, support relationship, or clinical meaning from text. It may reject an invalid response or apply only mechanical policy constraints defined in `annotation-policy.md`; it must not guess a replacement evidence status. Preserve the verifier recommendation and deterministic rule findings as separate records when they disagree. Resolve the public status conservatively and never silently downgrade a blocking rule failure.
@@ -168,6 +169,10 @@ Use immutable run records. The parent record stores provenance and lifecycle met
 
 Persist a source-content digest when available from Spec 001. It supplements, but never replaces, required source ID/version lookup. Store prompt and annotation-policy versions, not hidden prompt reasoning.
 
+### Runtime invariants beyond OpenAPI
+
+Pydantic request/response validators and service-level checks MUST enforce invariants that ordinary OpenAPI field schemas cannot express: submitted claim IDs are distinct; normalized finding claim IDs are distinct and exactly equal the submitted claim-ID set; every successful run has one finding per submitted claim and no foreign or missing finding; every span satisfies `0 <= start < end <= len(source)` under Unicode code-point indexing; every quotation equals the exact immutable-source substring for its span; and every `UNSUPPORTED` context quotation is paired to a valid span and marked `CONTEXT_NON_SUPPORTING`. These failures are contract or evidence-integrity failures, never replacement evidence statuses.
+
 ## API design
 
 ### POST /api/v1/verification-runs
@@ -176,6 +181,8 @@ The endpoint creates one verification attempt. Its response schema always includ
 
 - <code>findings</code> for a successful terminal run; or
 - <code>failure</code> for a terminal failure.
+
+The public response is the traceable `VerificationRun` representation, not a reduced summary. It includes model ID/version, prompt version/hash, annotation and evidence-status policy versions, correlation ID, and created/started/completed timestamps. Model or prompt values may be null only when a failure occurs before they are available; all other execution metadata is required for durable traceability and evaluation handoff.
 
 Malformed HTTP payloads that cannot form an identifiable run may use the application’s standard client-validation response. Once a request has enough identity to create a run, source mismatch, stale ownership, verifier timeout, and evidence-integrity failure must be represented durably as a non-successful run. The endpoint must never return a success envelope containing partial or unvalidated findings.
 
@@ -187,7 +194,7 @@ The PoC does not introduce production authentication or authorization, consisten
 
 | Level | Focus |
 |---|---|
-| Unit | Unicode code-point offset conversion, span boundary/quotation integrity, status precedence, CERTAINTY-v1, negation scope, attribution, all-or-nothing coverage, and failure normalization. |
+| Unit | Unicode code-point offset conversion, span boundary/quotation integrity, status precedence, EVIDENCE_ANNOTATION-v1 fixture-label validation, negation scope, attribution, all-or-nothing coverage, and failure normalization. |
 | Contract | Request and response schemas, enum closure, mandatory provenance, success/failure exclusivity, stable error envelope, and unknown-field behavior. |
 | Integration | Immutable source and claim lookup, persistence transaction, API lifecycle, model adapter with deterministic stub, cross-note rejection, and preservation of any existing middleware boundary. |
 | Development acceptance | A real configured verifier runs against a fixed, versioned synthetic development dataset. Assert status, discrepancy labels, and evidence integrity—not exact explanation wording; record failures with model/prompt/policy versions. This dataset is not held out and does not establish release quality. |

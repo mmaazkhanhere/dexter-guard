@@ -12,7 +12,7 @@
 | FR-08, source character spans | US-2; SourceSpan contract | Unicode code-point validator and derived quotation | T006–T009, T016, T024 |
 | FR-09, unsupported | status policy; EV-002 and EV-014 | precedence and no-span exception | T016, T017, T024 |
 | FR-10, contradiction | status policy; EV-003 and EV-004 | explicit-conflict precedence | T016, T017, T024 |
-| FR-12, negation/certainty/attribution | qualifier policy; EV-004–EV-006, EV-013 | discrepancy model and CERTAINTY-v1 | T016, T017, T024 |
+| FR-12, negation/certainty/attribution | qualifier policy; EV-004–EV-006, EV-013 | discrepancy model and EVIDENCE_ANNOTATION-v1 | T016, T017, T024 |
 | FR-13, unsupported clinical conclusion | qualifier policy; EV-007 | clinical-inference discrepancy | T016, T017, T024 |
 
 ## Consistency checks
@@ -24,7 +24,7 @@
 | Source is sole evidence authority | Pass | specify scope and plan architecture prohibit candidate-note self-support; T012 constrains the semantic port. |
 | Offsets and quotations independently checkable | Pass | clarify CL-004/CL-005 and plan SourceSpan contract agree; T006–T009 test them. |
 | Unsupported distinct from contradicted | Pass | same precedence appears in spec, clarification, plan, and regression tasks. |
-| Certainty ambiguity does not become an unexplained contradiction | Pass | CERTAINTY-v1 documented in clarify CL-007 and consumed by plan/T016/T017. |
+| Certainty ambiguity does not become an unexplained contradiction | Pass | EVIDENCE_ANNOTATION-v1 documented in clarify CL-007 and consumed by plan/T016/T017. |
 | Partial negation cannot be reduced to negative-token match | Pass | explicit in spec, clarification, test strategy, T017, and EV-013. |
 | Spec boundaries retained | Pass | numeric/unit work, omissions, approval, and benchmark ownership stay with Specs 005–008 in all artifacts. |
 | API supports safe failure | Pass | plan response/lifecycle and T022–T023 provide a durable non-success outcome with no authoritative partial findings. |

@@ -166,7 +166,8 @@ The canonical domain shape follows `docs/architecture.md`: `source_id`, `source_
 | claimId | Required stable claim identifier, unique in submitted claim set. |
 | status | Required EvidenceStatus; exactly one primary value. |
 | explanation | Required concise human-readable basis. |
-| sourceSpans | Required array; non-empty for supported, contradicted, and uncertain; may be empty only for unsupported. |
+| sourceSpans | Required array; non-empty for supported, contradicted, and uncertain; may be empty only for unsupported. Optional unsupported context spans are allowed only with paired `CONTEXT_NON_SUPPORTING` evidence quotations. |
+| evidenceQuotes | Required source-derived quotations paired to spans. For an unsupported context span, the quotation MUST be marked `CONTEXT_NON_SUPPORTING` and cannot be presented as support or conflict. |
 | discrepancies | Required structured array, with types such as NEGATION, CERTAINTY, ATTRIBUTION, CLINICAL_INFERENCE, and OTHER. |
 | policyVersion | Required for policy-governed certainty treatment; otherwise the run policy version applies. |
 | verifierFinding | Retained normalized verifier recommendation when semantic verification was invoked. It MUST remain available if deterministic checks resolve the public status differently. |
@@ -187,7 +188,9 @@ The canonical domain shape follows `docs/architecture.md`: `source_id`, `source_
 | annotationPolicyVersion | Classification policy in force. |
 | evidenceStatusPolicyVersion | Version of the definitions and precedence for the four primary evidence statuses. |
 | idempotencyKey | Required request identity used to make retries resolve to the same run. |
-| startedAt, completedAt | Run timestamps. |
+| modelId, modelVersion, promptVersion | Configured verifier identity and prompt version/hash; explicitly null only when unavailable before invocation. |
+| correlationId | Required execution trace identifier. |
+| createdAt, startedAt, completedAt | Required lifecycle timestamps for durable execution traceability. |
 
 The executable HTTP schema is [contracts/verification-runs.openapi.yaml](contracts/verification-runs.openapi.yaml). It defines success/failure exclusivity and makes `UNSUPPORTED` with no source spans a successful finding, while invalid required spans produce a non-successful `FAILED_EVIDENCE_INTEGRITY` run.
 

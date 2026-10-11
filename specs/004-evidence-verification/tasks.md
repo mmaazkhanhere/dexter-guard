@@ -11,9 +11,9 @@
   **Depends on:** T001
 - [ ] T003 [P] Inspect Specs 005–008 interfaces to confirm numerical/unit checks, omissions, approval, and evaluation remain outside this module.  
   **Depends on:** T001
-- [ ] T004 Define the versioned Pydantic and OpenAPI public/internal schemas for EvidenceStatus, SourceSpan, EvidenceFinding, VerificationRun, request, and structured failure. Use the architecture's canonical SourceSpan fields (`source_id`, `source_version`, `start`, `end`), define the explicit transport mapping if needed, include derived quotations only alongside spans, include the evidence-status-policy version and idempotency key, and encode enum closure and success/failure exclusivity.
+- [ ] T004 Define the versioned Pydantic and OpenAPI public/internal schemas for EvidenceStatus, SourceSpan, EvidenceFinding, VerificationRun, request, and structured failure. Use the architecture's canonical SourceSpan fields (`source_id`, `source_version`, `start`, `end`), define the explicit transport mapping if needed, include derived quotations only alongside spans, evidence-status-policy version, annotation-policy version, idempotency key, model/prompt identity, timestamps, and correlation ID, and encode enum closure and success/failure exclusivity.
   **Depends on:** T001, T002
-- [ ] T005 Write contract tests for the schemas before service implementation, including missing fields, unknown enum, duplicate claim ID, invalid terminal-state combinations, foreign claim ID, success/failure exclusivity, successful `UNSUPPORTED` findings with no spans, and invalid required-span failure responses.
+- [ ] T005 Write Pydantic service-validator and API contract tests before service implementation. Enforce distinct submitted claim IDs; exact, unique response coverage with no missing or foreign claim IDs; success/failure exclusivity; valid end-exclusive Unicode source offsets; source-derived quotation-to-span equality; successful `UNSUPPORTED` findings with no spans or only `CONTEXT_NON_SUPPORTING` context; and invalid required-span failure responses.
   **Depends on:** T004
 
 ## Phase 1 — Deterministic integrity foundation
@@ -22,9 +22,9 @@
   **Depends on:** T004
 - [ ] T007 Write unit tests for T006 using German umlauts, combining characters, emoji/non-BMP characters, whitespace, punctuation, line breaks, empty ranges, and out-of-bound ranges.  
   **Depends on:** T006
-- [ ] T008 Implement SourceSpan validation: source ID/version equality, integer/range checks, source substring derivation, and rejection of verifier quotation mismatch.  
+- [ ] T008 Implement SourceSpan and quotation validation: source ID/version equality, integer/range checks under zero-based end-exclusive Unicode code-point indexing, source substring derivation, quotation-to-span equality, and rejection of verifier quotation mismatch.
   **Depends on:** T006
-- [ ] T009 Write integrity tests for valid span, stale source identity, reversed/empty/out-of-range offsets, and mismatched quotation. Cover EV-010.  
+- [ ] T009 Write integrity tests for valid span, stale source identity, reversed/empty/out-of-range offsets, end-exclusive boundary behavior, mismatched quotation, and invalid `CONTEXT_NON_SUPPORTING` pairing. Cover EV-010.
   **Depends on:** T008
 - [ ] T010 Implement input and provenance validation against existing source, note, and claim repositories. Enforce non-empty claim set, unique claim IDs, exact source version, exact note revision, claim ownership, required resident identity/`UNKNOWN` handling, and known-resident equality with the source.
   **Depends on:** T002, T004
@@ -41,7 +41,7 @@
   **Depends on:** T012, T013
 - [ ] T015 Write adapter contract tests with a deterministic fake for malformed JSON, invalid enum, duplicated/missing/foreign claim IDs, missing explanation, timeout, and provider failure. Cover EV-012.  
   **Depends on:** T014
-- [ ] T016 Implement deterministic response validation and annotation-policy application: enum/contract validation, coverage enforcement, required spans by status, required discrepancy labels, and CERTAINTY-v1 handling. The semantic verifier—not deterministic code—classifies semantic support, contradiction, or uncertainty. Preserve conflicting verifier/rule findings and resolve only documented mechanical policy constraints conservatively.
+- [ ] T016 Implement deterministic response validation and EVIDENCE_ANNOTATION-v1 application: enum/contract validation, coverage enforcement, required spans by status, required discrepancy labels, and qualifier-policy handling. The semantic verifier—not deterministic code—classifies semantic support, contradiction, or uncertainty. Preserve conflicting verifier/rule findings and resolve only documented mechanical policy constraints conservatively.
   **Depends on:** T008, T014
 - [ ] T017 Write policy unit tests for explicit contradiction, absent support, genuine ambiguity, certainty escalation, explicitly unconfirmable certainty claim, patient-report attribution escalation, unsupported clinical inference, negation reversal, and partial negation.  
   **Depends on:** T016
@@ -54,14 +54,14 @@
   **Depends on:** T016, T018
 - [ ] T020 Implement the verification application service in the algorithm order from plan.md: validation, immutable lookup, discovery, verifier call, response validation, span validation, normalization, coverage, atomic persistence.  
   **Depends on:** T019
-- [ ] T021 Write integration tests proving all-or-nothing behavior: one failing claim, invalid evidence in one finding, missing finding, persistence failure, and no approved/authoritative partial output. Prove that an invalid required span fails the whole run while a contract-valid `UNSUPPORTED` claim with no span remains a successful finding.
+- [ ] T021 Write integration tests proving all-or-nothing behavior: one failing claim, invalid evidence in one finding, missing/duplicate/foreign findings, persistence failure, and no approved/authoritative partial output. Prove that an invalid required span fails the whole run while a contract-valid `UNSUPPORTED` claim with no span or only valid `CONTEXT_NON_SUPPORTING` context remains a successful finding.
   **Depends on:** T020
 
 ## Phase 4 — HTTP API and end-to-end regression suite
 
 - [ ] T022 Add POST /api/v1/verification-runs to the existing API router, its versioned OpenAPI contract, error-envelope, required idempotency, and correlation conventions. Use a local synthetic-demo access boundary and data minimization; do not add accounts, roles, permissions, authentication, or authorization.
   **Depends on:** T020
-- [ ] T023 Write API contract tests for successful response, invalid HTTP request, identifiable failed run, response-schema stability, findings/failure exclusivity, and minimum evidence exposure at the applicable review boundary.
+- [ ] T023 Write API contract tests for successful response, invalid HTTP request, identifiable failed run, response-schema stability, findings/failure exclusivity, required public execution metadata (model/prompt identity, timestamps, correlation ID, and policy versions), and minimum evidence exposure at the applicable review boundary.
   **Depends on:** T022
 - [ ] T024 Create versioned German-language fixtures and expected findings for EV-001 through EV-014. Each test asserts the `EVIDENCE_ANNOTATION-v1` policy version, claim ID, canonical primary status, required discrepancy labels, span boundaries/text where required, and run state.
   **Depends on:** T017, T023

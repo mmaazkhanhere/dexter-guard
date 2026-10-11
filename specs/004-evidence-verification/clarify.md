@@ -14,7 +14,7 @@
 | CL-004 | How are source offsets defined? | Offsets are Unicode code-point positions in the exact immutable source string, zero-based, start-inclusive, and end-exclusive. Newlines, whitespace, and punctuation are characters; offsets are never calculated from normalized display text. |
 | CL-005 | Is verifier quotation authoritative? | No. The service derives the returned quotation from the immutable source and validated offsets. A supplied quotation that differs from the derived string is an integrity failure. |
 | CL-006 | What is the status precedence? | Explicit semantic conflict, then faithful support, then relevant unresolved ambiguity, then absence of support. This prevents absent evidence from becoming a contradiction and avoids treating model failures as evidence. |
-| CL-007 | How does certainty affect status? | Apply annotation policy CERTAINTY-v1. A mere source qualification such as “vielleicht” or “unklar” versus a claim asserting the underlying fact is UNCERTAIN and carries a CERTAINTY discrepancy. It is CONTRADICTED only when the claim asserts confirmation or certainty and the source explicitly states that confirmation cannot be made or has been withheld. The finding records the policy version. |
+| CL-007 | How does certainty affect status? | Apply `EVIDENCE_ANNOTATION-v1`. A mere source qualification such as “vielleicht” or “unklar” versus a claim asserting the underlying fact is UNCERTAIN and carries a CERTAINTY discrepancy. It is CONTRADICTED only when the claim asserts confirmation or certainty and the source explicitly states that confirmation cannot be made or has been withheld. The finding records the policy version. |
 | CL-008 | How does attribution affect status? | A patient report, third-party report, and confirmed clinical observation are different propositions. A report alone cannot support a claim that the symptom was clinically confirmed. The finding carries an ATTRIBUTION discrepancy; classification follows the available evidence and must not be SUPPORTED solely by the report. |
 | CL-009 | How is a partial negation handled? | Negation scope is material. “Keine starken Schmerzen” does not establish “keine Schmerzen,” nor does it establish the opposite. The finding is normally UNCERTAIN if that is the only relevant evidence; it must include a NEGATION discrepancy. |
 | CL-010 | When may unsupported have no span? | Only UNSUPPORTED may have no source span. SUPPORTED, CONTRADICTED, and UNCERTAIN must cite at least one relevant validated span, allowing a reviewer to check the basis. |
@@ -30,7 +30,7 @@
 | “Patient verneint Schmerzen.” | “Patient hat keine Schmerzen.” | SUPPORTED. |
 | No pain reference. | “Patient hat Schmerzen.” | UNSUPPORTED; absence is not contradiction. |
 | “Patient verneint Schmerzen.” | “Patient hat Schmerzen.” | CONTRADICTED with NEGATION discrepancy. |
-| “Vielleicht Schmerzen beim Umlagern.” | “Patient hat Schmerzen beim Umlagern.” | UNCERTAIN with CERTAINTY discrepancy under CERTAINTY-v1. |
+| “Vielleicht Schmerzen beim Umlagern.” | “Patient hat Schmerzen beim Umlagern.” | UNCERTAIN with CERTAINTY discrepancy under EVIDENCE_ANNOTATION-v1. |
 | “Diagnose Exsikkose konnte nicht bestätigt werden.” | “Exsikkose ist bestätigt.” | CONTRADICTED with CERTAINTY and CLINICAL_INFERENCE discrepancies. |
 | “Patient berichtet Schwindel.” | “Schwindel klinisch festgestellt.” | Not SUPPORTED solely on the report; ATTRIBUTION discrepancy. |
 | “Keine starken Schmerzen.” | “Keine Schmerzen.” | UNCERTAIN with NEGATION discrepancy, unless other evidence resolves the broader claim. |
@@ -46,4 +46,4 @@ These choices do not alter functional behavior and are intentionally delegated t
 
 ## No remaining blocking product ambiguity
 
-The status taxonomy, source authority, character-span convention, certainty policy, qualifier behavior, ownership boundaries, and safe-failure behavior are sufficiently decided to plan. Any later change to CERTAINTY-v1 requires a new policy version and regression cases; it must not silently change the meaning of prior runs.
+The status taxonomy, source authority, character-span convention, certainty policy, qualifier behavior, ownership boundaries, and safe-failure behavior are sufficiently decided to plan. Any later change to EVIDENCE_ANNOTATION-v1 requires a new policy version and regression cases; it must not silently change the meaning of prior runs.
