@@ -1,0 +1,31 @@
+{
+  "evaluationVersion": "spec006-development-evaluation-v1",
+  "datasetVersion": "spec006-synthetic-v1",
+  "split": "held-out",
+  "annotationProvenance": "synthetic-manual-v1",
+  "disputedLabelResolution": "No disputed labels in this fixture set.",
+  "rawCounts": {
+    "caseCount": 10,
+    "applicableAnnotatedExpectedFacts": 9,
+    "faithfullyCoveredAnnotatedExpectedFacts": 3,
+    "annotatedOmissions": 6,
+    "correctlyFlaggedAnnotatedOmissions": 6,
+    "reviewedNonOmissions": 3,
+    "falseOmissionWarnings": 0
+  },
+  "metrics": {
+    "benchmarkCompleteness": 0.3333333333,
+    "omissionDetectionRecall": 1.0,
+    "falseOmissionWarningRate": 0.0
+  },
+  "runtimeMetricCaveat": "CoverageRun.runtimeCompleteness is based on system-extracted expected facts and is not benchmark ground truth.",
+  "otherConstitutionMetrics": {
+    "criticalErrorRecall": null,
+    "falsePositiveRate": null,
+    "claimClassificationPerformance": null,
+    "latency": "Captured per run in executionMetrics; no release threshold is defined in the absent Spec 008 contract.",
+    "inferenceCost": "Captured per run in executionMetrics; no release threshold is defined in the absent Spec 008 contract.",
+    "reviewerWorkload": "Not evaluated in this development fixture set."
+  },
+  "interpretation": "Synthetic development evidence only; this is not clinical safety validation."
+}

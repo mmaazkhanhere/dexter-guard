@@ -23,3 +23,24 @@ Verify that implemented code completely satisfies Spec 006's specification, clar
 - **Gaps found:** Append one unchecked, dependency-ordered task per gap stating the missing requirement, code/test evidence, dependency, and acceptance proof. Then run `implement.md` for new tasks and repeat this procedure.
 - A missing source citation, fabricated source fact, unsafe partial success, automatic note change/approval, severity decision by Spec 006, system-only benchmark completeness, or failed/unavailable test is **not converged**.
 
+## Verification result - 2026-10-12
+
+**Conditional convergence for the repository-available Spec 006 scope.** The
+contract, extraction, semantic matching, status precedence, evidence-linked
+findings, immutable run/revision checks, API, acceptance tests, evaluation
+handoff, and telemetry gates pass. The convergence fixes also ensure an
+unresolved semantic relation takes precedence, German resident-name subjects
+are normalized, and claim-keyed Spec 004/005 findings attach to their source
+fact.
+
+Evidence: `.venv\\Scripts\\python.exe -m pytest -q` passed (248 tests),
+`.venv\\Scripts\\python.exe -m compileall -q src tests` passed, and
+`git diff --check` passed.
+
+The result cannot be unconditional because `specs/007-*` and `specs/008-*`
+are absent. Final Spec 007 severity/approval compatibility and Spec 008
+release-threshold compatibility therefore remain unresolved external gates;
+Spec 006 deliberately exposes policy keys and benchmark handoff fields
+without inventing those downstream contracts. T025 remains unchecked until
+those contracts are supplied and reviewed.
+
