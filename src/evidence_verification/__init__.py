@@ -28,6 +28,7 @@ from .repository import (
     VerificationRepositoryError,
 )
 from .service import VerificationService, VerificationServiceError
+from .observability import InMemoryVerificationLogger, VerificationMetrics, VerificationMetricsSnapshot
 from .validation import (
     ImmutableClaimReference,
     IdempotencyBinding,
@@ -69,6 +70,9 @@ __all__ = [
     "VerificationRepositoryError",
     "VerificationService",
     "VerificationServiceError",
+    "InMemoryVerificationLogger",
+    "VerificationMetrics",
+    "VerificationMetricsSnapshot",
     "canonical_request_digest",
     "validate_claim_references",
     "validate_idempotency_replay",

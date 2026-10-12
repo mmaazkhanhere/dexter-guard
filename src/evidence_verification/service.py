@@ -34,6 +34,7 @@ from .provider import (
     provider_metadata,
 )
 from .repository import InMemoryVerificationRepository, VerificationRunRepository
+from .observability import VerificationMetrics
 from .validation import (
     IdempotencyKeyConflictError,
     VerificationIntegrityError,
@@ -69,6 +70,7 @@ class VerificationService:
         provider_timeout_seconds: float = 30.0,
         max_provider_attempts: int = 2,
         logger: object | None = None,
+        metrics: VerificationMetrics | None = None,
     ) -> None:
         if provider_timeout_seconds <= 0:
             raise ValueError("provider_timeout_seconds must be positive")
@@ -84,6 +86,7 @@ class VerificationService:
         self._correlation_factory = correlation_factory or (lambda: str(uuid4()))
         self.provider_timeout_seconds = provider_timeout_seconds
         self.logger = logger
+        self.metrics = metrics or VerificationMetrics()
 
     def verify(self, payload: VerificationRunRequest | Mapping[str, object]) -> VerificationRun:
         request = payload if isinstance(payload, VerificationRunRequest) else VerificationRunRequest.model_validate(payload)
@@ -105,6 +108,7 @@ class VerificationService:
             claims = self._resolve_claims(request, source)
             self._validate_note(request, source)
         except Exception as error:
+            self.metrics.increment("validation_failures")
             return self._persist_failure(
                 request,
                 run_id=run_id,
@@ -122,6 +126,7 @@ class VerificationService:
         try:
             response = self._invoke_verifier(claims, source.transcript_text, run_id)
         except (ProviderTimeoutError, FutureTimeoutError, TimeoutError):
+            self.metrics.increment("provider_failures")
             return self._persist_failure(
                 request,
                 run_id=run_id,
@@ -136,6 +141,7 @@ class VerificationService:
                 started_at=started_at,
             )
         except ProviderUnavailableError:
+            self.metrics.increment("provider_failures")
             return self._persist_failure(
                 request,
                 run_id=run_id,
@@ -150,6 +156,7 @@ class VerificationService:
                 started_at=started_at,
             )
         except MalformedVerifierOutputError:
+            self.metrics.increment("provider_failures")
             return self._persist_failure(
                 request,
                 run_id=run_id,
@@ -192,6 +199,7 @@ class VerificationService:
             )
             validate_successful_run(request, run, source.transcript_text)
         except MalformedVerifierOutputError:
+            self.metrics.increment("provider_failures")
             return self._persist_failure(
                 request,
                 run_id=run_id,
@@ -206,6 +214,7 @@ class VerificationService:
                 started_at=started_at,
             )
         except VerificationIntegrityError as error:
+            self.metrics.increment("evidence_integrity_failures")
             return self._persist_failure(
                 request,
                 run_id=run_id,
@@ -220,6 +229,7 @@ class VerificationService:
                 started_at=started_at,
             )
         except (ValidationError, ValueError, TypeError) as error:
+            self.metrics.increment("evidence_integrity_failures")
             return self._persist_failure(
                 request,
                 run_id=run_id,
@@ -314,6 +324,7 @@ class VerificationService:
         return tuple(resolved)
 
     def _invoke_verifier(self, claims: Sequence[object], source_text: str, run_id: str) -> VerifierResponse:
+        self.metrics.increment("provider_attempts")
         executor = ThreadPoolExecutor(max_workers=1)
         future = executor.submit(self.verifier.verify, claims=claims, source_text=source_text, run_id=run_id)
         timed_out = False
@@ -387,9 +398,11 @@ class VerificationService:
     ) -> VerificationRun:
         try:
             persisted = self.repository.save(run)
+            self.metrics.increment("successful_runs")
             self._log("verification_completed", status="SUCCEEDED", run_id=run.verification_run_id)
             return persisted
         except Exception:
+            self.metrics.increment("persistence_failures")
             failure = self._failure_run(
                 request,
                 run_id=run.verification_run_id,
