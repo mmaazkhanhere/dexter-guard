@@ -2,7 +2,7 @@
   "reportSchemaVersion": "SPEC004_DEVELOPMENT_EVALUATION-v1",
   "datasetId": "spec004-german-development",
   "datasetVersion": "1.0.0",
-  "datasetDigest": "sha256:ev-001-014-v1",
+  "datasetDigest": "sha256:0567601d8cc58b2359bb711a2a787e95fc4afa75d9f863bbdf5b7e4b2063c834",
   "criticalCaseManifestVersion": "SPEC004_CRITICAL_CASES-v1",
   "evaluatorVersion": "spec004-fixture-evaluator-v1",
   "evaluatedAt": "2026-10-12T00:00:00Z",
