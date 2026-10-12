@@ -3,8 +3,7 @@ info:
   title: Dexter Guard Human Review and Audit API
   version: REVIEW-AUDIT-CONTRACT-v1
   description: >-
-    Proposed Spec 007 contract. No endpoint in this file is claimed to be
-    implemented. The API composes immutable references from Specs 001-006 and
+    Versioned Spec 007 backend contract. The API composes immutable references from Specs 001-006 and
     never accepts client-supplied transcript, claim, or evidence text as authority.
 paths:
   /api/v1/reviews/{noteId}:
@@ -316,10 +315,11 @@ components:
     SuggestedCorrection:
       type: object
       additionalProperties: false
-      required: [suggestionId, findingId, baseRevision, replacement, targetNoteSpan, supportStatus, supportSpans, generatedBy, createdAt]
+      required: [suggestionId, findingId, noteId, baseRevision, replacement, targetNoteSpan, supportStatus, supportSpans, generatedBy, createdAt]
       properties:
         suggestionId: { type: string, minLength: 1 }
         findingId: { type: string, minLength: 1 }
+        noteId: { type: string, minLength: 1 }
         baseRevision: { type: integer, minimum: 1 }
         replacement: { type: string, minLength: 1 }
         targetNoteSpan: { $ref: '#/components/schemas/NoteSpan' }
@@ -473,7 +473,7 @@ components:
         failureCode: { type: [string, 'null'] }
         failureMessage: { type: [string, 'null'] }
         createdAt: { type: string, format: date-time }
-        completedAt: { type: [string, 'null'], format: date-time }
+        completedAt: { type: string, format: date-time }
       allOf:
         - if:
             properties: { status: { const: VALID } }
@@ -545,6 +545,7 @@ components:
         reviewerLabel: { type: string, minLength: 1 }
         reason: { type: [string, 'null'] }
         fullVerificationId: { type: [string, 'null'] }
+        eligibilityPolicyVersion: { type: [string, 'null'] }
         decidedAt: { type: string, format: date-time }
     AuditEvent:
       type: object

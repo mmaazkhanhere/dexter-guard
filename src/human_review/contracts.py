@@ -79,6 +79,14 @@ class ReviewFinding(Contract):
     state: Literal["OPEN", "RESOLVED", "ADJUDICATED", "STALE"]
     created_at: datetime = Field(alias="createdAt")
 
+    @model_validator(mode="after")
+    def upstream_identity(self) -> "ReviewFinding":
+        if self.origin == "REVIEW_OPERATIONAL":
+            return self
+        if not self.origin_run_id or not self.origin_finding_id:
+            raise ValueError("upstream findings require origin run and finding identities")
+        return self
+
 
 class SuggestedCorrection(Contract):
     suggestion_id: StrictStr = Field(alias="suggestionId", min_length=1)
@@ -151,6 +159,8 @@ class FullNoteVerification(Contract):
 
     @model_validator(mode="after")
     def terminal_closure(self) -> "FullNoteVerification":
+        if self.completed_at is None:
+            object.__setattr__(self, "completed_at", self.created_at)
         components = [item.component for item in self.component_statuses]
         if set(components) != {"CLAIM_EXTRACTION", "EVIDENCE_VERIFICATION", "DETERMINISTIC_VALIDATION", "SOURCE_COVERAGE"}:
             raise ValueError("full verification must contain exactly one status per component")
@@ -160,6 +170,8 @@ class FullNoteVerification(Contract):
             raise ValueError("failed or invalid verification requires a safe failure")
         if self.status == "VALID" and self.coverage_unresolved_source_items:
             raise ValueError("unresolved source items block valid approval")
+        if self.status == "VALID" and any(item.run_id is None for item in self.component_statuses):
+            raise ValueError("valid verification requires a run id for every component")
         return self
 
 
@@ -171,6 +183,7 @@ class NoteDisposition(Contract):
     reviewer_label: StrictStr = Field(alias="reviewerLabel", min_length=1)
     reason: StrictStr | None = None
     full_verification_id: StrictStr | None = Field(default=None, alias="fullVerificationId")
+    eligibility_policy_version: StrictStr | None = Field(default=None, alias="eligibilityPolicyVersion")
     decided_at: datetime = Field(alias="decidedAt")
 
     @model_validator(mode="after")
@@ -204,3 +217,56 @@ class ClaimReverificationResponse(Contract):
     upstream_verification_run_id: StrictStr = Field(alias="upstreamVerificationRunId", min_length=1)
     status: Literal["SUCCEEDED", "FAILED", "INVALID"]
     approval_eligible: Literal[False] = Field(alias="approvalEligible")
+
+
+class SaveRevisionRequest(Contract):
+    expected_revision: StrictInt = Field(alias="expectedRevision", ge=1)
+    content: StrictStr = Field(min_length=1)
+    reviewer_label: StrictStr = Field(alias="reviewerLabel", min_length=1)
+    finding_id: StrictStr | None = Field(default=None, alias="findingId")
+    idempotency_key: StrictStr = Field(alias="idempotencyKey", min_length=1)
+
+
+class FindingDecisionRequest(Contract):
+    expected_revision: StrictInt = Field(alias="expectedRevision", ge=1)
+    kind: Literal["ACKNOWLEDGED", "DISPUTED", "ADJUDICATED", "SUGGESTION_ACCEPTED", "SUGGESTION_REJECTED"]
+    reviewer_label: StrictStr = Field(alias="reviewerLabel", min_length=1)
+    rationale: StrictStr | None = Field(default=None, min_length=1)
+    suggestion_id: StrictStr | None = Field(default=None, alias="suggestionId")
+    idempotency_key: StrictStr = Field(alias="idempotencyKey", min_length=1)
+
+    @model_validator(mode="after")
+    def conditional_fields(self) -> "FindingDecisionRequest":
+        if self.kind in {"SUGGESTION_ACCEPTED", "SUGGESTION_REJECTED"} and not self.suggestion_id:
+            raise ValueError("suggestionId is required for suggestion decisions")
+        if self.kind in {"DISPUTED", "ADJUDICATED", "SUGGESTION_REJECTED"} and not self.rationale:
+            raise ValueError("rationale is required for this decision")
+        return self
+
+
+class ClaimReverificationRequest(Contract):
+    note_revision: StrictInt = Field(alias="noteRevision", ge=1)
+    claim_id: StrictStr = Field(alias="claimId", min_length=1)
+    reviewer_label: StrictStr = Field(alias="reviewerLabel", min_length=1)
+    idempotency_key: StrictStr = Field(alias="idempotencyKey", min_length=1)
+
+
+class FullVerificationRequest(Contract):
+    expected_revision: StrictInt = Field(alias="expectedRevision", ge=1)
+    reviewer_label: StrictStr = Field(alias="reviewerLabel", min_length=1)
+    idempotency_key: StrictStr = Field(alias="idempotencyKey", min_length=1)
+
+
+class ApproveRequest(Contract):
+    expected_revision: StrictInt = Field(alias="expectedRevision", ge=1)
+    full_verification_id: StrictStr = Field(alias="fullVerificationId", min_length=1)
+    reviewer_label: StrictStr = Field(alias="reviewerLabel", min_length=1)
+    rationale: StrictStr | None = Field(default=None, min_length=1)
+    idempotency_key: StrictStr = Field(alias="idempotencyKey", min_length=1)
+
+
+class RejectRequest(Contract):
+    expected_revision: StrictInt = Field(alias="expectedRevision", ge=1)
+    reviewer_label: StrictStr = Field(alias="reviewerLabel", min_length=1)
+    reason: StrictStr = Field(min_length=1)
+    idempotency_key: StrictStr = Field(alias="idempotencyKey", min_length=1)

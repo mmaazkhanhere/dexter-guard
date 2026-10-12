@@ -148,3 +148,25 @@ The task ledger currently leaves T001–T042 unchecked. In particular:
 This reconciles the convergence result with the task ledger: passing tests demonstrate partial
 behavioral correctness, not task completion. The remaining tasks must be completed and checked,
 then this procedure rerun before reporting **Converged** or opening an implementation PR.
+
+## Latest backend hardening pass — 2026-10-12
+
+The backend implementation was hardened after the correction review. The changes add typed
+request validation and common validation errors, revision-scoped context and suggestion
+retrieval, the documented finding-scoped claim-reverification route (with the legacy local alias),
+idempotency replay/conflict handling, terminal verification timestamps and malformed-output
+classification, stricter approval decision completeness, durable restart coverage, and
+content-minimized review telemetry. The OpenAPI contract now reflects the implemented backend
+route status and terminal fields.
+
+Evidence recorded for this pass:
+
+- `.venv\Scripts\python.exe -m pytest -q`: passed.
+- `.venv\Scripts\python.exe -m pytest -q tests\human_review`: passed.
+- `.venv\Scripts\python.exe -m compileall -q src tests`: passed.
+- `git diff --check`: passed.
+
+This pass does not close the independent reviewer gate, create the absent React frontend, supply
+the complete synthetic HR-001–HR-018 acceptance/observability fixture package, approve ADR 006,
+or execute the externally owned Spec 008 benchmark. Those remain convergence blockers or
+external release gates as identified by T001–T042.

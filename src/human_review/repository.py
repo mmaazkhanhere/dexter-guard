@@ -27,6 +27,7 @@ class InMemoryReviewRepository:
         self.dispositions: list[NoteDisposition] = []
         self.events: dict[str, list[AuditEvent]] = {}
         self.idempotency: dict[tuple[str, str], str] = {}
+        self.replays: dict[tuple[str, str], Any] = {}
 
     def append_event(self, event: AuditEvent) -> AuditEvent:
         with self._lock:
@@ -50,23 +51,43 @@ class InMemoryReviewRepository:
                 raise ReviewRepositoryError("IDEMPOTENCY_KEY_CONFLICT")
             self.idempotency[(operation, key)] = digest
 
+    def idempotency_digest(self, operation: str, key: str) -> str | None:
+        with self._lock:
+            return self.idempotency.get((operation, key))
+
+    def get_replay(self, operation: str, key: str) -> Any | None:
+        with self._lock:
+            return deepcopy(self.replays.get((operation, key)))
+
+    def set_replay(self, operation: str, key: str, value: Any) -> None:
+        with self._lock:
+            self.replays[(operation, key)] = deepcopy(value)
+
     def persist_note(self, note: Any) -> None:
         return None
 
     def persist_finding(self, finding: ReviewFinding) -> None:
-        return None
+        existing = self.findings.get(finding.review_finding_id)
+        if existing is not None and existing != finding:
+            raise ReviewRepositoryError("IMMUTABLE_RECORD_CONFLICT")
 
     def persist_decision(self, decision: ReviewDecision) -> None:
-        return None
+        if any(existing.review_decision_id == decision.review_decision_id and existing != decision for existing in self.decisions):
+            raise ReviewRepositoryError("IMMUTABLE_RECORD_CONFLICT")
 
     def persist_suggestion(self, suggestion: SuggestedCorrection) -> None:
-        return None
+        existing = self.suggestions.get(suggestion.suggestion_id)
+        if existing is not None and existing != suggestion:
+            raise ReviewRepositoryError("IMMUTABLE_RECORD_CONFLICT")
 
     def persist_verification(self, verification: FullNoteVerification) -> None:
-        return None
+        existing = self.verifications.get(verification.full_verification_id)
+        if existing is not None and existing != verification:
+            raise ReviewRepositoryError("IMMUTABLE_RECORD_CONFLICT")
 
     def persist_disposition(self, disposition: NoteDisposition) -> None:
-        return None
+        if any(existing.disposition_id == disposition.disposition_id and existing != disposition for existing in self.dispositions):
+            raise ReviewRepositoryError("IMMUTABLE_RECORD_CONFLICT")
 
 
 class SQLiteReviewRepository(InMemoryReviewRepository):

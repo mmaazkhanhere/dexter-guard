@@ -65,7 +65,7 @@ def test_api_rejection_is_available_without_verification():
     response = client.post("/api/v1/reviews/note-1/reject", json={
         "expectedRevision": 1, "reviewerLabel": "reviewer", "reason": "failed verification", "idempotencyKey": "reject-1"
     })
-    assert response.status_code == 200
+    assert response.status_code == 201
     assert response.json()["kind"] == "REJECTED"
 
 
@@ -121,3 +121,36 @@ def test_api_accepts_valid_suggestion_as_a_successor_revision():
     assert response.status_code == 201
     assert response.json()["successorRevision"] == 2
     assert service.get_note("note-1").content == "Bericht"
+
+
+def test_api_replays_idempotent_decision_and_rejects_digest_conflict():
+    service = ReviewService(InMemoryReviewRepository())
+    service.seed_note("note-1", "source-1", 1, "Notiz")
+    service.add_finding(ReviewFinding(
+        reviewFindingId="finding-1", origin="REVIEW_OPERATIONAL", noteId="note-1", noteRevision=1,
+        sourceId="source-1", sourceVersion=1, severity="MAJOR", severityPolicyVersion="REVIEW_SEVERITY-v1",
+        severityRationale="synthetic", explanation="review", evidence={"availability": "MISSING", "spans": [], "excerpts": []},
+        state="OPEN", createdAt=datetime.now(timezone.utc),
+    ))
+    client = TestClient(create_app(service))
+    payload = {"expectedRevision": 1, "kind": "ACKNOWLEDGED", "reviewerLabel": "reviewer", "idempotencyKey": "decision-1"}
+    first = client.post("/api/v1/reviews/note-1/findings/finding-1/decisions", json=payload)
+    replay = client.post("/api/v1/reviews/note-1/findings/finding-1/decisions", json=payload)
+    conflict = client.post("/api/v1/reviews/note-1/findings/finding-1/decisions", json={**payload, "reviewerLabel": "other"})
+    assert first.status_code == replay.status_code == 201
+    assert first.json() == replay.json()
+    assert conflict.status_code == 409
+    assert conflict.json()["code"] == "IDEMPOTENCY_KEY_CONFLICT"
+
+
+def test_api_suggestion_retrieval_is_revision_scoped():
+    service = ReviewService(InMemoryReviewRepository())
+    service.seed_note("note-1", "source-1", 1, "Notiz")
+    service.add_suggestion(SuggestedCorrection(
+        suggestionId="suggestion-1", findingId="finding-1", noteId="note-1", baseRevision=1,
+        replacement="Bericht", targetNoteSpan={"startCodePoint": 0, "endCodePointExclusive": 5, "text": "Notiz"},
+        supportStatus="UNUSABLE", supportSpans=(), generatedBy="SPEC_007_CORRECTION_ADAPTER", createdAt=datetime.now(timezone.utc),
+    ))
+    response = TestClient(create_app(service)).get("/api/v1/reviews/note-1/suggestions?revision=1")
+    assert response.status_code == 200
+    assert [item["suggestionId"] for item in response.json()["suggestions"]] == ["suggestion-1"]

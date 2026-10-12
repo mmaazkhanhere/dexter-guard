@@ -16,6 +16,8 @@ class ApprovalEligibilityPolicy:
             raise ReviewServiceError("STALE_REVISION")
         if verification is None or verification.status != "VALID" or verification.note_revision != latest_revision:
             raise ReviewServiceError("APPROVAL_PRECONDITION_FAILED")
+        if verification.claim_set_id in {"", "unavailable"}:
+            raise ReviewServiceError("APPROVAL_PRECONDITION_FAILED")
         if source is not None and (verification.source.source_id, verification.source.source_version) != source:
             raise ReviewServiceError("APPROVAL_PRECONDITION_FAILED")
         if verification.evidence_run_id == "unavailable" or verification.deterministic_validation_run_id == "unavailable" or verification.coverage_run_id == "unavailable":
@@ -31,6 +33,16 @@ class ApprovalEligibilityPolicy:
             raise ReviewServiceError("APPROVAL_PRECONDITION_FAILED")
         current_findings = [f for f in findings if f.note_revision == latest_revision]
         if decisions is not None:
-            decided = {d.finding_id for d in decisions if d.note_revision == latest_revision}
+            current_decisions = [d for d in decisions if d.note_revision == latest_revision]
+            decided = {d.finding_id for d in current_decisions}
             if any(f.review_finding_id not in decided for f in current_findings):
                 raise ReviewServiceError("APPROVAL_PRECONDITION_FAILED")
+            latest_by_finding: dict[str, ReviewDecision] = {}
+            for decision in current_decisions:
+                latest_by_finding[decision.finding_id] = decision
+            for finding in current_findings:
+                decision = latest_by_finding.get(finding.review_finding_id)
+                if decision is None:
+                    raise ReviewServiceError("APPROVAL_PRECONDITION_FAILED")
+                if finding.severity != "CRITICAL" and decision.outcome not in {"ADJUDICATED", "RESOLVED"}:
+                    raise ReviewServiceError("APPROVAL_PRECONDITION_FAILED")
