@@ -1,0 +1,28 @@
+{
+  "manifestVersion": "SPEC005_ACCEPTANCE-v1",
+  "rulesetVersion": "DVE-RULESET-v1",
+  "syntheticOnly": true,
+  "cases": [
+    {"id": "AT-001", "scenario": "37,2 C equals 37.2 C", "expected": {"outcome": "PASS", "ruleIds": []}},
+    {"id": "AT-002", "scenario": "temperature differs", "expected": {"outcome": "FAIL", "ruleIds": ["NUM-001"]}},
+    {"id": "AT-003", "scenario": "0,5 L equals 500 ml", "expected": {"outcome": "PASS", "ruleIds": []}},
+    {"id": "AT-004", "scenario": "incompatible measurement dimensions", "expected": {"outcome": "FAIL", "ruleIds": ["NUM-003"]}},
+    {"id": "AT-005", "scenario": "systolic blood pressure differs", "expected": {"outcome": "FAIL", "ruleIds": ["NUM-005"]}},
+    {"id": "AT-006", "scenario": "approximate source becomes exact", "expected": {"outcome": "FAIL", "ruleIds": ["NUM-004"]}},
+    {"id": "AT-007", "scenario": "missing claim identifier", "expected": {"httpStatus": 422, "code": "SCHEMA_ERROR"}},
+    {"id": "AT-008", "scenario": "evidence end exceeds source", "expected": {"outcome": "FAIL", "ruleIds": ["EVD-001"]}},
+    {"id": "AT-009", "scenario": "outdated evidence source version", "expected": {"outcome": "FAIL", "ruleIds": ["EVD-002"]}},
+    {"id": "AT-010", "scenario": "altered evidence quotation", "expected": {"outcome": "FAIL", "ruleIds": ["EVD-003"]}},
+    {"id": "AT-011", "scenario": "ambiguous alignment", "expected": {"outcome": "NOT_EVALUABLE", "ruleIds": ["ALIGN-001"]}},
+    {"id": "AT-012", "scenario": "repeat identical immutable input", "expected": {"canonicalizedRepeatable": true}},
+    {"id": "AT-013", "scenario": "unparseable structured scalar", "expected": {"outcome": "FAIL", "ruleIds": ["STR-001"]}},
+    {"id": "AT-014", "scenario": "nullable persisted claim revision", "expected": {"outcome": "FAIL", "ruleIds": ["STR-002"]}},
+    {"id": "AT-015", "scenario": "invalid fluid unit pairing", "expected": {"outcome": "FAIL", "ruleIds": ["STR-003"]}},
+    {"id": "AT-016", "scenario": "unsupported resolved category", "expected": {"httpStatus": 409, "code": "PROVENANCE_CONFLICT"}},
+    {"id": "AT-017", "scenario": "empty evidence span", "expected": {"outcome": "FAIL", "ruleIds": ["EVD-001"]}},
+    {"id": "AT-018", "scenario": "claim belongs to another revision", "expected": {"httpStatus": 409, "code": "PROVENANCE_CONFLICT"}},
+    {"id": "AT-019", "scenario": "fact reused in explicit alignments", "expected": {"outcome": "PASS", "ruleIds": []}},
+    {"id": "AT-020", "scenario": "requested source version unavailable", "expected": {"httpStatus": 404, "codes": ["SOURCE_NOT_FOUND", "SOURCE_VERSION_NOT_FOUND"]}},
+    {"id": "AT-021", "scenario": "repository unavailable", "expected": {"httpStatus": 503, "code": "DEPENDENCY_UNAVAILABLE"}}
+  ]
+}
