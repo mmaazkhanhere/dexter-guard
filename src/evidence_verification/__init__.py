@@ -1,13 +1,25 @@
 """Runtime contracts and deterministic integrity checks for Spec 004."""
 
 from .contracts import (
+    Discrepancy,
     EvidenceFinding,
     EvidenceQuote,
     EvidenceRole,
     EvidenceStatus,
     SourceSpan,
     VerificationRunRequest,
+    VerificationRunFailed,
     VerificationRunSucceeded,
+    VerificationFailure,
+    VerificationRun,
+)
+from .provider import (
+    MalformedVerifierOutputError,
+    ProviderTimeoutError,
+    ProviderUnavailableError,
+    StructuredVerifierAdapter,
+    VerifierCandidateFinding,
+    VerifierResponse,
 )
 from .validation import (
     ImmutableClaimReference,
@@ -23,6 +35,7 @@ from .validation import (
 
 __all__ = [
     "EvidenceFinding",
+    "Discrepancy",
     "EvidenceQuote",
     "EvidenceRole",
     "EvidenceStatus",
@@ -33,7 +46,16 @@ __all__ = [
     "SourceSpan",
     "VerificationIntegrityError",
     "VerificationRunRequest",
+    "VerificationRunFailed",
     "VerificationRunSucceeded",
+    "VerificationFailure",
+    "VerificationRun",
+    "MalformedVerifierOutputError",
+    "ProviderTimeoutError",
+    "ProviderUnavailableError",
+    "StructuredVerifierAdapter",
+    "VerifierCandidateFinding",
+    "VerifierResponse",
     "canonical_request_digest",
     "validate_claim_references",
     "validate_idempotency_replay",
