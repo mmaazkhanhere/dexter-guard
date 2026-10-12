@@ -150,6 +150,19 @@ def test_repository_failure_is_dependency_unavailable() -> None:
     assert captured.value.payload.code.value == "DEPENDENCY_UNAVAILABLE"
 
 
+def test_unexpected_engine_failure_is_internal_error_without_a_run() -> None:
+    class BrokenEngine:
+        def evaluate(self, *args, **kwargs):
+            raise ValueError("unexpected")
+
+    service = make_service()
+    service.engine = BrokenEngine()
+    with pytest.raises(DeterministicValidationError) as captured:
+        service.execute(request())
+    assert captured.value.status_code == 500
+    assert captured.value.payload.code.value == "INTERNAL_ERROR"
+
+
 def test_resolved_unsupported_category_is_provenance_conflict() -> None:
     unsupported = {
         "sourceFactId": "fact-1", "sourceId": "source-1", "sourceVersion": 1,

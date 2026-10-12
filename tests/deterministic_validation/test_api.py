@@ -34,3 +34,13 @@ def test_endpoint_maps_unavailable_validation_dependency_to_503() -> None:
     assert response.status_code == 503
     assert response.json()["code"] == "DEPENDENCY_UNAVAILABLE"
 
+
+def test_endpoint_maps_unexpected_engine_failure_to_500() -> None:
+    service = make_service()
+    service.engine = type("BrokenEngine", (), {"evaluate": lambda self, *args, **kwargs: (_ for _ in ()).throw(ValueError("unexpected"))})()
+    response = TestClient(create_app(deterministic_validation_service=service)).post(
+        "/api/v1/deterministic-validation-runs", json=request()
+    )
+    assert response.status_code == 500
+    assert response.json()["code"] == "INTERNAL_ERROR"
+

@@ -30,6 +30,7 @@ from .repository import (
     TranscriptRepository,
     ValidationRunRepository,
 )
+from .observability import ValidationTelemetry
 
 
 def _plain_payload(value: Any) -> Any:
@@ -69,6 +70,7 @@ class DeterministicValidationService:
         engine: DeterministicRuleEngine | None = None,
         id_factory: Callable[[], str] | None = None,
         engine_version: str = ENGINE_VERSION,
+        telemetry: ValidationTelemetry | None = None,
     ) -> None:
         self.transcript_repository = transcript_repository
         self.source_fact_repository = source_fact_repository
@@ -78,6 +80,7 @@ class DeterministicValidationService:
         self.engine = engine or DeterministicRuleEngine()
         self._id_factory = id_factory or (lambda: f"validation-{uuid4()}")
         self.engine_version = engine_version
+        self.telemetry = telemetry
 
     def _snapshot(self, request: ValidationRequest) -> TranscriptSnapshot:
         try:
@@ -159,21 +162,29 @@ class DeterministicValidationService:
         facts = tuple(self._resolve_fact(request, item) for item in request.source_fact_ids)
         claims = tuple(self._resolve_claim(request, item) for item in request.claim_ids)
         alignments = tuple(self._resolve_alignment(request, item) for item in request.alignment_ids)
-        findings = self.engine.evaluate(snapshot, facts, claims, alignments)
-        run = ValidationRun(
-            validation_run_id=str(self._id_factory()),
-            source_id=request.source_id,
-            source_version=request.source_version,
-            note_id=request.note_id,
-            note_revision=request.note_revision,
-            input_digest=_canonical_digest(request, snapshot, facts, claims, alignments),
-            engine_version=self.engine_version,
-            contract_version=CONTRACT_VERSION,
-            ruleset_version=RULESET_VERSION,
-            findings=findings,
-        )
         try:
-            return self.run_repository.append(run)
+            findings = self.engine.evaluate(snapshot, facts, claims, alignments)
+            run = ValidationRun(
+                validation_run_id=str(self._id_factory()),
+                source_id=request.source_id,
+                source_version=request.source_version,
+                note_id=request.note_id,
+                note_revision=request.note_revision,
+                input_digest=_canonical_digest(request, snapshot, facts, claims, alignments),
+                engine_version=self.engine_version,
+                contract_version=CONTRACT_VERSION,
+                ruleset_version=RULESET_VERSION,
+                findings=findings,
+            )
+        except DeterministicValidationError:
+            raise
+        except Exception as error:
+            raise api_error(code="INTERNAL_ERROR", message="Deterministic validation could not complete.", status_code=500) from error
+        try:
+            persisted = self.run_repository.append(run)
+            if self.telemetry is not None:
+                self.telemetry.record(persisted)
+            return persisted
         except DeterministicValidationError:
             raise
         except Exception as error:
