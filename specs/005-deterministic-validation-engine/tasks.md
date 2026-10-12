@@ -45,6 +45,17 @@
 - [ ] T026 Have a human reviewer update the reviewer-owned requirements checklist; implementation must not update it. **Depends on:** T025.
 - [ ] T027 Run [converge.md](converge.md), append only newly discovered gap tasks, implement them, and repeat until convergence reports `Converged`. **Depends on:** T026.
 
+## Implementation status (2026-10-12)
+
+- [x] T001–T003: repository mapping, upstream contract verification, and ADR 004 review recorded in `compatibility-review.md`.
+- [x] T004–T005: versioned Pydantic contracts and contract tests.
+- [x] T006–T011: exact Decimal/unit/BP rules and Unicode evidence-integrity tests.
+- [x] T012–T018: explicit-alignment orchestration, immutable run service, repository ports, API route, and integration tests.
+- [x] T019–T024: AT-001–AT-021 synthetic manifest, acceptance/repeatability tests, Spec 007/008 handoff, and minimized telemetry.
+- [x] T025: `pytest -q` (209 passed), `python -m compileall -q src tests`, and `git diff --check` passed. No repository lint/type-check commands are configured in `pyproject.toml`.
+- [ ] T026: human reviewer checklist update.
+- [ ] T027: convergence procedure.
+
 ## Dependency summary
 
 ```text

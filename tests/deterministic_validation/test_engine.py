@@ -99,6 +99,12 @@ def test_blood_pressure_compares_components_without_clinical_range_logic() -> No
     assert "systolic" in result[0].message
 
 
+def test_blood_pressure_components_must_be_positive_integers() -> None:
+    source = SourceFact(sourceId="source-1", sourceVersion=1, sourceFactId="fact-1", measurement={"category": "BLOOD_PRESSURE", "value": {"systolic": "0", "diastolic": 80}, "unit": "MMHG", "approximation": "EXACT"}, evidence=(ref(),))
+    observed = Claim(claimId="claim-1", noteId="note-1", noteRevision=1, measurement={"category": "BLOOD_PRESSURE", "value": {"systolic": "120", "diastolic": 80}, "unit": "MMHG", "approximation": "EXACT"})
+    assert findings(source, observed)[0].rule_id == "STR-001"
+
+
 def test_invalid_structured_value_skips_numeric_comparison() -> None:
     result = findings(fact("not-a-number"), claim("38.2"))
     assert result[0].rule_id == "STR-001"
@@ -133,4 +139,10 @@ def test_evidence_checks_are_after_comparison_findings_and_once_per_reference() 
     observed = claim("39.2", evidence=(shared,))
     result = findings(source, observed)
     assert [item.rule_id for item in result] == ["NUM-001"]
+
+
+def test_rule_module_has_no_model_or_network_dependency() -> None:
+    import deterministic_validation.engine as engine_module
+
+    assert not {"openai", "httpx", "requests"}.intersection(engine_module.__dict__)
 
