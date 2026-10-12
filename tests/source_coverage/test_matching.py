@@ -4,7 +4,7 @@ from decimal import Decimal
 from claim_extraction.models import Claim
 from source_ingestion.contracts import SourceDocument
 
-from source_coverage.contracts import SourceFact, SourceSpan
+from source_coverage.contracts import SemanticRelation, SourceFact, SourceSpan
 from source_coverage.extraction import source_text_hash
 from source_coverage.matching import HeuristicGermanSemanticMatcher, build_assessments
 
@@ -65,3 +65,14 @@ def test_faithful_duplicate_has_coverage_precedence_over_distortion():
     assessments, findings = build_assessments([source], (), relations, source_quotes={"fact-1": (source.fact_text,)})
     assert assessments[0].status.value == "COVERED"
     assert findings == ()
+
+
+def test_unresolved_semantic_relation_is_uncertain_even_with_a_related_relation():
+    source = fact()
+    relations = (
+        SemanticRelation(sourceFactId="fact-1", claimId="claim-1", kind="UNRESOLVED", preservedAttributes=(), missingAttributes=(), distortedAttributes=(), explanation="Ambiguous semantic match."),
+        SemanticRelation(sourceFactId="fact-1", claimId="claim-2", kind="FAITHFUL", preservedAttributes=(), missingAttributes=(), distortedAttributes=(), explanation="Faithful candidate."),
+    )
+    assessments, findings = build_assessments([source], (), relations, source_quotes={"fact-1": (source.fact_text,)})
+    assert assessments[0].status.value == "UNCERTAIN"
+    assert findings[0].requires_review is True

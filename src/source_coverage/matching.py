@@ -101,6 +101,16 @@ def _claim_attribution(claim: Claim) -> Attribution:
     return Attribution.UNSPECIFIED
 
 
+def _claim_subject(claim: Claim) -> str | None:
+    if claim.subject:
+        subject = claim.subject.casefold()
+        if any(token in subject for token in ("bewohner", "patient", "frau", "herr", "resident", "care_recipient")):
+            return "care_recipient"
+        return claim.subject
+    text = _claim_text(claim).casefold()
+    return "care_recipient" if any(token in text for token in ("bewohner", "patient", "frau ", "herr ")) else None
+
+
 def _claim_certainty(claim: Claim) -> Certainty:
     return Certainty[claim.certainty.value]
 
@@ -160,7 +170,7 @@ def _attribute_differences(fact: SourceFact, claim: Claim) -> tuple[tuple[Materi
         else:
             preserved.append(MaterialAttribute.CARE_ACTION)
     if fact.subject:
-        compare(MaterialAttribute.SUBJECT, fact.subject, claim.subject or ("care_recipient" if "bewohner" in claim_text.casefold() else None), absent_is_missing=True)
+        compare(MaterialAttribute.SUBJECT, fact.subject, _claim_subject(claim), absent_is_missing=True)
     return tuple(dict.fromkeys(preserved)), tuple(dict.fromkeys(missing)), tuple(dict.fromkeys(distorted))
 
 
@@ -204,6 +214,9 @@ def validate_relations(relations: Iterable[SemanticRelation], facts: Sequence[So
 
 
 def _status_for(relations: Sequence[SemanticRelation]) -> tuple[CoverageStatus, tuple[str, ...], tuple[MaterialAttribute, ...], tuple[MaterialAttribute, ...], tuple[MaterialAttribute, ...], str]:
+    unresolved = [item for item in relations if item.kind is SemanticRelationKind.UNRESOLVED]
+    if unresolved:
+        return CoverageStatus.UNCERTAIN, tuple(item.claim_id for item in unresolved if item.claim_id), (), (), (), "Semantic comparison could not be resolved reliably."
     faithful = [item for item in relations if item.kind is SemanticRelationKind.FAITHFUL]
     if faithful:
         item = faithful[0]
@@ -216,8 +229,6 @@ def _status_for(relations: Sequence[SemanticRelation]) -> tuple[CoverageStatus, 
     if partial:
         item = partial[0]
         return CoverageStatus.PARTIALLY_COVERED, tuple(item.claim_id for item in partial if item.claim_id), item.preserved_attributes, tuple(dict.fromkeys(a for item in partial for a in item.missing_attributes)), (), "A related claim omits material source detail."
-    if any(item.kind is SemanticRelationKind.UNRESOLVED for item in relations):
-        return CoverageStatus.UNCERTAIN, tuple(item.claim_id for item in relations if item.claim_id), (), (), (), "Semantic comparison could not be resolved reliably."
     return CoverageStatus.MISSING, (), (), (), (), "No related candidate claim was found."
 
 

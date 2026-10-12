@@ -134,8 +134,13 @@ class SourceCoverageService:
                 fact_ids=tuple(item.source_fact_id for item in expected_facts), claim_ids=tuple(item.id for item in claims),
             )
             refs_by_owner: dict[str, tuple[RelatedFindingRef, ...]] = {}
+            relation_claims_by_fact: dict[str, set[str]] = {}
+            for relation in relations:
+                if relation.claim_id is not None:
+                    relation_claims_by_fact.setdefault(relation.source_fact_id, set()).add(relation.claim_id)
             for owner in tuple(item.source_fact_id for item in expected_facts) + tuple(item.unresolved_source_item_id for item in extraction.unresolved_items):
-                refs = tuple(RelatedFindingRef(owner=item.owner, findingId=item.finding_id) for item in related if item.source_fact_id == owner or item.claim_id == owner)
+                claim_ids_for_owner = relation_claims_by_fact.get(owner, set())
+                refs = tuple(RelatedFindingRef(owner=item.owner, findingId=item.finding_id) for item in related if item.source_fact_id == owner or item.claim_id in claim_ids_for_owner)
                 if refs:
                     refs_by_owner[owner] = refs
             assessments, findings = build_assessments(expected_facts, extraction.unresolved_items, relations, source_quotes=source_quotes, related_refs=refs_by_owner)
