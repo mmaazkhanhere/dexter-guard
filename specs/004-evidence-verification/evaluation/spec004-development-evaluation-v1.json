@@ -1,0 +1,30 @@
+{
+  "reportSchemaVersion": "SPEC004_DEVELOPMENT_EVALUATION-v1",
+  "datasetId": "spec004-german-development",
+  "datasetVersion": "1.0.0",
+  "datasetDigest": "sha256:ev-001-014-v1",
+  "criticalCaseManifestVersion": "SPEC004_CRITICAL_CASES-v1",
+  "evaluatorVersion": "spec004-fixture-evaluator-v1",
+  "evaluatedAt": "2026-10-12T00:00:00Z",
+  "modelId": "spec004-fixture-verifier",
+  "modelVersion": "fixture-2026-10",
+  "promptVersion": "verification-v1",
+  "promptHash": "sha256:spec004-fixture",
+  "annotationPolicyVersion": "EVIDENCE_ANNOTATION-v1",
+  "evidenceStatusPolicyVersion": "EVIDENCE_STATUS-v1",
+  "totalClaims": 11,
+  "classification": {
+    "exactMatches": 11,
+    "total": 11,
+    "exactAccuracy": 1.0,
+    "confusionMatrix": {
+      "SUPPORTED": {"SUPPORTED": 2},
+      "UNSUPPORTED": {"UNSUPPORTED": 3},
+      "CONTRADICTED": {"CONTRADICTED": 2},
+      "UNCERTAIN": {"UNCERTAIN": 4}
+    }
+  },
+  "criticalErrorRecall": {"truePositives": 6, "eligibleCriticalCases": 6, "value": 1.0},
+  "supportedClaimFalsePositiveRate": {"falsePositives": 0, "predictedSupported": 2, "value": 0.0},
+  "evidenceGroundingValidity": {"validFindings": 8, "findingsRequiringGrounding": 8, "value": 1.0}
+}

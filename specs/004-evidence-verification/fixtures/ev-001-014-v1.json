@@ -1,0 +1,23 @@
+{
+  "manifestVersion": "SPEC004_CRITICAL_CASES-v1",
+  "datasetId": "spec004-german-development",
+  "datasetVersion": "1.0.0",
+  "annotationPolicyVersion": "EVIDENCE_ANNOTATION-v1",
+  "evidenceStatusPolicyVersion": "EVIDENCE_STATUS-v1",
+  "cases": [
+    {"caseId": "EV-001", "sourceText": "Die Patientin wirkt ruhig.", "claimText": "Patientin wirkt ruhig.", "expectedStatus": "SUPPORTED", "requiredDiscrepancies": [], "spanRule": "REQUIRED"},
+    {"caseId": "EV-002", "sourceText": "Der Blutdruck ist stabil.", "claimText": "Patientin hat Übelkeit.", "expectedStatus": "UNSUPPORTED", "requiredDiscrepancies": [], "spanRule": "NONE"},
+    {"caseId": "EV-003", "sourceText": "Der Patient klagt über starke Schmerzen.", "claimText": "Patient hat keine Schmerzen.", "expectedStatus": "CONTRADICTED", "requiredDiscrepancies": [], "spanRule": "REQUIRED"},
+    {"caseId": "EV-004", "sourceText": "Der Patient hat keine Schmerzen.", "claimText": "Patient hat Schmerzen.", "expectedStatus": "CONTRADICTED", "requiredDiscrepancies": ["NEGATION"], "spanRule": "REQUIRED"},
+    {"caseId": "EV-005", "sourceText": "Vielleicht Schmerzen beim Umlagern.", "claimText": "Patient hat Schmerzen beim Umlagern.", "expectedStatus": "UNCERTAIN", "requiredDiscrepancies": ["CERTAINTY"], "spanRule": "REQUIRED"},
+    {"caseId": "EV-006", "sourceText": "Der Patient berichtet Schwindel.", "claimText": "Patient hat Schwindel.", "expectedStatus": "UNCERTAIN", "requiredDiscrepancies": ["ATTRIBUTION"], "spanRule": "REQUIRED"},
+    {"caseId": "EV-007", "sourceText": "Der Patient wirkt müde.", "claimText": "Patient hat eine Depression.", "expectedStatus": "UNSUPPORTED", "requiredDiscrepancies": ["CLINICAL_INFERENCE"], "spanRule": "NONE"},
+    {"caseId": "EV-008", "sourceText": "Die Patientin klagt über Atemnot.", "claimText": "Patientin berichtet Dyspnoe.", "expectedStatus": "SUPPORTED", "requiredDiscrepancies": [], "spanRule": "REQUIRED"},
+    {"caseId": "EV-009", "sourceText": "Druckgefühl, Ursache unklar.", "claimText": "Patient hat ein Druckgefühl.", "expectedStatus": "UNCERTAIN", "requiredDiscrepancies": [], "spanRule": "REQUIRED"},
+    {"caseId": "EV-010", "sourceText": "Der Patient wirkt ruhig.", "claimText": "Patient wirkt ruhig.", "expectedStatus": null, "requiredDiscrepancies": [], "spanRule": "INTEGRITY_FAILURE"},
+    {"caseId": "EV-011", "sourceText": "Der Patient wirkt ruhig.", "claimText": "Patient wirkt ruhig.", "expectedStatus": null, "requiredDiscrepancies": [], "spanRule": "SOURCE_VERSION_FAILURE"},
+    {"caseId": "EV-012", "sourceText": "Der Patient wirkt ruhig.", "claimText": "Patient wirkt ruhig.", "expectedStatus": null, "requiredDiscrepancies": [], "spanRule": "VERIFIER_FAILURE"},
+    {"caseId": "EV-013", "sourceText": "Keine starken Schmerzen.", "claimText": "Keine Schmerzen.", "expectedStatus": "UNCERTAIN", "requiredDiscrepancies": ["NEGATION"], "spanRule": "REQUIRED"},
+    {"caseId": "EV-014", "sourceText": "Die Patientin ist wach und orientiert.", "claimText": "Patientin hat Schmerzen.", "expectedStatus": "UNSUPPORTED", "requiredDiscrepancies": [], "spanRule": "NONE"}
+  ]
+}
