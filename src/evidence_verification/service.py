@@ -56,14 +56,16 @@ class VerificationService:
 
     def __init__(
         self,
-        *,
         source_repository: object | None = None,
+        claim_repository: object | None = None,
+        verifier: object | None = None,
+        *,
         source_service: object | None = None,
         note_repository: object | None = None,
-        claim_repository: object | None = None,
         claim_resolver: Callable[[str], object] | None = None,
-        verifier: object,
+        provider: object | None = None,
         repository: VerificationRunRepository | None = None,
+        run_repository: VerificationRunRepository | None = None,
         clock: Callable[[], datetime] | None = None,
         id_factory: Callable[[], str] | None = None,
         correlation_factory: Callable[[], str] | None = None,
@@ -74,13 +76,17 @@ class VerificationService:
     ) -> None:
         if provider_timeout_seconds <= 0:
             raise ValueError("provider_timeout_seconds must be positive")
+        if verifier is None:
+            verifier = provider
+        if verifier is None:
+            raise ValueError("verifier or provider must be configured")
         self.source_repository = source_repository
         self.source_service = source_service
         self.note_repository = note_repository
         self.claim_repository = claim_repository
         self.claim_resolver = claim_resolver
         self.verifier = verifier if isinstance(verifier, StructuredVerifierAdapter) else StructuredVerifierAdapter(verifier, max_attempts=max_provider_attempts)
-        self.repository = repository or InMemoryVerificationRepository()
+        self.repository = repository or run_repository or InMemoryVerificationRepository()
         self._clock = clock or (lambda: datetime.now(timezone.utc))
         self._id_factory = id_factory or (lambda: str(uuid4()))
         self._correlation_factory = correlation_factory or (lambda: str(uuid4()))
