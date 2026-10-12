@@ -36,8 +36,8 @@ execution trace ID.
 
 ## Verification performed
 
-- `uv run pytest -q`: 130 passed before the convergence follow-up; the full suite is rerun for T029.
-- `uv run pytest tests/evidence_verification -q`: 62 passed after the convergence follow-up.
+- `uv run pytest -q`: 170 passed after the convergence follow-up; one pre-existing Starlette/httpx deprecation warning.
+- `uv run pytest tests/evidence_verification -q`: 64 passed after the convergence follow-up.
 - `uv run python -m compileall -q src tests`: passed.
 - `git diff --check`: passed.
 

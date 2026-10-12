@@ -53,7 +53,7 @@ must not self-approve those markers.
 
 Latest implementation evidence:
 
-- `uv run pytest tests/evidence_verification -q`: 62 passed.
+- `uv run pytest tests/evidence_verification -q`: 64 passed.
 - `uv run python -m compileall -q src tests`: passed.
 - `git diff --check`: passed.
 - EV-001 through EV-014 manifest, immutable-fixture API acceptance, safe
