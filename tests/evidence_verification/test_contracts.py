@@ -155,19 +155,20 @@ def test_sqlite_idempotency_registry_replays_or_rejects_atomically() -> None:
     registry = SqliteIdempotencyRegistry(sqlite3.connect(":memory:"))
     original = request("c1")
 
-    created = registry.bind_or_replay(original, verification_run_id="run-1")
-    replayed = registry.bind_or_replay(original, verification_run_id="run-2")
+    created = registry.bind_or_replay(original, verification_run_id="run-1", run_payload="payload-1")
+    replayed = registry.bind_or_replay(original, verification_run_id="run-2", run_payload="payload-2")
 
     assert created.created is True
     assert replayed.created is False
     assert replayed.verification_run_id == "run-1"
     assert replayed.input_digest == created.input_digest
+    assert replayed.run_payload == "payload-1"
 
     changed_payload = original.model_dump(by_alias=True)
     changed_payload["sourceVersion"] = 2
     changed = VerificationRunRequest.model_validate(changed_payload)
     with pytest.raises(IdempotencyKeyConflictError, match="different request identity"):
-        registry.bind_or_replay(changed, verification_run_id="run-3")
+        registry.bind_or_replay(changed, verification_run_id="run-3", run_payload="payload-3")
 
 
 @pytest.mark.parametrize("findings", [(finding("c1"),), (finding("c1"), finding("c1")), (finding("c1"), finding("foreign"))])

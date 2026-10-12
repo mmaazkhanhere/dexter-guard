@@ -25,6 +25,7 @@ class IdempotencyBinding:
 
     verification_run_id: str
     input_digest: str
+    run_payload: str
     created: bool
 
 
@@ -78,10 +79,11 @@ def validate_idempotency_replay(
 
 
 class SqliteIdempotencyRegistry:
-    """Atomically bind verification idempotency keys to canonical input digests.
+    """Atomically persist a run and bind its idempotency key.
 
-    A caller creates and persists a new run only when ``bind_or_replay`` returns
-    ``created=True``. The existing run ID is returned for an exact replay.
+    The run payload and idempotency binding are committed in one SQLite
+    transaction. A caller invokes the model only after this reservation is
+    created, and an exact retry receives the previously persisted run payload.
     """
 
     def __init__(self, connection: sqlite3.Connection) -> None:
@@ -95,6 +97,15 @@ class SqliteIdempotencyRegistry:
             )
             """
         )
+        self._connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS verification_runs (
+                verification_run_id TEXT PRIMARY KEY,
+                input_digest TEXT NOT NULL,
+                run_payload TEXT NOT NULL
+            )
+            """
+        )
         self._connection.commit()
 
     def bind_or_replay(
@@ -102,6 +113,7 @@ class SqliteIdempotencyRegistry:
         request: VerificationRunRequest,
         *,
         verification_run_id: str,
+        run_payload: str,
     ) -> IdempotencyBinding:
         """Return an existing run for an exact replay or reserve a new binding.
 
@@ -114,14 +126,16 @@ class SqliteIdempotencyRegistry:
             self._connection.execute("BEGIN IMMEDIATE")
             row = self._connection.execute(
                 """
-                SELECT input_digest, verification_run_id
-                FROM verification_idempotency
-                WHERE idempotency_key = ?
+                SELECT i.input_digest, i.verification_run_id, r.run_payload
+                FROM verification_idempotency AS i
+                JOIN verification_runs AS r
+                  ON r.verification_run_id = i.verification_run_id
+                WHERE i.idempotency_key = ?
                 """,
                 (request.idempotency_key,),
             ).fetchone()
             if row is not None:
-                stored_digest, stored_run_id = row
+                stored_digest, stored_run_id, stored_payload = row
                 if stored_digest != input_digest:
                     raise IdempotencyKeyConflictError(
                         "idempotency key is already bound to a different request identity"
@@ -130,8 +144,17 @@ class SqliteIdempotencyRegistry:
                 return IdempotencyBinding(
                     verification_run_id=stored_run_id,
                     input_digest=stored_digest,
+                    run_payload=stored_payload,
                     created=False,
                 )
+            self._connection.execute(
+                """
+                INSERT INTO verification_runs
+                    (verification_run_id, input_digest, run_payload)
+                VALUES (?, ?, ?)
+                """,
+                (verification_run_id, input_digest, run_payload),
+            )
             self._connection.execute(
                 """
                 INSERT INTO verification_idempotency
@@ -144,6 +167,7 @@ class SqliteIdempotencyRegistry:
             return IdempotencyBinding(
                 verification_run_id=verification_run_id,
                 input_digest=input_digest,
+                run_payload=run_payload,
                 created=True,
             )
         except Exception:

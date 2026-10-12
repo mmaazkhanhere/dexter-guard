@@ -10,7 +10,7 @@
 4. Do not edit checklist.md, check checklist items, or treat task completion as reviewer approval.
 5. When the checklist is approved, complete T001 first and map all planned components to the repository’s existing locations.
 
-At generation time, checklist.md deliberately has unchecked reviewer-owned items. Therefore an implementation run started now must stop at step 3; it must not build a partial verifier.
+At the current stage, checklist.md retains open reviewer-owned integration-test items. Therefore an implementation run must stop at step 3 until those items are satisfied; it must not claim a complete verifier from contract scaffolding alone.
 
 ## Execution order
 

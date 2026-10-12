@@ -3,7 +3,7 @@
 **Canonical feature specification:** This `spec.md` file is the authoritative behavioral specification for Spec 004.
 
 **Feature:** Evidence-grounded verification of nursing-note claims  
-**Status:** Pending independent requirements-quality review
+**Status:** Requirements reviewed; implementation integration pending
 **Input dependencies:** immutable German transcript (Spec 001), candidate note revision (Spec 002), and atomic claims (Spec 003)  
 **Primary requirements:** FR-07, FR-08, FR-09, FR-10, FR-12, FR-13
 
@@ -36,9 +36,9 @@ Claims are supplied by immutable reference, not re-submitted by value: each requ
 | Numerical and unit validation | Spec 005 |
 | Source-to-note completeness and important omissions | Spec 006 |
 | Caregiver edits, approval, severity, and audit decisions | Spec 007 |
-| Benchmark metrics and regression reporting | Spec 008 |
+| Held-out benchmark metrics, release thresholds, and regression reporting | Spec 008 |
 
-Spec 004 may consume normalized claim attributes from upstream components. It must not alter transcripts, claims, or nursing notes.
+Spec 004 may consume normalized claim attributes from upstream components. It must not alter transcripts, claims, or nursing notes. Spec 004 owns only the development-acceptance report required before configured-verifier use; held-out benchmark metrics and release thresholds remain owned by Spec 008.
 
 ## Definitions
 

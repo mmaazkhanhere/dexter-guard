@@ -2,7 +2,7 @@
 
 **Reviewer-owned artifact:** This checklist assesses whether the specification is clear, complete, internally consistent, and testable. It does not track implementation progress. A reviewer, not the implementation workflow, checks an item only after verifying the criterion.
 
-**Review state:** Approved on 2026-10-12 after a user-requested independent requirements-quality review. Corrections are recorded in [compatibility-review.md](compatibility-review.md), including the immutable claim-set mapping and idempotency conflict semantics.
+**Review state:** Contract requirements reviewed on 2026-10-12. Integration-test criteria remain open pending implementation of the verification service, repositories, and API. Corrections are recorded in [compatibility-review.md](compatibility-review.md), including the immutable claim-set mapping and idempotency conflict semantics.
 
 ## Requirement clarity
 
@@ -49,11 +49,11 @@
 - [x] Regression cases cover attribution escalation and unsupported clinical diagnosis.
 - [x] Integrity tests prove quotations are derived from validated offsets rather than model-provided strings.
 - [x] Contract tests reject unknown evidence statuses and illegal source-span values.
-- [x] Integration tests prove a stale source version and cross-note claim are non-successful.
-- [x] Failure tests demonstrate that malformed verifier output and timeout cannot return an authoritative result.
+- [ ] Integration tests prove a stale source version and cross-note claim are non-successful.
+- [ ] Failure tests demonstrate that malformed verifier output and timeout cannot return an authoritative result.
 - [x] Evaluation-handoff requirements permit Spec 008 to measure errors and false positives from stable labeled fixtures.
 
 ## Review decision
 
-- [x] The reviewer finds the specification ready for implementation planning.
-- [x] The reviewer records any required follow-up in the issue or review system without modifying these reviewer-owned marks automatically.
+- [ ] The reviewer finds the specification ready for implementation planning.
+- [x] The reviewer records the open integration-test follow-up and required compatibility corrections in the issue/review artifacts.

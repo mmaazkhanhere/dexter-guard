@@ -2,7 +2,7 @@
 
 **Analysis type:** Read-only cross-artifact review  
 **Artifacts reviewed:** spec.md, clarify.md, annotation-policy.md, plan.md, tasks.md, contracts, and Specs 001–003 interfaces
-**Result:** No blocking conflicts found after the recorded compatibility corrections. The PoC contract is synchronous; asynchronous execution is deferred to a separately versioned API.
+**Result:** No unresolved policy conflicts remain. The synchronous PoC contract is fixed, but implementation readiness remains blocked by the outstanding integration-test checklist items and repository/API wiring.
 
 ## Requirement traceability
 
@@ -28,8 +28,8 @@
 | Partial negation cannot be reduced to negative-token match | Pass | explicit in spec, clarification, test strategy, T017, and EV-013. |
 | Spec boundaries retained | Pass | numeric/unit work, omissions, approval, and benchmark ownership stay with Specs 005–008 in all artifacts. |
 | API supports safe failure | Pass | plan response/lifecycle and T022–T023 provide a durable non-success outcome with no authoritative partial findings. |
-| Idempotency cannot replay a different request | Pass | The canonical request digest is bound atomically to the idempotency key; same digest replays the existing run and a differing digest returns HTTP 409. |
-| Specs 001–003 interfaces compose | Pass | [compatibility-review.md](compatibility-review.md) maps source, note, extraction, claim, resident, and claim-set identities to the Spec 004 contract. |
+| Idempotency cannot replay a different request | Pass at persistence primitive; integration pending | The SQLite run store binds the canonical digest, run payload, and key in one transaction; HTTP 409 mapping and endpoint integration remain implementation tasks. |
+| Specs 001–003 interfaces compose | Contract mapping pass; runtime integration pending | [compatibility-review.md](compatibility-review.md) maps source, note, extraction, claim, resident, and claim-set identities; repository/service wiring remains unimplemented. |
 | Acceptance scenarios are testable | Pass | EV-001 through EV-014 map to fixture task T024 and end-to-end task T025. |
 
 ## Non-blocking implementation decisions
@@ -44,8 +44,8 @@ The execution mode is not deferred: this PoC is synchronous and returns a termin
 
 ## Checklist gate
 
-The checklist review is recorded in [checklist.md](checklist.md). The user-requested independent review verified the criteria against the listed artifacts and recorded compatibility corrections before approval.
+The checklist review is recorded in [checklist.md](checklist.md). The contract-level criteria are reviewed, while integration-test criteria remain explicitly open until the service, repositories, and API exist.
 
 ## Conclusion
 
-The documents are internally consistent and have no unresolved product-policy ambiguity that blocks planning. Proceed with implementation only after repository architecture mapping.
+The documents are internally consistent and have no unresolved product-policy ambiguity. Proceed with implementation only after repository architecture mapping and completion of the open integration-test criteria.
