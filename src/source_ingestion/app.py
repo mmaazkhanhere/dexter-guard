@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 from starlette import status
 
+from deterministic_validation.errors import DeterministicValidationError
 from .contracts import ResolvedSourceSpan, SourceDocument
 from .errors import ErrorCode, SourceError
 from .service import SourceIngestionService
@@ -109,6 +110,7 @@ def create_app(
     service: SourceIngestionService | None = None,
     note_service: Any | None = None,
     verification_service: Any | None = None,
+    deterministic_validation_service: Any | None = None,
 ) -> FastAPI:
     from nursing_notes.contracts import NoteResponse
     from nursing_notes.errors import NoteError
@@ -120,6 +122,7 @@ def create_app(
     app.state.source_service = service
     app.state.note_service = note_service
     app.state.verification_service = verification_service
+    app.state.deterministic_validation_service = deterministic_validation_service
 
     @app.exception_handler(SourceError)
     async def handle_source_error(_: Request, error: SourceError) -> JSONResponse:
@@ -139,6 +142,10 @@ def create_app(
             status_code=status.HTTP_409_CONFLICT,
             content={"code": "IDEMPOTENCY_KEY_CONFLICT", "message": str(error)},
         )
+
+    @app.exception_handler(DeterministicValidationError)
+    async def handle_deterministic_validation_error(_: Request, error: DeterministicValidationError) -> JSONResponse:
+        return JSONResponse(status_code=error.status_code, content=error.payload.model_dump(by_alias=True, exclude_none=True))
 
     @app.post("/sources", response_model=SourceDocument, status_code=status.HTTP_201_CREATED)
     async def create_source(request: Request) -> SourceDocument:
@@ -198,6 +205,15 @@ def create_app(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content={"code": "INVALID_REQUEST", "message": "The request does not match the verification contract."},
             )
+
+    @app.post("/api/v1/deterministic-validation-runs", status_code=status.HTTP_200_OK)
+    async def create_deterministic_validation_run(request: Request) -> Any:
+        if deterministic_validation_service is None:
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={"code": "DEPENDENCY_UNAVAILABLE", "message": "Deterministic validation is not configured."},
+            )
+        return deterministic_validation_service.execute(await _json_object(request))
 
     return app
 
