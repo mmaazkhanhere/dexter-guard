@@ -43,4 +43,19 @@ Then run implement.md for those new tasks and re-run this convergence procedure.
 
 ## Current baseline
 
-**Status: Documentation complete; code convergence not yet runnable.** This document set defines the convergence criteria, but Spec 004 implementation tasks remain unchecked and no code/test evidence has been supplied. It would be inaccurate to report “Converged” before implementation, reviewer approval, and T029–T031.
+**Status: Implementation evidence complete; reviewer gate pending.** The
+runtime, contract, fixture, end-to-end, telemetry, operations, and evaluation
+handoff evidence is now present and the executable Spec 004 suite passes. The
+branch is not yet `Converged` because checklist.md is reviewer-owned and its
+integration-test markers and final review decision remain open. T030 and T031
+must be completed by the designated reviewer/convergence run; this procedure
+must not self-approve those markers.
+
+Latest implementation evidence:
+
+- `uv run pytest tests/evidence_verification -q`: 64 passed.
+- `uv run python -m compileall -q src tests`: passed.
+- `git diff --check`: passed.
+- EV-001 through EV-014 manifest, immutable-fixture API acceptance, safe
+  failure cases, content-free telemetry, operations runbook, and Spec 008
+  handoff are versioned in the referenced artifacts.

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Literal
+from typing import Annotated, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr, field_validator, model_validator
 
@@ -32,6 +32,25 @@ class EvidenceRole(StrEnum):
     SUPPORTING = "SUPPORTING"
     CONFLICTING = "CONFLICTING"
     CONTEXT_NON_SUPPORTING = "CONTEXT_NON_SUPPORTING"
+
+
+class Discrepancy(StrEnum):
+    NEGATION = "NEGATION"
+    CERTAINTY = "CERTAINTY"
+    ATTRIBUTION = "ATTRIBUTION"
+    CLINICAL_INFERENCE = "CLINICAL_INFERENCE"
+    OTHER = "OTHER"
+
+
+class VerificationRunStatus(StrEnum):
+    RECEIVED = "RECEIVED"
+    VALIDATING = "VALIDATING"
+    VERIFYING = "VERIFYING"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED_VALIDATION = "FAILED_VALIDATION"
+    FAILED_EVIDENCE_INTEGRITY = "FAILED_EVIDENCE_INTEGRITY"
+    FAILED_VERIFIER = "FAILED_VERIFIER"
+    FAILED_PERSISTENCE = "FAILED_PERSISTENCE"
 
 
 class ClaimInput(_Contract):
@@ -102,7 +121,7 @@ class EvidenceFinding(_Contract):
     explanation: StrictStr = Field(min_length=1)
     source_spans: tuple[SourceSpan, ...] = Field(alias="sourceSpans")
     evidence_quotes: tuple[EvidenceQuote, ...] = Field(alias="evidenceQuotes")
-    discrepancies: tuple[StrictStr, ...]
+    discrepancies: tuple[Discrepancy, ...]
     policy_version: Literal["EVIDENCE_ANNOTATION-v1"] = Field(alias="policyVersion")
     verifier_finding: VerifierFinding = Field(alias="verifierFinding")
     deterministic_rule_findings: tuple[DeterministicRuleFinding, ...] = Field(alias="deterministicRuleFindings")
@@ -163,3 +182,56 @@ class VerificationRunSucceeded(_Contract):
         if not self.created_at <= self.started_at <= self.completed_at:
             raise ValueError("createdAt, startedAt, and completedAt must be ordered")
         return self
+
+
+class VerificationFailure(_Contract):
+    code: StrictStr = Field(min_length=1)
+    reason: StrictStr = Field(min_length=1)
+
+
+class VerificationRunFailed(_Contract):
+    verification_run_id: StrictStr = Field(alias="verificationRunId", min_length=1)
+    source_id: StrictStr = Field(alias="sourceId", min_length=1)
+    source_version: StrictInt = Field(alias="sourceVersion", ge=1)
+    note_id: StrictStr = Field(alias="noteId", min_length=1)
+    note_revision: StrictInt = Field(alias="noteRevision", ge=1)
+    claim_set_id: StrictStr = Field(alias="claimSetId", min_length=1)
+    idempotency_key: StrictStr = Field(alias="idempotencyKey", min_length=1)
+    input_digest: StrictStr = Field(alias="inputDigest", min_length=1)
+    evidence_status_policy_version: Literal["EVIDENCE_STATUS-v1"] = Field(alias="evidenceStatusPolicyVersion")
+    annotation_policy_version: Literal["EVIDENCE_ANNOTATION-v1"] = Field(alias="annotationPolicyVersion")
+    model_id: StrictStr | None = Field(default=None, alias="modelId", min_length=1)
+    model_version: StrictStr | None = Field(default=None, alias="modelVersion", min_length=1)
+    prompt_version: StrictStr | None = Field(default=None, alias="promptVersion", min_length=1)
+    prompt_hash: StrictStr | None = Field(default=None, alias="promptHash", min_length=1)
+    correlation_id: StrictStr = Field(alias="correlationId", min_length=1)
+    execution_trace_id: StrictStr = Field(alias="executionTraceId", min_length=1)
+    created_at: datetime = Field(alias="createdAt")
+    started_at: datetime = Field(alias="startedAt")
+    completed_at: datetime = Field(alias="completedAt")
+    status: Literal[
+        "FAILED_VALIDATION",
+        "FAILED_EVIDENCE_INTEGRITY",
+        "FAILED_VERIFIER",
+        "FAILED_PERSISTENCE",
+    ]
+    failure: VerificationFailure
+
+    @field_validator("created_at", "started_at", "completed_at")
+    @classmethod
+    def timestamps_must_be_timezone_aware(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("execution timestamps must be timezone-aware")
+        return value
+
+    @model_validator(mode="after")
+    def timestamps_must_be_ordered(self) -> "VerificationRunFailed":
+        if not self.created_at <= self.started_at <= self.completed_at:
+            raise ValueError("createdAt, startedAt, and completedAt must be ordered")
+        return self
+
+
+VerificationRun: TypeAlias = Annotated[
+    VerificationRunSucceeded | VerificationRunFailed,
+    Field(discriminator="status"),
+]

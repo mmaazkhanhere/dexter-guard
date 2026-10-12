@@ -8,11 +8,13 @@ from typing import Annotated, Any
 from fastapi import FastAPI, Path, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 from starlette import status
 
 from .contracts import ResolvedSourceSpan, SourceDocument
 from .errors import ErrorCode, SourceError
 from .service import SourceIngestionService
+from evidence_verification.validation import IdempotencyKeyConflictError
 
 
 class _DuplicateJsonKey(ValueError):
@@ -106,6 +108,7 @@ def _validation_error_response(error: RequestValidationError) -> JSONResponse:
 def create_app(
     service: SourceIngestionService | None = None,
     note_service: Any | None = None,
+    verification_service: Any | None = None,
 ) -> FastAPI:
     from nursing_notes.contracts import NoteResponse
     from nursing_notes.errors import NoteError
@@ -116,6 +119,7 @@ def create_app(
     app = FastAPI(title="Source and Note Ingestion API", version="1.0.0")
     app.state.source_service = service
     app.state.note_service = note_service
+    app.state.verification_service = verification_service
 
     @app.exception_handler(SourceError)
     async def handle_source_error(_: Request, error: SourceError) -> JSONResponse:
@@ -128,6 +132,13 @@ def create_app(
     @app.exception_handler(RequestValidationError)
     async def handle_request_validation_error(_: Request, error: RequestValidationError) -> JSONResponse:
         return _validation_error_response(error)
+
+    @app.exception_handler(IdempotencyKeyConflictError)
+    async def handle_idempotency_conflict(_: Request, error: IdempotencyKeyConflictError) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content={"code": "IDEMPOTENCY_KEY_CONFLICT", "message": str(error)},
+        )
 
     @app.post("/sources", response_model=SourceDocument, status_code=status.HTTP_201_CREATED)
     async def create_source(request: Request) -> SourceDocument:
@@ -172,6 +183,21 @@ def create_app(
     )
     async def import_nursing_note(request: Request) -> NoteResponse:
         return note_service.import_note(await _json_object(request))
+
+    @app.post("/api/v1/verification-runs", status_code=status.HTTP_200_OK)
+    async def create_verification_run(request: Request) -> Any:
+        if verification_service is None:
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={"code": "VERIFIER_UNAVAILABLE", "message": "Evidence verification is not configured."},
+            )
+        try:
+            return verification_service.verify(await _json_object(request))
+        except ValidationError:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"code": "INVALID_REQUEST", "message": "The request does not match the verification contract."},
+            )
 
     return app
 

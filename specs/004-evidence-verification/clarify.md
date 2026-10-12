@@ -41,7 +41,7 @@ These choices do not alter functional behavior and are intentionally delegated t
 
 - The repository-specific model provider, deployment mode, and credential mechanism.
 - The exact persistence adapter and migration syntax already established by the project architecture.
-- Whether the API completes a short run synchronously or returns a durable queued run, provided the published response contract and safe terminal states remain identical.
+- The repository-specific timeout value and bounded retry count for the mandated synchronous terminal request path. This PoC does not expose HTTP 202, polling, callbacks, or a queued-run contract; an asynchronous design requires a separate, versioned API contract and ADR.
 - The retrieval algorithm, provided it is advisory and cannot replace semantic comparison against the source.
 
 ## No remaining blocking product ambiguity
