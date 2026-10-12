@@ -1,7 +1,8 @@
 # Spec 007 Compatibility Review
 
-**Status:** T001-T002 complete; implementation compatibility is partially available and
-remaining adapter gaps are explicit below.
+**Status:** T001-T002 have documented inspection results but remain unchecked pending
+independent requirements-quality approval; implementation compatibility is partially available
+and remaining adapter gaps are explicit below.
 
 The concrete repository was inspected on 2026-10-12. Existing implementations are local
 Python modules with frozen Pydantic contracts, in-memory repositories, SQLite note/source

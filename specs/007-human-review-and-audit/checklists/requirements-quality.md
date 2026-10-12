@@ -5,6 +5,9 @@ implementation. The architecture self-review recorded below found no documentati
 but it does not substitute for reviewer sign-off or implementation evidence. Checked items
 represent requirements-quality review, not implementation completion.
 
+**Independent reviewer approval:** **PENDING.** Record the reviewer identity, date, and
+approval or exception here before any dependent implementation task is marked complete.
+
 **Architecture self-review:** PASS for CQ-001–CQ-024 on 2026-10-12. Upstream implementation
 compatibility remains an explicit external dependency documented in
 `compatibility-review.md`; T001–T002 must complete that verification before implementation.

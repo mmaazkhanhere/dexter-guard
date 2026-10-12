@@ -16,37 +16,45 @@ stage only after the independent checklist gate, then repeat this convergence pr
 
 ## Review sequence
 
-1. Confirm independent requirements-quality approval and task evidence. The architecture
-   self-review is not a substitute for that gate.
-2. Compare the implemented Pydantic/OpenAPI models and API behavior with
+1. Confirm independent requirements-quality approval recorded with reviewer identity/date and
+   task evidence. The architecture self-review is not a substitute for that gate.
+2. Reconcile `spec.md`, `clarify.md`, `data-model.md`, `plan.md`, `research.md`, `quickstart.md`,
+   `analyze.md`, and `tasks.md` with the contract and implementation. Trace every requirement,
+   invariant, lifecycle rule, dependency, and success criterion; record a concrete gap for any
+   disagreement rather than selecting one artifact implicitly.
+3. Compare the implemented Pydantic/OpenAPI models and API behavior with
    [`contracts/review-audit.openapi.yaml`](contracts/review-audit.openapi.yaml), including
    terminal verification states, exact source/note/run bindings, expected-revision conflicts,
    conditional suggestion fields, and the common error envelope.
-3. Verify the concrete Specs 001–006 ports, repositories, versions, timeout/retry rules,
+4. Verify the concrete Specs 001–006 ports, repositories, versions, timeout/retry rules,
    idempotency behavior, migrations, and fixtures using
    [`compatibility-review.md`](compatibility-review.md). Missing evidence is a dependency gap,
    not permission to infer an interface.
-4. Trace FR-15 and FR-17–FR-25, HR-001–HR-018, and each `[US#]` task mapping to implementation
+5. Trace FR-15 and FR-17–FR-25, HR-001–HR-018, and each `[US#]` task mapping to implementation
    and passing tests. Confirm no component task bypasses the user-story outcome or ownership
    boundary.
-5. Inspect source-span validation and highlighting for exact immutable source versions,
+6. Inspect source-span validation and highlighting for exact immutable source versions,
    Unicode code-point semantics, missing/invalid evidence states, and candidate/source
    separation.
-6. Verify immutable revisions, compare-and-append concurrency, stale finding/run behavior,
+7. Verify immutable revisions, compare-and-append concurrency, stale finding/run behavior,
    final-disposition immutability, and append-only audit history.
-7. Verify claim-level re-verification cannot authorize approval and that final full-note
+8. Verify claim-level re-verification cannot authorize approval and that final full-note
    verification contains the exact current claim set plus complete successful 004/005/006
    component results.
-8. Exercise backend approval guards for stale, failed, malformed, incomplete,
+9. Exercise backend approval guards for stale, failed, malformed, incomplete,
    source-mismatched, unresolved-critical, and unresolved-source-item cases. Confirm rejection
    remains possible after verification failure and approval is atomic against concurrent edits.
-9. Run contract, unit, repository, API, UI, acceptance, static/compile, observability,
-   idempotency/retry, and `git diff --check` checks configured by the implementation repository.
-10. Verify the [Spec 008 evaluation handoff](../../docs/evaluation/spec007-handoff.md), including
-    the required versioned 100+ synthetic German benchmark, held-out metrics, thresholds, and
-    model/prompt/ruleset/dataset provenance. Do not claim clinical safety or improvement from
-    feature acceptance tests alone.
-11. Confirm [ADR 006](../../docs/adr/006-human-review-and-audit-boundary.md) still matches the
+10. Run contract, unit, repository, API, UI, acceptance, static/compile, observability,
+    idempotency/retry, and `git diff --check` checks configured by the implementation repository.
+    Retain the exact command, exit status, timestamp, code revision, and non-sensitive result
+    summary for each check; an undated passing-test statement is not completion evidence.
+11. Verify the [Spec 008 evaluation handoff](../../docs/evaluation/spec007-handoff.md) is complete:
+    it must identify the benchmark owner and require the versioned 100+ synthetic German
+    benchmark, held-out metrics, thresholds, and model/prompt/ruleset/dataset provenance.
+    The benchmark itself remains a Spec 008 release/clinical-claim gate, not an unfulfilled
+    Spec 007 implementation task. Do not claim clinical safety or improvement from feature
+    acceptance tests alone.
+12. Confirm [ADR 006](../../docs/adr/006-human-review-and-audit-boundary.md) still matches the
     verified upstream interfaces and transaction boundary.
 
 ## Outcome rules
@@ -75,6 +83,10 @@ implementation and test evidence exist, rerun this procedure until the result ca
 be reported as **Converged**.
 
 ## Latest repository verification — 2026-10-12
+
+This section records the pre-correction implementation review. It is a historical baseline,
+despite the legacy heading above, and its gap list is superseded. It must not be read as the
+current repository state; the correction review below is the authoritative implementation update.
 
 The repository now contains a partial Spec 007 implementation. Verification evidence:
 
@@ -119,16 +131,19 @@ suite, compilation, and `git diff --check`.
 
 The result is still **Not converged**. The implementation corrections above are regression
 evidence, but they do not by themselves satisfy the completion conditions in `tasks.md`.
-The task ledger currently leaves T003–T042 unchecked. In particular:
+The task ledger currently leaves T001–T042 unchecked. In particular:
 
+- T001–T002 contain documented inspection results but remain unchecked until independent
+  requirements-quality approval is recorded.
 - T003–T036 still require their fixture, contract, frontend, integration, acceptance,
   observability, ADR, and evaluation completion evidence.
 - T037–T040 describe behavior that is present in the current partial implementation, but their
   required task-specific tests and completion evidence have not been recorded, so they remain
   open rather than being inferred complete from the focused suite.
 - T041–T042 remain incomplete: the repository has no React/frontend implementation or complete
-  contract/acceptance/observability coverage for every documented route, and the Spec 008
-  benchmark/release evidence has not been executed.
+  contract, acceptance, and observability coverage for every documented route. Spec 008
+  benchmark/release evidence remains a separate release/clinical-claim gate, not a condition
+  for completing those Spec 007 tasks.
 
 This reconciles the convergence result with the task ledger: passing tests demonstrate partial
 behavioral correctness, not task completion. The remaining tasks must be completed and checked,
