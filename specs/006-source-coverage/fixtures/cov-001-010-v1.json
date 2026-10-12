@@ -1,0 +1,18 @@
+{
+  "datasetVersion": "spec006-synthetic-v1",
+  "split": "held-out",
+  "annotationProvenance": "synthetic-manual-v1",
+  "disputedLabelResolution": "No disputed labels in this fixture set.",
+  "cases": [
+    {"caseId": "COV-001", "expected": "COVERED", "observed": "COVERED", "applicable": true, "materiality": "important"},
+    {"caseId": "COV-002", "expected": "MISSING", "observed": "MISSING", "applicable": true, "materiality": "required"},
+    {"caseId": "COV-003", "expected": "PARTIALLY_COVERED", "observed": "PARTIALLY_COVERED", "applicable": true, "materiality": "important"},
+    {"caseId": "COV-004", "expected": "COVERED", "observed": "COVERED", "applicable": true, "materiality": "important"},
+    {"caseId": "COV-005", "expected": "MISSING", "observed": "MISSING", "applicable": true, "materiality": "important"},
+    {"caseId": "COV-006", "expected": "DISTORTED", "observed": "DISTORTED", "applicable": true, "materiality": "important"},
+    {"caseId": "COV-007", "expected": "MISSING", "observed": "MISSING", "applicable": true, "materiality": "important"},
+    {"caseId": "COV-008", "expected": "COVERED", "observed": "COVERED", "applicable": true, "materiality": "important"},
+    {"caseId": "COV-009", "expected": "UNCERTAIN", "observed": "UNCERTAIN", "applicable": false, "materiality": "unresolved"},
+    {"caseId": "COV-010", "expected": "DISTORTED", "observed": "DISTORTED", "applicable": true, "materiality": "required"}
+  ]
+}

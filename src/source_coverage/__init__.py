@@ -11,6 +11,7 @@ from .contracts import (
     SourceFact,
     UnresolvedSourceItem,
 )
+from .service import SourceCoverageService
 
 __all__ = [
     "CONTRACT_VERSION",
@@ -22,4 +23,5 @@ __all__ = [
     "CoverageRunFailed",
     "SourceFact",
     "UnresolvedSourceItem",
+    "SourceCoverageService",
 ]

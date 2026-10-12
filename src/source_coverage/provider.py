@@ -22,6 +22,7 @@ class ProviderTimeoutError(TimeoutError):
 class BoundedSemanticMatcher:
     """Run a provider at most twice with one stable operation identity."""
 
+    matcher_version = "bounded-provider-v1"
     timeout_seconds = 30
     max_attempts = 2
 

@@ -112,6 +112,7 @@ def create_app(
     note_service: Any | None = None,
     verification_service: Any | None = None,
     deterministic_validation_service: Any | None = None,
+    coverage_service: Any | None = None,
 ) -> FastAPI:
     from nursing_notes.contracts import NoteResponse
     from nursing_notes.errors import NoteError
@@ -124,6 +125,7 @@ def create_app(
     app.state.note_service = note_service
     app.state.verification_service = verification_service
     app.state.deterministic_validation_service = deterministic_validation_service
+    app.state.coverage_service = coverage_service
 
     @app.exception_handler(SourceError)
     async def handle_source_error(_: Request, error: SourceError) -> JSONResponse:
@@ -219,6 +221,24 @@ def create_app(
                 content={"code": "DEPENDENCY_UNAVAILABLE", "message": "Deterministic validation is not configured."},
             )
         return deterministic_validation_service.execute(await _json_object(request))
+
+    @app.post("/api/v1/coverage-runs", status_code=status.HTTP_200_OK)
+    async def create_coverage_run(request: Request) -> Any:
+        if coverage_service is None:
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={"code": "DEPENDENCY_UNAVAILABLE", "message": "Source coverage is not configured."},
+            )
+        from source_coverage.service import CoverageServiceError
+
+        try:
+            result = coverage_service.execute(await _json_object(request))
+            return result.model_dump(mode="json", by_alias=True)
+        except CoverageServiceError as error:
+            return JSONResponse(
+                status_code=error.status_code,
+                content={"code": error.code, "message": str(error)},
+            )
 
     return app
 
