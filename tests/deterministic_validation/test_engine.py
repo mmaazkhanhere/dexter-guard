@@ -8,7 +8,7 @@ from deterministic_validation.contracts import (
     SourceFact,
     TranscriptSnapshot,
 )
-from deterministic_validation.engine import DeterministicRuleEngine, normalize_measurement, parse_decimal, serialize_decimal
+from deterministic_validation.engine import DeterministicRuleEngine, normalize_measurement, parse_decimal, serialize_decimal, validate_evidence
 
 
 SNAPSHOT = TranscriptSnapshot(sourceId="source-1", sourceVersion=1, transcriptText="Temperatur 37,2 °C. 😊")
@@ -131,6 +131,19 @@ def test_evidence_invalid_span_and_source_version_are_failures() -> None:
     assert findings(fact(evidence=(empty,)), claim())[0].rule_id == "EVD-001"
     old = ref("old", sourceVersion=2)
     assert findings(fact(evidence=(old,)), claim())[0].rule_id == "EVD-002"
+    out_of_range = ref("range", start=len(SNAPSHOT.transcript_text) - 1, end=len(SNAPSHOT.transcript_text) + 1, quotedText="x")
+    assert validate_evidence(SNAPSHOT, out_of_range, source_fact_id="fact-1", claim_id=None).rule_id == "EVD-001"
+
+
+def test_evidence_preserves_umlauts_combining_characters_and_non_bmp_code_points() -> None:
+    snapshot = TranscriptSnapshot(sourceId="source-2", sourceVersion=1, transcriptText="Ärger e\u0301 😊")
+    for ref_id, text in (("umlaut", "Ä"), ("combining", "e\u0301"), ("emoji", "😊")):
+        start = snapshot.transcript_text.index(text)
+        reference = EvidenceReference(
+            evidenceReferenceId=ref_id, sourceId="source-2", sourceVersion=1,
+            start=start, end=start + len(text), quotedText=text,
+        )
+        assert validate_evidence(snapshot, reference, source_fact_id="fact-2", claim_id=None) is None
 
 
 def test_evidence_checks_are_after_comparison_findings_and_once_per_reference() -> None:

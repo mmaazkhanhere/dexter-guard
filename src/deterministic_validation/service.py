@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from collections.abc import Callable, Mapping
 from typing import Any
 from uuid import uuid4
@@ -148,6 +149,7 @@ class DeterministicValidationService:
         return alignment
 
     def execute(self, payload: ValidationRequest | Mapping[str, Any]) -> ValidationRun:
+        started = time.perf_counter()
         if isinstance(payload, ValidationRequest):
             request = payload
         else:
@@ -183,7 +185,7 @@ class DeterministicValidationService:
         try:
             persisted = self.run_repository.append(run)
             if self.telemetry is not None:
-                self.telemetry.record(persisted)
+                self.telemetry.record(persisted, latency_ms=(time.perf_counter() - started) * 1000)
             return persisted
         except DeterministicValidationError:
             raise

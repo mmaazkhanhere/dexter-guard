@@ -10,7 +10,7 @@ from .contracts import ValidationRun
 
 
 class ValidationTelemetry(Protocol):
-    def record(self, run: ValidationRun) -> None: ...
+    def record(self, run: ValidationRun, *, latency_ms: float) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -21,13 +21,14 @@ class ValidationTelemetryEvent:
     outcome_counts: dict[str, int]
     rule_ids: tuple[str, ...]
     reason_codes: tuple[str, ...]
+    latency_ms: float
 
 
 @dataclass
 class InMemoryValidationTelemetry:
     events: list[ValidationTelemetryEvent] = field(default_factory=list)
 
-    def record(self, run: ValidationRun) -> None:
+    def record(self, run: ValidationRun, *, latency_ms: float) -> None:
         outcomes = Counter(item.outcome.value for item in run.findings)
         self.events.append(
             ValidationTelemetryEvent(
@@ -37,6 +38,7 @@ class InMemoryValidationTelemetry:
                 outcome_counts=dict(outcomes),
                 rule_ids=tuple(item.rule_id for item in run.findings),
                 reason_codes=tuple(item.reason_code.value for item in run.findings),
+                latency_ms=latency_ms,
             )
         )
 

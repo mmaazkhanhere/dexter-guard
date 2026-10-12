@@ -44,6 +44,7 @@ def test_telemetry_contains_only_safe_run_metadata() -> None:
     event = telemetry.events[0]
     payload = event.__dict__
     assert payload["ruleset_version"] == "DVE-RULESET-v1"
+    assert payload["latency_ms"] >= 0
     assert "transcript" not in str(payload).lower()
     assert "37,2" not in str(payload)
 
