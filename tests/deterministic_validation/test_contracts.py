@@ -56,6 +56,9 @@ def test_validation_request_is_strict_and_rejects_duplicate_ids() -> None:
     with pytest.raises(ValidationError):
         ValidationRequest.model_validate({key: value for key, value in request().items() if key != "claimIds"})
 
+    with pytest.raises(ValidationError):
+        ValidationRequest.model_validate(request(claimIds=[""]))
+
 
 def test_measurement_union_preserves_typed_blood_pressure_value() -> None:
     measurement = BloodPressureMeasurement.model_validate(
@@ -78,6 +81,24 @@ def test_claim_revision_is_required_but_nullable_for_persisted_malformed_records
 
     with pytest.raises(ValidationError):
         Claim.model_validate({key: value for key, value in payload.items() if key != "noteRevision"})
+
+
+def test_evidence_reference_ids_are_unique_within_each_resolved_record() -> None:
+    with pytest.raises(ValidationError, match="unique"):
+        from deterministic_validation.contracts import SourceFact
+
+        SourceFact.model_validate(
+            {
+                "sourceFactId": "fact-1",
+                "sourceId": "source-1",
+                "sourceVersion": 1,
+                "measurement": scalar(),
+                "evidence": [
+                    {"evidenceReferenceId": "same", "sourceId": "source-1", "sourceVersion": 1, "start": 0, "end": 1, "quotedText": "a"},
+                    {"evidenceReferenceId": "same", "sourceId": "source-1", "sourceVersion": 1, "start": 1, "end": 2, "quotedText": "b"},
+                ],
+            }
+        )
 
 
 def test_alignment_status_is_explicit_and_does_not_infer_semantics() -> None:

@@ -22,6 +22,9 @@ class _Contract(BaseModel):
     )
 
 
+Identifier: TypeAlias = Annotated[StrictStr, Field(min_length=1)]
+
+
 class Approximation(StrEnum):
     EXACT = "EXACT"
     APPROXIMATE = "APPROXIMATE"
@@ -126,6 +129,13 @@ class SourceFact(_Contract):
     measurement: Measurement
     evidence: tuple[EvidenceReference, ...] = Field(min_length=1)
 
+    @model_validator(mode="after")
+    def require_unique_evidence_ids(self) -> "SourceFact":
+        ids = [item.evidence_reference_id for item in self.evidence]
+        if len(ids) != len(set(ids)):
+            raise ValueError("evidence reference IDs must be unique within a source fact")
+        return self
+
 
 class Claim(_Contract):
     claim_id: StrictStr = Field(alias="claimId", min_length=1)
@@ -133,6 +143,13 @@ class Claim(_Contract):
     note_revision: StrictInt | None = Field(alias="noteRevision")
     measurement: Measurement
     evidence: tuple[EvidenceReference, ...] = ()
+
+    @model_validator(mode="after")
+    def require_unique_evidence_ids(self) -> "Claim":
+        ids = [item.evidence_reference_id for item in self.evidence]
+        if len(ids) != len(set(ids)):
+            raise ValueError("evidence reference IDs must be unique within a claim")
+        return self
 
 
 class Alignment(_Contract):
@@ -148,9 +165,9 @@ class ValidationRequest(_Contract):
     source_version: StrictInt = Field(alias="sourceVersion", ge=1)
     note_id: StrictStr = Field(alias="noteId", min_length=1)
     note_revision: StrictInt = Field(alias="noteRevision", ge=1)
-    source_fact_ids: tuple[StrictStr, ...] = Field(alias="sourceFactIds", min_length=1)
-    claim_ids: tuple[StrictStr, ...] = Field(alias="claimIds", min_length=1)
-    alignment_ids: tuple[StrictStr, ...] = Field(alias="alignmentIds", min_length=1)
+    source_fact_ids: tuple[Identifier, ...] = Field(alias="sourceFactIds", min_length=1)
+    claim_ids: tuple[Identifier, ...] = Field(alias="claimIds", min_length=1)
+    alignment_ids: tuple[Identifier, ...] = Field(alias="alignmentIds", min_length=1)
 
     @model_validator(mode="after")
     def require_distinct_ids(self) -> "ValidationRequest":

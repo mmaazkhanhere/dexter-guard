@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 from starlette import status
 
+from deterministic_validation.contracts import ValidationRun
 from deterministic_validation.errors import DeterministicValidationError
 from .contracts import ResolvedSourceSpan, SourceDocument
 from .errors import ErrorCode, SourceError
@@ -206,7 +207,11 @@ def create_app(
                 content={"code": "INVALID_REQUEST", "message": "The request does not match the verification contract."},
             )
 
-    @app.post("/api/v1/deterministic-validation-runs", status_code=status.HTTP_200_OK)
+    @app.post(
+        "/api/v1/deterministic-validation-runs",
+        response_model=ValidationRun,
+        status_code=status.HTTP_200_OK,
+    )
     async def create_deterministic_validation_run(request: Request) -> Any:
         if deterministic_validation_service is None:
             return JSONResponse(
