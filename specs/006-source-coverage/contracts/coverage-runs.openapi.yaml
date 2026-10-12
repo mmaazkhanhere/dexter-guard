@@ -1,0 +1,238 @@
+openapi: 3.1.0
+info:
+  title: Dexter Guard Source Coverage API
+  version: COVERAGE-CONTRACT-v1
+paths:
+  /api/v1/coverage-runs:
+    post:
+      operationId: createCoverageRun
+      summary: Evaluate source-to-note coverage for immutable references
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CoverageRunRequest'
+      responses:
+        '200':
+          description: Terminal immutable coverage run
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoverageRun'
+        '404': { $ref: '#/components/responses/ApiError' }
+        '409': { $ref: '#/components/responses/ApiError' }
+        '422': { $ref: '#/components/responses/SchemaError' }
+        '500': { $ref: '#/components/responses/ApiError' }
+        '503': { $ref: '#/components/responses/ApiError' }
+components:
+  responses:
+    ApiError:
+      description: Stable API error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+    SchemaError:
+      description: Schema error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/SchemaError' }
+  schemas:
+    CoverageRunRequest:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, sourceId, sourceVersion, residentContext, sourceTextHash, normalizationPolicy, noteId, noteRevision, sourceFactExtractionRunId, claimSetId, rulesetVersion, datasetVersion, idempotencyKey]
+      properties:
+        contractVersion: { const: COVERAGE-CONTRACT-v1 }
+        sourceId: { type: string, minLength: 1 }
+        sourceVersion: { type: integer, minimum: 1 }
+        residentContext: { $ref: '#/components/schemas/ResidentContextReference' }
+        sourceTextHash: { type: string, pattern: '^[a-f0-9]{64}$' }
+        normalizationPolicy: { type: string, minLength: 1 }
+        noteId: { type: string, minLength: 1 }
+        noteRevision: { type: integer, minimum: 1 }
+        sourceFactExtractionRunId: { type: string, minLength: 1 }
+        claimSetId: { type: string, minLength: 1, description: Immutable Spec 003 extractionRunId }
+        rulesetVersion: { const: COVERAGE-RULESET-v1 }
+        datasetVersion: { type: string, minLength: 1 }
+        relatedFindingRunIds:
+          type: array
+          uniqueItems: true
+          items: { type: string, minLength: 1 }
+        idempotencyKey: { type: string, minLength: 1 }
+    CoverageRun:
+      oneOf:
+        - $ref: '#/components/schemas/CoverageRunSucceeded'
+        - $ref: '#/components/schemas/CoverageRunFailed'
+      discriminator: { propertyName: status }
+    CoverageRunBase:
+      type: object
+      required: [coverageRunId, status, sourceId, sourceVersion, residentContext, sourceTextHash, normalizationPolicy, noteId, noteRevision, sourceFactExtractionRunId, claimSetId, rulesetVersion, coverageStatusPolicyVersion, expectationPolicyVersion, datasetVersion, idempotencyKey, correlationId, inputDigest, providerVersion, modelVersion, promptVersion, executionMetrics, createdAt, startedAt, completedAt]
+      properties:
+        coverageRunId: { type: string, minLength: 1 }
+        status: { enum: [SUCCEEDED, FAILED] }
+        sourceId: { type: string, minLength: 1 }
+        sourceVersion: { type: integer, minimum: 1 }
+        residentContext: { $ref: '#/components/schemas/ResidentContextReference' }
+        sourceTextHash: { type: string, pattern: '^[a-f0-9]{64}$' }
+        normalizationPolicy: { type: string, minLength: 1 }
+        noteId: { type: string, minLength: 1 }
+        noteRevision: { type: integer, minimum: 1 }
+        sourceFactExtractionRunId: { type: string, minLength: 1 }
+        claimSetId: { type: string, minLength: 1 }
+        rulesetVersion: { const: COVERAGE-RULESET-v1 }
+        coverageStatusPolicyVersion: { const: COVERAGE_STATUS-v1 }
+        expectationPolicyVersion: { const: COVERAGE_EXPECTATION-v1 }
+        datasetVersion: { type: string, minLength: 1 }
+        idempotencyKey: { type: string, minLength: 1 }
+        correlationId: { type: string, minLength: 1 }
+        inputDigest: { type: string, pattern: '^[a-f0-9]{64}$' }
+        providerVersion: { type: [string, 'null'] }
+        modelVersion: { type: [string, 'null'] }
+        promptVersion: { type: [string, 'null'] }
+        executionMetrics: { $ref: '#/components/schemas/ExecutionMetrics' }
+        createdAt: { type: string, format: date-time }
+        startedAt: { type: string, format: date-time }
+        completedAt: { type: string, format: date-time }
+    CoverageRunSucceeded:
+      allOf:
+        - $ref: '#/components/schemas/CoverageRunBase'
+        - type: object
+          unevaluatedProperties: false
+          required: [assessments, findings, runtimeCounts]
+          properties:
+            status: { const: SUCCEEDED }
+            assessments:
+              type: array
+              items: { $ref: '#/components/schemas/CoverageAssessment' }
+            findings:
+              type: array
+              items: { $ref: '#/components/schemas/CoverageFinding' }
+            runtimeCounts: { $ref: '#/components/schemas/CoverageCounts' }
+    CoverageRunFailed:
+      allOf:
+        - $ref: '#/components/schemas/CoverageRunBase'
+        - type: object
+          unevaluatedProperties: false
+          required: [failure]
+          properties:
+            status: { const: FAILED }
+            failure: { $ref: '#/components/schemas/Failure' }
+    CoverageAssessment:
+      type: object
+      additionalProperties: false
+      required: [assessmentId, status, sourceSpans, sourceQuotes, matchedClaimIds, preservedAttributes, missingAttributes, distortedAttributes, explanation, relatedFindingRefs]
+      properties:
+        assessmentId: { type: string, minLength: 1 }
+        sourceFactId: { type: [string, 'null'] }
+        unresolvedSourceItemId: { type: [string, 'null'] }
+        status: { enum: [COVERED, PARTIALLY_COVERED, MISSING, DISTORTED, UNCERTAIN] }
+        sourceSpans: { type: array, minItems: 1, items: { $ref: '#/components/schemas/SourceSpan' } }
+        sourceQuotes: { type: array, minItems: 1, items: { type: string, minLength: 1 } }
+        matchedClaimIds: { type: array, items: { type: string } }
+        preservedAttributes: { type: array, items: { $ref: '#/components/schemas/MaterialAttribute' } }
+        missingAttributes: { type: array, items: { $ref: '#/components/schemas/MaterialAttribute' } }
+        distortedAttributes: { type: array, items: { $ref: '#/components/schemas/MaterialAttribute' } }
+        explanation: { type: string, minLength: 1 }
+        relatedFindingRefs: { type: array, items: { $ref: '#/components/schemas/RelatedFindingRef' } }
+    CoverageFinding:
+      type: object
+      additionalProperties: false
+      required: [coverageFindingId, assessmentId, status, coverageStatusPolicyVersion, expectationPolicyVersion, rulesetVersion, sourceSpans, sourceQuotes, matchedClaimIds, missingAttributes, distortedAttributes, suggestion, relatedFindingRefs, requiresReview]
+      properties:
+        coverageFindingId: { type: string, minLength: 1 }
+        assessmentId: { type: string, minLength: 1 }
+        sourceFactId: { type: [string, 'null'] }
+        unresolvedSourceItemId: { type: [string, 'null'] }
+        status: { enum: [PARTIALLY_COVERED, MISSING, DISTORTED, UNCERTAIN] }
+        coverageStatusPolicyVersion: { const: COVERAGE_STATUS-v1 }
+        expectationPolicyVersion: { const: COVERAGE_EXPECTATION-v1 }
+        rulesetVersion: { const: COVERAGE-RULESET-v1 }
+        documentationExpectation: { enum: [REQUIRED, IMPORTANT, null] }
+        severityPolicyKey: { type: [string, 'null'] }
+        sourceSpans: { type: array, minItems: 1, items: { $ref: '#/components/schemas/SourceSpan' } }
+        sourceQuotes: { type: array, minItems: 1, items: { type: string, minLength: 1 } }
+        matchedClaimIds: { type: array, items: { type: string } }
+        missingAttributes: { type: array, items: { $ref: '#/components/schemas/MaterialAttribute' } }
+        distortedAttributes: { type: array, items: { $ref: '#/components/schemas/MaterialAttribute' } }
+        suggestion: { type: string, minLength: 1 }
+        relatedFindingRefs: { type: array, items: { $ref: '#/components/schemas/RelatedFindingRef' } }
+        requiresReview: { const: true }
+    CoverageCounts:
+      type: object
+      additionalProperties: false
+      required: [extractedExpectedFacts, coveredExpectedFacts, partiallyCoveredExpectedFacts, missingExpectedFacts, distortedExpectedFacts, uncertainExpectedFacts, unresolvedSourceItems, runtimeCompleteness, metricBasis]
+      properties:
+        extractedExpectedFacts: { type: integer, minimum: 0 }
+        coveredExpectedFacts: { type: integer, minimum: 0 }
+        partiallyCoveredExpectedFacts: { type: integer, minimum: 0 }
+        missingExpectedFacts: { type: integer, minimum: 0 }
+        distortedExpectedFacts: { type: integer, minimum: 0 }
+        uncertainExpectedFacts: { type: integer, minimum: 0 }
+        unresolvedSourceItems: { type: integer, minimum: 0 }
+        runtimeCompleteness: { type: [number, 'null'], minimum: 0, maximum: 1 }
+        metricBasis: { const: SYSTEM_EXTRACTED_EXPECTED_FACTS }
+    SourceSpan:
+      type: object
+      additionalProperties: false
+      required: [sourceId, sourceVersion, start, end]
+      properties:
+        sourceId: { type: string, minLength: 1 }
+        sourceVersion: { type: integer, minimum: 1 }
+        start: { type: integer, minimum: 0 }
+        end: { type: integer, minimum: 1 }
+    ResidentContextReference:
+      type: object
+      additionalProperties: false
+      required: [residentTestId, source, trustLevel, version, permittedUse]
+      properties:
+        residentTestId: { type: string, minLength: 1 }
+        source: { const: SPEC_001_SOURCE_DOCUMENT }
+        trustLevel: { const: AUTHORITATIVE_TRANSCRIPT }
+        version: { type: string, minLength: 1 }
+        permittedUse: { const: TRANSCRIPT_EVIDENCE_ONLY }
+    MaterialAttribute:
+      enum: [SUBJECT, POLARITY, CERTAINTY, ATTRIBUTION, TEMPORAL, LATERALITY, NUMERIC_VALUE, UNIT, APPROXIMATION, MOBILITY_ASSISTANCE, CARE_ACTION, OTHER]
+    RelatedFindingRef:
+      type: object
+      additionalProperties: false
+      required: [owner, findingId]
+      properties:
+        owner: { enum: [SPEC_004, SPEC_005] }
+        findingId: { type: string, minLength: 1 }
+    Failure:
+      type: object
+      additionalProperties: false
+      required: [code, message, retryable]
+      properties:
+        code: { enum: [MALFORMED_PROVIDER_OUTPUT, PROVIDER_TIMEOUT, INVALID_SOURCE_SPAN, PROVENANCE_CONFLICT, MISSING_ASSESSMENT, IDEMPOTENCY_KEY_CONFLICT, DEPENDENCY_UNAVAILABLE, INTERNAL_ERROR] }
+        message: { type: string, minLength: 1 }
+        retryable: { type: boolean }
+    SchemaError:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code: { const: SCHEMA_ERROR }
+        message: { type: string, minLength: 1 }
+        path: { type: [string, 'null'] }
+    ApiError:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code: { enum: [SOURCE_NOT_FOUND, SOURCE_VERSION_NOT_FOUND, NOTE_NOT_FOUND, SOURCE_FACT_EXTRACTION_NOT_FOUND, CLAIM_SET_NOT_FOUND, PROVENANCE_CONFLICT, IDEMPOTENCY_KEY_CONFLICT, DEPENDENCY_UNAVAILABLE, INTERNAL_ERROR] }
+        message: { type: string, minLength: 1 }
+        correlationId: { type: [string, 'null'] }
+    ExecutionMetrics:
+      type: object
+      additionalProperties: false
+      required: [latencyMilliseconds, retryCount, inputTokens, outputTokens, inferenceCost, warningCount]
+      properties:
+        latencyMilliseconds: { type: integer, minimum: 0 }
+        retryCount: { type: integer, minimum: 0 }
+        inputTokens: { type: [integer, 'null'], minimum: 0 }
+        outputTokens: { type: [integer, 'null'], minimum: 0 }
+        inferenceCost: { type: [number, 'null'], minimum: 0 }
+        warningCount: { type: integer, minimum: 0 }
+
