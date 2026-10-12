@@ -45,7 +45,7 @@ paths:
               schema: { $ref: '#/components/schemas/RevisionSavedResponse' }
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/StaleRevision' }
+        '409': { $ref: '#/components/responses/RevisionConflict' }
         '422': { $ref: '#/components/responses/ValidationError' }
   /api/v1/reviews/{noteId}/findings/{findingId}/decisions:
     post:
@@ -200,6 +200,19 @@ components:
               - $ref: '#/components/schemas/ErrorResponse'
               - type: object
                 properties: { code: { const: STALE_REVISION } }
+    RevisionConflict:
+      description: The expected revision is stale or the note has a final disposition.
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/StaleRevisionError'
+              - $ref: '#/components/schemas/FinalDispositionImmutableError'
+    FinalDispositionImmutable:
+      description: The note already has a final approval or rejection disposition; reopening is out of scope.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/FinalDispositionImmutableError' }
     ApprovalPreconditionFailed:
       description: Approval guard rejected stale, failed, invalid, incomplete, or critical-open verification.
       content:
@@ -213,6 +226,16 @@ components:
       description: A required upstream service or repository was unavailable; it cannot be treated as verified.
       content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
   schemas:
+    StaleRevisionError:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties: { code: { const: STALE_REVISION } }
+    FinalDispositionImmutableError:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties: { code: { const: FINAL_DISPOSITION_IMMUTABLE } }
     ErrorResponse:
       type: object
       additionalProperties: false
@@ -353,6 +376,17 @@ components:
         rationale: { type: string, minLength: 1 }
         suggestionId: { type: string, minLength: 1 }
         idempotencyKey: { type: string, minLength: 1 }
+      allOf:
+        - if:
+            properties: { kind: { enum: [SUGGESTION_ACCEPTED, SUGGESTION_REJECTED] } }
+            required: [kind]
+          then:
+            required: [suggestionId]
+        - if:
+            properties: { kind: { enum: [DISPUTED, ADJUDICATED, SUGGESTION_REJECTED] } }
+            required: [kind]
+          then:
+            required: [rationale]
     ReviewDecision:
       type: object
       additionalProperties: false
@@ -369,6 +403,12 @@ components:
         successorRevision: { type: [integer, 'null'], minimum: 1 }
         suggestionId: { type: [string, 'null'] }
         recordedAt: { type: string, format: date-time }
+      allOf:
+        - if:
+            properties: { kind: { const: SUGGESTION_ACCEPTED } }
+            required: [kind]
+          then:
+            required: [suggestionId, successorRevision]
     ClaimReverificationRequest:
       type: object
       additionalProperties: false
@@ -417,9 +457,12 @@ components:
         noteId: { type: string, minLength: 1 }
         noteRevision: { type: integer, minimum: 1 }
         source: { $ref: '#/components/schemas/SourceReference' }
-        claimSetId: { type: [string, 'null'] }
+        claimSetId: { type: string, minLength: 1 }
+        evidenceRunId: { type: string, minLength: 1 }
+        deterministicValidationRunId: { type: string, minLength: 1 }
+        coverageRunId: { type: string, minLength: 1 }
         componentStatuses: { type: array, minItems: 4, items: { $ref: '#/components/schemas/ComponentStatus' } }
-        status: { enum: [RUNNING, VALID, INVALID, FAILED] }
+        status: { enum: [VALID, INVALID, FAILED] }
         idempotencyKey: { type: string, minLength: 1 }
         requestDigest: { type: string, minLength: 1 }
         correlationId: { type: [string, 'null'] }

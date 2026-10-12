@@ -7,7 +7,7 @@
 
 No installed `specify`/`speckit` command or template directory was found under `.specify`; the repository's established `specify → clarify → plan → tasks → analyze` artifact convention was followed manually. This is a documentation consistency review, not a simulated tool execution or implementation/test claim.
 
-**Result: internally consistent after reconciling Spec 006 policy keys, display-only suggestions, and unresolved source-item blocking.** No application source, dependency, test, or upstream contract was changed. The feature is ready for independent requirements-quality review; implementation is blocked only by the unchecked reviewer-owned checklist gate.
+**Result: internally consistent after reconciling Spec 006 policy keys, display-only suggestions, unresolved source-item blocking, terminal verification responses, conditional suggestion acceptance, and final-disposition immutability.** No application source, dependency, test, or upstream contract was changed. The feature is ready for independent requirements-quality review; implementation is blocked only by the unchecked reviewer-owned checklist gate.
 
 ## Requirement coverage
 

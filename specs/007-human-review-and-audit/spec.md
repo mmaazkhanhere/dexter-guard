@@ -124,6 +124,8 @@ The current Spec 006 contract permits a free-form optional `severityPolicyKey`; 
 
 Saving text or accepting a suggestion requires `expectedRevision`, creates exactly `revision + 1`, and atomically appends the revision plus its audit event. The server rejects a stale/current-version mismatch with `409 STALE_REVISION`; it never merges text or overwrites a revision. A saved successor is `AWAITING_FULL_VERIFICATION`; old claim sets and runs remain available only as history and are ineligible for approval. “Saved” is not “verified.”
 
+Once the latest note has an `APPROVED` or `REJECTED` disposition, revision-save commands are rejected with `409 FINAL_DISPOSITION_IMMUTABLE`; reopening requires a future versioned policy and is not part of this feature.
+
 ### Verification and approval rules
 
 Claim-level verification is a narrow feedback operation and must retain the exact source/version, note revision, claim-set ID, and upstream run reference. It cannot create `ELIGIBLE_FOR_APPROVAL`.

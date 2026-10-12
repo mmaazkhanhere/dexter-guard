@@ -72,12 +72,12 @@ An immutable human event about one `ReviewFinding` on one note revision.
 | `noteId`, `noteRevision`, `sourceId`, `sourceVersion` | Yes | Exact immutable binding, equal to all valid components. |
 | `claimSetId` | Yes | Exact current Spec 003 extraction run. |
 | `evidenceRunId`, `deterministicValidationRunId`, `coverageRunId` | Yes | Required component run IDs; may not refer to another revision/source. |
-| `status` | Yes | `RUNNING`, `VALID`, `INVALID`, `FAILED`; terminal records immutable. A valid empty Spec 003 claim set is `INVALID` with `EMPTY_CLAIM_SET_REQUIRES_REVIEW`. |
+| `status` | Yes | `VALID`, `INVALID`, or `FAILED`; every persisted aggregate is terminal and immutable. A valid empty Spec 003 claim set is `INVALID` with `EMPTY_CLAIM_SET_REQUIRES_REVIEW`. |
 | `componentStatuses` | Yes | Each component `SUCCEEDED`, `FAILED`, `INVALID`, or `UNAVAILABLE`; aggregate `VALID` requires all `SUCCEEDED` and reference validation. |
 | `createdAt`, `completedAt`, `correlationId` | Yes | Lifecycle/audit fields; terminal timestamp required for terminal state. |
 | `failureCode`, `failureMessage` | Conditional | Required for `INVALID`/`FAILED`; contains safe diagnostic only. |
 
-`RUNNING` exists for honest UI state; it is never approval-valid. Synchronous initial implementation may transition within one request but persists terminal failure where upstream processing began.
+The synchronous endpoint does not expose or persist a non-terminal aggregate. A client sees only a terminal `VALID`, `INVALID`, or `FAILED` result; an upstream operation that fails after starting is retained as a terminal failed/invalid aggregate.
 
 ### `NoteDisposition`
 
@@ -112,7 +112,7 @@ An immutable human event about one `ReviewFinding` on one note revision.
 | `ELIGIBLE_FOR_APPROVAL` | Any new revision/changed latest identity | successor `AWAITING_FULL_VERIFICATION` |
 | `ELIGIBLE_FOR_APPROVAL` | Atomic approval guard passes | `APPROVED` |
 | any non-final latest revision | Human rejection with reason | `REJECTED` |
-| `APPROVED` or `REJECTED` | New edit (if product permits reopen) | out of scope; require explicit future policy |
+| `APPROVED` or `REJECTED` | Any revision-save command | Rejected with `FINAL_DISPOSITION_IMMUTABLE`; reopening is out of scope for this feature |
 
 ### Finding status
 
@@ -130,9 +130,9 @@ An immutable human event about one `ReviewFinding` on one note revision.
 
 | From | Event | To |
 | --- | --- | --- |
-| `RUNNING` | All required exact-revision components succeed and validate | `VALID` |
-| `RUNNING` | Any component fails/is unavailable/malformed | `FAILED` |
-| `RUNNING` | Component source/note/claim provenance or output closure fails | `INVALID` |
+| request execution | All required exact-revision components succeed and validate | `VALID` |
+| request execution | Any component fails/is unavailable/malformed | `FAILED` |
+| request execution | Component source/note/claim provenance or output closure fails | `INVALID` |
 | terminal | Any retry | new aggregate or idempotent replay; never mutate terminal record |
 
 ## Database invariants

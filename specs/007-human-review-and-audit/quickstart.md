@@ -76,6 +76,7 @@ The fixture is designed to expose negation, numeric, and assistance discrepancie
 | Concurrent save/approval | Losing command gets `409 STALE_REVISION`/precondition failure and writes no invalid disposition. |
 | Rejection after failed verification | Succeeds with reviewer label and reason. |
 | Successful coverage run with unresolved source item | Approval remains blocked despite runtime completeness or acknowledgement/adjudication. |
+| Edit after approved/rejected disposition | Returns `409 FINAL_DISPOSITION_IMMUTABLE`; reopening is out of scope. |
 
 ## Test execution after implementation
 
