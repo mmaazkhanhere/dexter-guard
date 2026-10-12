@@ -161,7 +161,7 @@ components:
     CoverageCounts:
       type: object
       additionalProperties: false
-      required: [extractedExpectedFacts, coveredExpectedFacts, partiallyCoveredExpectedFacts, missingExpectedFacts, distortedExpectedFacts, uncertainExpectedFacts, unresolvedSourceItems, runtimeCompleteness, metricBasis]
+      required: [extractedExpectedFacts, coveredExpectedFacts, partiallyCoveredExpectedFacts, missingExpectedFacts, distortedExpectedFacts, uncertainExpectedFacts, unresolvedSourceItems, unresolvedSourceItemsRequireReview, runtimeCompleteness, metricBasis]
       properties:
         extractedExpectedFacts: { type: integer, minimum: 0 }
         coveredExpectedFacts: { type: integer, minimum: 0 }
@@ -170,6 +170,7 @@ components:
         distortedExpectedFacts: { type: integer, minimum: 0 }
         uncertainExpectedFacts: { type: integer, minimum: 0 }
         unresolvedSourceItems: { type: integer, minimum: 0 }
+        unresolvedSourceItemsRequireReview: { const: true }
         runtimeCompleteness: { type: [number, 'null'], minimum: 0, maximum: 1 }
         metricBasis: { const: SYSTEM_EXTRACTED_EXPECTED_FACTS }
     SourceSpan:

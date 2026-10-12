@@ -28,7 +28,7 @@
 
 - [x] CQ-016 `spec.md`, `clarify.md`, `data-model.md`, OpenAPI contract, plan, ADR 005, and tasks use the same status names, policy/version metadata, identifiers, idempotency rules, and denominator rules.
 - [x] CQ-017 Every FR-14 requirement maps to one or more planned contract, unit, integration, acceptance, or evaluation-handoff tests.
-- [x] CQ-018 COV-001 through COV-010 have explicit fixture expectations, including exact status, source/item reference, attributes, related findings, and denominator treatment.
+- [x] CQ-018 COV-001 through COV-011 have explicit fixture expectations, including exact status, source/item reference, attributes, related findings, and denominator treatment.
 - [x] CQ-019 Fixtures include German semantic paraphrase, multi-clause text, temporal modifiers, approximate measurement, indirect speech, explicit negation, uncertainty, and Unicode span boundaries.
 - [x] CQ-020 The plan demonstrates deterministic boundary validation around an untrusted semantic extractor/matcher and prohibits network/LLM use in contract integrity checks.
 - [x] CQ-021 Evaluation handoff preserves source text, manually annotated expected facts, claim-level outcomes, source evidence, materiality/severity labels, annotation provenance/dispute resolution, policy/dataset versions, raw counts for all constitution metrics, and held-out split protection.

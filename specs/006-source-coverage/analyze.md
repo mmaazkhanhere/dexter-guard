@@ -1,11 +1,11 @@
 # Spec 006 - Consistency Analysis
 
 **Analysis type:** Read-only cross-artifact review  
-**Artifacts reviewed:** `specify.md`, `spec.md`, `clarify.md`, `data-model.md`, `contracts/coverage-runs.openapi.yaml`, `plan.md`, `tasks.md`, [ADR 005](../../docs/adr/005-source-coverage-boundary.md), the constitution, architecture, and adjacent Specs 004-005.
+**Artifacts reviewed:** `specify.md`, `spec.md`, `clarify.md`, `data-model.md`, `contracts/coverage-runs.openapi.yaml`, `plan.md`, `tasks.md`, [ADR 005](../../docs/adr/005-source-coverage-boundary.md), [compatibility-review.md](compatibility-review.md), the constitution, architecture, and adjacent Specs 004-005.
 
 ## Result
 
-**No unresolved requirement, policy, contract, or task-traceability conflict remains after the constitution-alignment revisions.** The documents are ready for independent requirements-quality review. They are not yet implementation-authorized because [checklist.md](checklist.md) is intentionally reviewer-owned and unchecked.
+The internal Spec 006 artifacts are consistent after the precedence, unresolved-item, and contract-alignment revisions. The requirements-quality checklist has been reviewed and approved with all 21 items checked. Repository compatibility is verified for Specs 001-005 in [compatibility-review.md](compatibility-review.md), but Specs 007 and 008 are not present in this repository; downstream compatibility remains an explicit pre-implementation gate.
 
 ## Requirement traceability
 
@@ -34,10 +34,13 @@
 | Numeric/contradiction ownership remains Specs 005/004 | Pass | scope, CL-011/CL-012, correlation-only plan/task. |
 | Revisions preserve history | Pass | US-4, CL-016, plan persistence, T018. |
 | All COV cases testable | Pass | acceptance table and T019/T020 provide exact assertions. |
+| Faithful coverage outranks contradictory duplicate | Pass | CL-008/CL-009, explicit pseudocode and COV-011, plan first-match table, T011/T020. |
+| Unresolved source items remain review-required | Pass | CL-010/CL-015, `unresolvedSourceItemsRequireReview`, runtime-count text, T019/T020. |
 | Run metadata satisfies constitution | Pass | Required resident context, source hash/normalization, ruleset/dataset/model/prompt versions, correlation, and idempotency are in the model, OpenAPI contract, ADR 005, and T003/T014/T022. |
 | Retry and idempotency are fail-safe | Pass | CL-017/018, mandatory request key, 30-second/two-attempt bound, same-digest replay, and conflict behavior are specified. |
 | Evaluation and observability handoff is complete | Pass | Source text, claim-level outcomes, annotation provenance, materiality/severity labels, all constitution metrics, and content-minimized cost/token telemetry are assigned to T019-T022. |
 | Cross-component architecture is documented | Pass | ADR 005 records alternatives, consequences, provider boundary, and change-control version. |
+| Adjacent contract compatibility | Conditional | Specs 001-005 verified in `compatibility-review.md`; Spec 007/008 artifacts are absent and must be supplied before those integrations are implemented. |
 
 ## Controlled implementation decisions
 
@@ -45,5 +48,5 @@ Provider selection, prompt text, router placement, and SQLite migration mechanic
 
 ## Checklist gate
 
-All custom checklist items remain unchecked because this is the artifact author's analysis, not an independent review. The next authorised action is reviewer completion of [checklist.md](checklist.md); `implement.md` then executes tasks in order.
+All 21 custom checklist items are checked. Implementation may proceed through T001/T002, but T002 must keep the Spec 007/008 compatibility gate open until those contracts are supplied and reviewed.
 

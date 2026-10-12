@@ -77,18 +77,17 @@ The source-fact extractor and matcher input/output schemas must include model, p
 
 ## Matching and classification design
 
-The matcher may surface only the following per-fact relation classes: `FAITHFUL`, `RELATED_ATTRIBUTE_OMITTED`, `RELATED_ATTRIBUTE_DISTORTED`, `NO_RELATED_CLAIM`, or `UNRESOLVED`. It must return referenced claim IDs and explicit material-attribute sets, never a prose-only judgment. The deterministic orchestrator maps them:
+The matcher may surface only the following per-fact relation classes: `FAITHFUL`, `RELATED_ATTRIBUTE_OMITTED`, `RELATED_ATTRIBUTE_DISTORTED`, `NO_RELATED_CLAIM`, or `UNRESOLVED`. It must return referenced claim IDs and explicit material-attribute sets, never a prose-only judgment. The deterministic orchestrator evaluates these relations in the exact order below; the first matching row wins:
 
 | Input | Coverage status |
 | --- | --- |
-| Source unresolved item | `UNCERTAIN` |
-| Matcher `UNRESOLVED` | `UNCERTAIN` |
-| One or more `FAITHFUL` relation | `COVERED` |
+| Source unresolved item or matcher `UNRESOLVED` | `UNCERTAIN` |
+| One or more `FAITHFUL` relations | `COVERED` |
 | No faithful relation; one or more distorted relation | `DISTORTED` |
 | No faithful/distorted relation; one or more omitted-attribute relation | `PARTIALLY_COVERED` |
 | Only `NO_RELATED_CLAIM` | `MISSING` |
 
-This implements the canonical policy's practical precedence: a faithful independent representation wins for coverage, although distorted restatements remain linked separately. Numeric incompatibility must cite an existing matching Spec 005 finding when supplied; it does not perform decimal/unit calculation locally.
+This implements the canonical policy's practical precedence: a faithful independent representation wins for coverage, although distorted restatements remain linked separately. Numeric incompatibility must cite an existing matching Spec 005 finding when supplied; it does not perform decimal/unit calculation locally. An unresolved source item is counted separately, creates a review-required `UNCERTAIN` finding, and cannot authorize approval regardless of the runtime completeness percentage.
 
 ## Persistence, provenance, and revision behaviour
 
@@ -118,7 +117,7 @@ No failed response may contain a successful partial assessment, an approval sign
 | Contract | Pydantic/OpenAPI closure, reference-only request, source-fact/unresolved-item invariants, finding conditional fields, error codes, version fields, and source-span integrity. |
 | Provider boundary | Valid/invalid structured extraction/matcher output; model timeout/retry; no-citation rejection; unresolved item non-invention. |
 | Repository/integration | Immutable fact/run persistence, source/note/claim provenance, stale revision/cross-note rejection, historical re-evaluation, idempotency binding, and linked 004/005 findings. |
-| Acceptance | COV-001 through COV-010 with synthetic German fixtures; exact status, attribute, source quote/span, link, and denominator assertions. |
+| Acceptance | COV-001 through COV-011 with synthetic German fixtures; exact status, attribute, source quote/span, link, review-required flag, and denominator assertions. |
 | Property/boundary | Unicode code points including umlauts, combining characters, emoji and line endings; empty/reversed/out-of-range spans; duplicate IDs; exhaustive status closure/order; no zero-denominator 100%. |
 | Evaluation handoff | Manifest including source text, manual expected facts, annotations, source spans, expected claim-level outcomes, materiality/severity labels, annotation provenance/dispute resolution, train/held-out split, dataset version, and raw-count metric schema for Spec 008. |
 

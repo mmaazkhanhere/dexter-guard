@@ -7,14 +7,14 @@ Verify that implemented code completely satisfies Spec 006's specification, clar
 ## Review sequence
 
 1. Confirm independent checklist approval and task evidence.
-2. Compare public Pydantic/API models with `COVERAGE-CONTRACT-v1` and ADR 005, including reference-only request validation, resident trust context, source hash/normalization, required ruleset/dataset/model/prompt metadata, idempotency/retry semantics, success/failure exclusivity, source-span semantics, and absence of approval/mutation fields.
+2. Compare public Pydantic/API models with `COVERAGE-CONTRACT-v1`, ADR 005, and [compatibility-review.md](compatibility-review.md), including reference-only request validation, resident trust context, source hash/normalization, required ruleset/dataset/model/prompt metadata, idempotency/retry semantics, success/failure exclusivity, source-span semantics, and absence of approval/mutation fields.
 3. Trace FR-14.1 through FR-14.8 and every COV scenario to implementation and a passing test.
 4. Inspect extraction to prove each asserted source fact has valid immutable spans, atomic attributes, documented expectation, source-derived quotation, and no uncited invented fact; inspect unresolved-item handling separately.
 5. Inspect matching/status precedence using faithful paraphrase, laterality, negation, uncertainty, attribution, temporal modifier, approximation, care action, mobility, and incompatible value fixtures.
 6. Confirm successful run closure: every expected fact/unresolved item exactly once, contextual facts excluded, only `COVERED` in numerator, zero denominator `null`, and runtime count basis explicitly labelled.
-7. Confirm correlation references preserve (rather than replace) Spec 004/005 outcomes and Spec 007 remains final severity/approval owner.
+7. Confirm correlation references preserve (rather than replace) Spec 004/005 outcomes and Spec 007 remains final severity/approval owner. If Spec 007/008 contracts are unavailable, report convergence as conditional rather than complete.
 8. Confirm new note revisions create new immutable coverage runs and no code auto-resolves old findings.
-9. Re-run COV-001 through COV-010, contract/unit/integration/property tests, full test suite, compile/static/format checks configured by the project, telemetry cost/token assertions, idempotency/retry tests, and `git diff --check`.
+9. Re-run COV-001 through COV-011, contract/unit/integration/property tests, full test suite, compile/static/format checks configured by the project, telemetry cost/token assertions, idempotency/retry tests, and `git diff --check`.
 10. Review the Spec 008 handoff to ensure held-out completeness uses manual annotated facts and reports raw counts, omission recall, false-warning rate, and split protection.
 
 ## Outcome rules

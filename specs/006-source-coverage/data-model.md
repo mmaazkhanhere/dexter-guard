@@ -171,6 +171,7 @@ CoverageCounts {
   distortedExpectedFacts: non-negative integer
   uncertainExpectedFacts: non-negative integer
   unresolvedSourceItems: non-negative integer
+  unresolvedSourceItemsRequireReview: true
   runtimeCompleteness: decimal | null
   metricBasis: "SYSTEM_EXTRACTED_EXPECTED_FACTS"
 }
@@ -182,7 +183,7 @@ Each Spec 008 fixture record must retain the exact synthetic `sourceText`, expec
 The run's `executionMetrics` record is content-free and is retained with the immutable run for latency, retry, token, cost, and warning observability.
 ```
 
-`runtimeCompleteness` is `coveredExpectedFacts / extractedExpectedFacts` when the denominator is non-zero; otherwise it is `null`, not 100%. It is operational telemetry, never the held-out quality metric.
+`runtimeCompleteness` is `coveredExpectedFacts / extractedExpectedFacts` when the denominator is non-zero; otherwise it is `null`, not 100%. It is operational telemetry, never the held-out quality metric. A non-zero `unresolvedSourceItems` count always remains visible through `unresolvedSourceItemsRequireReview=true` and downstream review findings; a high runtime completeness value never authorizes approval.
 
 Spec 008 calculates benchmark completeness with manual annotation:
 

@@ -29,5 +29,5 @@ For an immutable German caregiver transcript and an exact candidate nursing-note
 
 ## Initial acceptance cases
 
-`COV-001` through `COV-010` cover faithful coverage, omitted temperature, lost laterality, German paraphrase, omitted negation, lost uncertainty, findings from an otherwise valid note, note-revision re-evaluation, unresolved source extraction, and incompatible values. Fixtures also exercise multi-clause statements, temporal qualifiers, approximate measurements, indirect speech, and negation.
+`COV-001` through `COV-011` cover faithful coverage, omitted temperature, lost laterality, German paraphrase, omitted negation, lost uncertainty, findings from an otherwise valid note, note-revision re-evaluation, unresolved source extraction, incompatible values, and faithful coverage alongside a contradictory duplicate. Fixtures also exercise multi-clause statements, temporal qualifiers, approximate measurements, indirect speech, and negation.
 

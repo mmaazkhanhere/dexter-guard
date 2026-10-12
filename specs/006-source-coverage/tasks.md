@@ -1,6 +1,6 @@
 # Spec 006 - Implementation Tasks
 
-**Execution prerequisite:** An independent reviewer must complete every item in [checklist.md](checklist.md). These task boxes track implementation progress and are intentionally open.  
+**Execution prerequisite:** An independent reviewer must complete every item in [checklist.md](checklist.md) before T001 begins. T024 records that precondition for traceability; it is not a post-implementation approval step. These task boxes track implementation progress.
 **Dependencies:** Specs 001-005 contracts; Spec 007 severity/review integration; Spec 008 benchmark/evaluation integration.
 
 ## Phase 0 - Baseline and contracts
@@ -21,7 +21,7 @@
 
 - [ ] T009 Define the versioned semantic matcher port, structured relation schema, provider adapter, mandatory 30-second timeout, maximum two attempts with the same run/idempotency identity, and malformed-output rejection. Prove deterministic validators do not make provider/network calls. **Requirements:** FR-14.3, FR-14.4. **Depends on:** T003, T006.
 - [ ] T010 Write/implement pure status orchestration from matcher relations: unresolved, faithful, distorted, partial, and no-related-claim; enforce a faithful duplicate's coverage precedence and full assessment closure/order. **Requirements:** FR-14.3, FR-14.4. **Depends on:** T009.
-- [ ] T011 Add focused German tests for faithful paraphrase, lost laterality, omitted negation, lost uncertainty, time/approximation omissions, indirect speech/attribution, and incompatible values. **Requirements:** FR-14.2-14.4. **Depends on:** T010.
+- [ ] T011 Add focused German tests for faithful paraphrase, lost laterality, omitted negation, lost uncertainty, time/approximation omissions, indirect speech/attribution, incompatible values, and a faithful claim plus contradictory duplicate proving `COVERED` precedence. **Requirements:** FR-14.2-14.4. **Depends on:** T010.
 - [ ] T012 Implement structured coverage findings with source-derived references/quotes, material-attribute lists, safe source-grounded suggestion, `requiresReview`, and no note mutation. **Requirements:** FR-14.5. **Depends on:** T008, T010.
 - [ ] T013 Implement correlation with immutable Spec 004/005 findings by referenced claim/fact/version; preserve links without recomputing their outcomes. Test omission/contradiction overlap and numeric distortion. **Requirements:** FR-14.6. **Depends on:** T002, T012.
 
@@ -35,12 +35,12 @@
 
 ## Phase 4 - Acceptance, evaluation handoff, and closure
 
-- [ ] T019 Create a versioned synthetic German fixture manifest for COV-001 through COV-010 with exact source text, annotated source spans, expected source facts/unresolved item, claims and claim-level outcomes, materiality/severity-policy labels, annotation provenance and disputed-label resolution, dataset version, expected assessments/findings/links, and denominator treatment. **Requirements:** all acceptance scenarios. **Depends on:** T011, T018.
-- [ ] T020 Implement acceptance tests against the manifest. Assert exact IDs, status, matching claim IDs, source spans/quotes, attributes, expectation/policy key, related finding refs, immutable revision behaviour, and runtime-count basis. **Requirements:** FR-14.1-14.8. **Depends on:** T017, T019.
+- [ ] T019 Create a versioned synthetic German fixture manifest for COV-001 through COV-011 with exact source text, annotated source spans, expected source facts/unresolved item, claims and claim-level outcomes, materiality/severity-policy labels, annotation provenance and disputed-label resolution, dataset version, expected assessments/findings/links, review-required unresolved-item handling, and denominator treatment. **Requirements:** all acceptance scenarios. **Depends on:** T011, T018.
+- [ ] T020 Implement acceptance tests against the manifest. Assert exact IDs, status, matching claim IDs, source spans/quotes, attributes, expectation/policy key, related finding refs, faithful-over-distorted precedence, unresolved-item review requirement, immutable revision behaviour, and runtime-count basis. **Requirements:** FR-14.1-14.8. **Depends on:** T017, T019.
 - [ ] T021 Export a Spec 008 evaluation handoff with manually annotated expected facts, applicable-denominator flag, source text/evidence references, claim-level ground truth, materiality/severity labels, annotation provenance/dispute resolution, train/held-out split, dataset version, and raw-count formulas for critical-error recall, false-positive rate, claim classification, completeness, latency, inference cost, reviewer workload, omission recall, and false-warning rate. **Requirements:** FR-14.8. **Depends on:** T019.
 - [ ] T022 Add content-minimized telemetry and tests for source/note/resident version IDs, policy/ruleset/dataset/model/prompt versions, status counts, denominator, linked finding counts, persisted execution metrics, latency, retries, input/output tokens, inference cost, rejection/warning counts, and safe failures; verify no full transcript/note logging. **Requirements:** FR-14.5, FR-14.8. **Depends on:** T016.
 - [ ] T023 Run configured format/static checks, focused/new tests, complete test suite, compile check, and `git diff --check`; record exact commands/results. **Requirements:** definition of done. **Depends on:** T020-T022.
-- [ ] T024 Have an independent reviewer update the reviewer-owned checklist; the implementation workflow must not modify it. **Depends on:** T023.
+- [x] T024 Independent requirements-quality review completed and reviewer-owned checklist approved before implementation; the implementation workflow must not modify it. **Precondition for:** T001.
 - [ ] T025 Run [converge.md](converge.md), append only concrete new gap tasks if needed, implement those tasks, and repeat until convergence reports `Converged`. **Depends on:** T024.
 
 ## Dependency summary
@@ -52,7 +52,7 @@ T003 + T006 -> T009 -> T010 -> T011 -> T019
 T003 -> T008 -> T012 -> T013
 T007 + T010 + T012 + T013 -> T014 -> T015/T016/T018
 T016 -> T017
-T017 + T019 -> T020 -> T023 -> T024 -> T025
+T024 -> T001; T017 + T019 -> T020 -> T023 -> T025
 T019 -> T021; T016 -> T022; T020-T022 -> T023
 ```
 

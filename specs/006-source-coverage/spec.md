@@ -65,12 +65,27 @@ The coverage status definitions and precedence are versioned as `COVERAGE_STATUS
 The comparison outcome is selected in this order for each expected source fact:
 
 1. `UNCERTAIN` when the fact was not reliably extracted or semantic comparison is unresolved.
-2. `DISTORTED` when a related note claim changes a material attribute, including incompatible numeric values, reversed polarity, lost uncertainty rendered as definite, changed laterality, or changed temporal meaning.
-3. `COVERED` when at least one claim faithfully preserves every material attribute.
-4. `PARTIALLY_COVERED` when a related claim retains the fact but omits a material attribute and no faithful claim exists.
+2. `COVERED` when at least one candidate claim faithfully preserves every material attribute.
+3. `DISTORTED` when no faithful claim exists and a related note claim changes a material attribute, including incompatible numeric values, reversed polarity, lost uncertainty rendered as definite, changed laterality, or changed temporal meaning.
+4. `PARTIALLY_COVERED` when no faithful or distorted claim exists and a related claim retains the fact but omits a material attribute.
 5. `MISSING` when no related claim represents the fact.
 
-`DISTORTED` takes precedence over `PARTIALLY_COVERED` only when no other candidate claim faithfully covers the fact. A distinct faithful claim therefore prevents a fact from being reported as omitted merely because another sentence restates it incorrectly; the linked contradiction remains available to Spec 004/005 and Spec 007.
+The faithful-match check is deliberately before distorted and partial checks. Therefore, if `Claim A` faithfully covers `Temperatur 38,2 C.` and `Claim B` says `Temperatur 39,2 C.`, the source fact is `COVERED` for Spec 006. The incompatible duplicate must still be preserved and reported through the applicable Spec 004 contradiction and/or Spec 005 numeric finding; it must not be silently discarded.
+
+Equivalent deterministic pseudocode is:
+
+```text
+if source_item_is_unresolved or matcher_is_unresolved:
+    status = UNCERTAIN
+elif any(relation.kind == FAITHFUL for relation in relations):
+    status = COVERED
+elif any(relation.kind == RELATED_ATTRIBUTE_DISTORTED for relation in relations):
+    status = DISTORTED
+elif any(relation.kind == RELATED_ATTRIBUTE_OMITTED for relation in relations):
+    status = PARTIALLY_COVERED
+else:
+    status = MISSING
+```
 
 ## Expected-fact policy and severity handoff
 
@@ -152,6 +167,7 @@ As an evaluator, I need completeness and omission-detection metrics that cannot 
 4. The benchmark also reports omission detection recall and false omission warning rate with counts and denominators.
 5. The held-out split is not used for prompt/rule tuning.
 6. The Spec 008 handoff also supports constitution-wide reporting of critical-error recall, false-positive rate, claim classification performance, latency, inference cost, and reviewer workload with stated denominators.
+7. Unresolved source items are excluded from the runtime completeness denominator but are reported separately, create `UNCERTAIN` findings with `requiresReview=true`, and never authorize approval even when runtime completeness is high.
 
 ## Functional requirements
 
@@ -212,6 +228,7 @@ HTTP 200 returns a terminal immutable run: either a successful run with coverage
 | COV-008 | A revised note includes a previously missing fact. | New revision receives a new run and fact is re-evaluated; historical run is unchanged. |
 | COV-009 | The source extractor cannot reliably establish a fact from a source passage. | `UNCERTAIN` unresolved-item assessment, source-linked explanation, no invented `SourceFact`, excluded from denominator. |
 | COV-010 | Source and related note claim use incompatible numerical values. | `DISTORTED`; linked to the relevant Spec 005 finding and Spec 004 contradiction when available. |
+| COV-011 | One claim faithfully covers a source measurement while a duplicate claim gives an incompatible value. | `COVERED` for Spec 006; the duplicate remains linked to Spec 004/005 findings. |
 
 Fixtures must additionally cover multi-clause German statements, temporal modifiers, approximate measurements, indirect speech, Unicode offsets, and negations. Tests assert exact source/item IDs, status, attributes, source locations, claim links, related-finding links, and denominator treatment rather than merely a warning string.
 
