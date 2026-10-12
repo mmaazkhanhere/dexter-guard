@@ -40,6 +40,7 @@ from .validation import (
     validate_idempotency_replay,
     validate_successful_run,
 )
+from .spans import SourceSpanValidationError, SourceTextIndex, derive_source_quote
 
 __all__ = [
     "EvidenceFinding",
@@ -77,4 +78,7 @@ __all__ = [
     "validate_claim_references",
     "validate_idempotency_replay",
     "validate_successful_run",
+    "SourceSpanValidationError",
+    "SourceTextIndex",
+    "derive_source_quote",
 ]

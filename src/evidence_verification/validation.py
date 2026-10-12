@@ -9,6 +9,7 @@ import json
 import sqlite3
 
 from .contracts import EvidenceFinding, VerificationRunRequest, VerificationRunSucceeded
+from .spans import SourceTextIndex, SourceSpanValidationError
 
 
 class VerificationIntegrityError(ValueError):
@@ -212,18 +213,23 @@ def _validate_finding_source(
     source_version: int,
     source_text: str,
 ) -> None:
+    index = SourceTextIndex(source_text)
     for span in finding.source_spans:
         if span.source_id != source_id or span.source_version != source_version:
             raise VerificationIntegrityError("source span references a different immutable source")
-        if not 0 <= span.start < span.end <= len(source_text):
-            raise VerificationIntegrityError("source span is outside the immutable source or is not end-exclusive")
+        try:
+            index.validate(span.start, span.end)
+        except SourceSpanValidationError as error:
+            raise VerificationIntegrityError(str(error)) from error
     for quote in finding.evidence_quotes:
         span = quote.span
         if span.source_id != source_id or span.source_version != source_version:
             raise VerificationIntegrityError("evidence quote references a different immutable source")
-        if not 0 <= span.start < span.end <= len(source_text):
-            raise VerificationIntegrityError("evidence quote span is outside the immutable source or is not end-exclusive")
-        if quote.text != source_text[span.start : span.end]:
+        try:
+            derived = index.derive(span.start, span.end)
+        except SourceSpanValidationError as error:
+            raise VerificationIntegrityError(str(error)) from error
+        if quote.text != derived:
             raise VerificationIntegrityError("evidence quote must equal its exact immutable-source substring")
 
 
