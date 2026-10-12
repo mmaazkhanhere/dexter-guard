@@ -8,7 +8,7 @@ from deterministic_validation.contracts import (
     SourceFact,
     TranscriptSnapshot,
 )
-from deterministic_validation.engine import DeterministicRuleEngine, normalize_measurement, parse_decimal, serialize_decimal, validate_evidence
+from deterministic_validation.engine import DeterministicRuleEngine, conversion_trace, normalize_measurement, parse_decimal, serialize_decimal, validate_evidence
 
 
 SNAPSHOT = TranscriptSnapshot(sourceId="source-1", sourceVersion=1, transcriptText="Temperatur 37,2 °C. 😊")
@@ -74,6 +74,8 @@ def test_fluid_litre_and_millilitre_are_equal_after_decimal_conversion() -> None
     result = findings(fact("0,5", category="FLUID_INTAKE", unit="LITRE"), claim("500", category="FLUID_INTAKE", unit="MILLILITRE"))
     assert result == ()
     assert normalize_measurement(fact("0,5", category="FLUID_INTAKE", unit="LITRE").measurement).value == 500
+    trace = conversion_trace(fact("0,5", category="FLUID_INTAKE", unit="LITRE").measurement, claim("500", category="FLUID_INTAKE", unit="MILLILITRE").measurement)
+    assert trace is not None and trace.rule_id == "NUM-002" and trace.outcome.value == "PASS"
 
 
 def test_incompatible_category_dimensions_are_num003_and_invalid_pairing_is_str003() -> None:

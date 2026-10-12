@@ -52,6 +52,13 @@ class CanonicalBloodPressure:
     converted: bool = False
 
 
+@dataclass(frozen=True)
+class RuleTrace:
+    rule_id: str
+    outcome: Outcome
+    message: str
+
+
 def parse_decimal(value: str) -> Decimal | None:
     if not _DECIMAL_PATTERN.fullmatch(value):
         return None
@@ -96,6 +103,20 @@ def normalize_measurement(measurement: Measurement) -> CanonicalScalar | Canonic
     if systolic is None or diastolic is None:
         return None
     return CanonicalBloodPressure(systolic, diastolic, canonical_unit)
+
+
+def conversion_trace(source: Measurement, observed: Measurement) -> RuleTrace | None:
+    """Return the optional NUM-002 PASS trace; public findings omit PASS records."""
+
+    source_canonical = normalize_measurement(source)
+    observed_canonical = normalize_measurement(observed)
+    if source_canonical is None or observed_canonical is None:
+        return None
+    source_converted = getattr(source_canonical, "converted", False)
+    observed_converted = getattr(observed_canonical, "converted", False)
+    if not source_converted and not observed_converted:
+        return None
+    return RuleTrace("NUM-002", Outcome.PASS, "A permitted exact unit conversion was applied before comparison.")
 
 
 def _raw_value(measurement: Measurement) -> str | dict[str, int | str]:
@@ -274,7 +295,7 @@ class DeterministicRuleEngine:
         return tuple(comparison_findings + evidence_findings)
 
 
-__all__ = ["CanonicalBloodPressure", "CanonicalScalar", "DeterministicRuleEngine", "category_unit_is_valid",
-           "normalize_measurement", "parse_blood_pressure_component", "parse_decimal", "serialize_decimal",
-           "validate_evidence"]
+__all__ = ["CanonicalBloodPressure", "CanonicalScalar", "DeterministicRuleEngine", "RuleTrace",
+           "category_unit_is_valid", "conversion_trace", "normalize_measurement",
+           "parse_blood_pressure_component", "parse_decimal", "serialize_decimal", "validate_evidence"]
 
