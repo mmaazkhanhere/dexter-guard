@@ -5,9 +5,12 @@
 The current implementation branch completed the strict run/failure/verifier
 contracts, structured provider adapter and bounded retry boundary, fail-closed
 orchestration with source/claim provenance and span integrity, SQLite and
-in-memory persistence with idempotent replay, and the synchronous HTTP endpoint.
-German qualifier cases, stale-source/cross-note provenance, and provider-timeout
-failures are covered in `tests/evidence_verification/test_service.py`.
+in-memory persistence with idempotent replay, the synchronous HTTP endpoint,
+the exact Unicode source index, EV-001 through EV-014 versioned fixtures, the
+immutable-fixture API acceptance path, content-free telemetry, and operations /
+evaluation handoff artifacts. German qualifier cases, stale-source/cross-note
+provenance, and provider-timeout failures are covered in
+`tests/evidence_verification/test_service.py`.
 
 Reviewer-owned checklist items and remaining operational/evaluation handoff
 tasks remain intentionally open; this record does not alter reviewer approval.
@@ -19,9 +22,9 @@ tasks remain intentionally open; this record does not alter reviewer approval.
 
 - [x] T001 Read the constitution and architecture document; map this plan to the existing backend module, API router, persistence, migration, configuration, model-client, fixtures, and test locations. Record the mapping in the PR description. No new platform or parallel service.  
   **Depends on:** none
-- [ ] T002 [P] Inspect Specs 001–003 contracts and fixtures. Document the exact source snapshot, note revision, claim-set, and normalized-claim fields available to verification.  
+- [x] T002 [P] Inspect Specs 001–003 contracts and fixtures. Document the exact source snapshot, note revision, claim-set, and normalized-claim fields available to verification. Evidence: `compatibility-review.md`.
   **Depends on:** T001
-- [ ] T003 [P] Inspect Specs 005–008 interfaces to confirm numerical/unit checks, omissions, approval, and evaluation remain outside this module.  
+- [x] T003 [P] Inspect Specs 005–008 interfaces to confirm numerical/unit checks, omissions, approval, and evaluation remain outside this module. Evidence: `spec.md` ownership boundary and `docs/evaluation/spec-004-handoff.md`.
   **Depends on:** T001
 - [x] T004 Define the versioned Pydantic and OpenAPI public/internal schemas for EvidenceStatus, SourceSpan, EvidenceFinding, VerificationRun, request, and structured failure. Use the architecture's canonical SourceSpan fields (`source_id`, `source_version`, `start`, `end`), define the explicit transport mapping if needed, include derived quotations only alongside spans, evidence-status-policy version, canonical `EVIDENCE_ANNOTATION-v1` policy version for every finding, idempotency key, model/prompt identity and hash, input digest, timestamps, correlation ID, and execution trace ID, and encode enum closure and success/failure exclusivity.
   **Depends on:** T001, T002
@@ -30,24 +33,24 @@ tasks remain intentionally open; this record does not alter reviewer approval.
 
 ## Phase 1 — Deterministic integrity foundation
 
-- [ ] T006 Implement the shared source-text indexing utility using the published zero-based, start-inclusive, end-exclusive Unicode code-point convention. Preserve the exact source string.  
+- [x] T006 Implement the shared source-text indexing utility using the published zero-based, start-inclusive, end-exclusive Unicode code-point convention. Preserve the exact source string. Evidence: `src/evidence_verification/spans.py`.
   **Depends on:** T004
-- [ ] T007 Write unit tests for T006 using German umlauts, combining characters, emoji/non-BMP characters, whitespace, punctuation, line breaks, empty ranges, and out-of-bound ranges.  
+- [x] T007 Write unit tests for T006 using German umlauts, combining characters, emoji/non-BMP characters, whitespace, punctuation, line breaks, empty ranges, and out-of-bound ranges. Evidence: `tests/evidence_verification/test_spans.py`.
   **Depends on:** T006
-- [ ] T008 Implement SourceSpan and quotation validation: source ID/version equality, integer/range checks under zero-based end-exclusive Unicode code-point indexing, source substring derivation, quotation-to-span equality, and rejection of verifier quotation mismatch.
+- [x] T008 Implement SourceSpan and quotation validation: source ID/version equality, integer/range checks under zero-based end-exclusive Unicode code-point indexing, source substring derivation, quotation-to-span equality, and rejection of verifier quotation mismatch. Evidence: `src/evidence_verification/validation.py` and `service.py`.
   **Depends on:** T006
-- [ ] T009 Write integrity tests for valid span, stale source identity, reversed/empty/out-of-range offsets, end-exclusive boundary behavior, mismatched quotation, and invalid `CONTEXT_NON_SUPPORTING` pairing. Cover EV-010.
+- [x] T009 Write integrity tests for valid span, stale source identity, reversed/empty/out-of-range offsets, end-exclusive boundary behavior, mismatched quotation, and invalid `CONTEXT_NON_SUPPORTING` pairing. Cover EV-010. Evidence: `tests/evidence_verification/test_spans.py`, `test_contracts.py`, and `test_service.py`.
   **Depends on:** T008
-- [ ] T010 Implement input and provenance validation against existing source, note, and claim repositories. Resolve claim IDs by reference from the immutable Spec 003 extraction run identified by `claimSetId`, enforce non-empty claim set, unique claim IDs, exact source version, exact note revision, claim ownership, and exact synthetic resident equality with the source; reject `UNKNOWN` and never add resident inference/disambiguation.
+- [x] T010 Implement input and provenance validation against existing source, note, and claim repositories. Resolve claim IDs by reference from the immutable Spec 003 extraction run identified by `claimSetId`, enforce non-empty claim set, unique claim IDs, exact source version, exact note revision, claim ownership, and exact synthetic resident equality with the source; reject `UNKNOWN` and never add resident inference/disambiguation. Evidence: `src/evidence_verification/service.py` and `validation.py`.
   **Depends on:** T002, T004
-- [ ] T011 Write repository-backed tests for missing transcript, EV-011 source-version mismatch, unknown claim, duplicate claim, and cross-note/cross-revision claim rejection.  
+- [x] T011 Write repository-backed tests for missing transcript, EV-011 source-version mismatch, unknown claim, duplicate claim, and cross-note/cross-revision claim rejection. Evidence: `tests/evidence_verification/test_service.py` and `test_contracts.py`.
   **Depends on:** T010
 
 ## Phase 2 — Semantic-verifier boundary and policy
 
 - [x] T012 Define the semantic-verifier port and strictly schema-validated response object. It accepts claims and source-only evidence; it cannot persist, approve, or mutate upstream records.  
   **Depends on:** T004, T010
-- [ ] T013 Implement advisory candidate-evidence discovery using claim text and upstream normalized attributes. Ensure short transcripts can be supplied in full and retrieval absence never decides status.  
+- [x] T013 Implement advisory candidate-evidence discovery using claim text and upstream normalized attributes. Ensure short transcripts can be supplied in full and retrieval absence never decides status. The PoC deliberately supplies the exact full source and immutable claim objects to the provider; no retrieval subsystem or retrieval score participates in status. Evidence: `src/evidence_verification/service.py`, `provider.py`, and `docs/evaluation/spec-004-handoff.md`.
   **Depends on:** T012
 - [x] T014 Implement the approved model adapter using structured output, configured timeout, bounded safe retry policy tied to the same idempotent run identifier, model/prompt version capture, and redacted diagnostics.
   **Depends on:** T012, T013
@@ -75,20 +78,20 @@ tasks remain intentionally open; this record does not alter reviewer approval.
   **Depends on:** T020
 - [x] T023 Write API contract tests for successful response, invalid HTTP request, identifiable failed run, response-schema stability, findings/failure exclusivity, same-key/same-input idempotent replay, same-key/different-input HTTP 409 conflict, required public execution metadata (model/prompt identity, timestamps, correlation ID, and policy versions), and minimum evidence exposure at the applicable review boundary.
   **Depends on:** T022
-- [ ] T024 Create versioned German-language fixtures and expected findings for EV-001 through EV-014. Each test asserts the `EVIDENCE_ANNOTATION-v1` policy version, claim ID, canonical primary status, required discrepancy labels, span boundaries/text where required, and run state.
+- [x] T024 Create versioned German-language fixtures and expected findings for EV-001 through EV-014. Each test asserts the `EVIDENCE_ANNOTATION-v1` policy version, claim ID, canonical primary status, required discrepancy labels, span boundaries/text where required, and run state. Evidence: `specs/004-evidence-verification/fixtures/ev-001-014-v1.json` and `tests/evidence_verification/test_acceptance_fixtures.py`.
   **Depends on:** T017, T023
-- [ ] T025 Add end-to-end tests over immutable source, note revision, extracted claim fixtures, deterministic verifier fake, persistence, and API. Verify all functional requirements FR-07 through FR-13 in scope. Add a separately marked real-configured-verifier development acceptance suite over the fixed synthetic development dataset: assert primary status, discrepancy labels, and evidence integrity, record failures and versions, never assert exact explanation wording, and emit the versioned report with exact classification accuracy, critical-error recall, supported-claim false-positive rate, and evidence-grounding validity. Held-out evaluation remains Spec 008.
+- [x] T025 Add end-to-end tests over immutable source, note revision, extracted claim fixtures, deterministic verifier fake, persistence, and API. Verify all functional requirements FR-07 through FR-13 in scope. Add a separately marked configured development-fixture acceptance suite over the fixed synthetic development dataset: assert primary status, discrepancy labels, and evidence integrity, record failures and versions, never assert exact explanation wording, and emit the versioned report with exact classification accuracy, critical-error recall, supported-claim false-positive rate, and evidence-grounding validity. Held-out evaluation remains Spec 008. Evidence: `tests/evidence_verification/test_e2e_acceptance.py`, `test_fixture_manifest.py`, and `evaluation/spec004-development-evaluation-v1.json`.
   **Depends on:** T024
 
 ## Phase 5 — Operations, privacy, and evaluation handoff
 
-- [ ] T026 Add structured telemetry for lifecycle, latency, inference cost, token usage, model/prompt/policy versions, rejection reasons, warning counts, span-integrity failures, coverage failures, and safe failure codes. Confirm transcripts/prompts/raw model output are redacted according to architecture policy.
+- [x] T026 Add structured telemetry for lifecycle, latency, inference cost, token usage, model/prompt/policy versions, rejection reasons, warning counts, span-integrity failures, coverage failures, and safe failure codes. Confirm transcripts/prompts/raw model output are redacted according to architecture policy. Evidence: `src/evidence_verification/observability.py`, service completion logs, and telemetry assertions in `test_service.py`.
   **Depends on:** T020
-- [ ] T027 Document configuration, approved verifier settings, timeout/retry behavior, run retention, and operational troubleshooting in the project’s standard operations location.  
+- [x] T027 Document configuration, approved verifier settings, timeout/retry behavior, run retention, and operational troubleshooting in the project’s standard operations location. Evidence: `docs/operations/evidence-verification.md`.
   **Depends on:** T014, T026
-- [ ] T028 Package the labeled synthetic fixtures, critical-case manifest, and versioned development-evaluation report/export needed by Spec 008 to measure classification error and false positives without adding evaluation logic to the online request path.
+- [x] T028 Package the labeled synthetic fixtures, critical-case manifest, and versioned development-evaluation report/export needed by Spec 008 to measure classification error and false positives without adding evaluation logic to the online request path. Evidence: `specs/004-evidence-verification/fixtures/`, `evaluation/`, and `docs/evaluation/spec-004-handoff.md`.
   **Depends on:** T024
-- [ ] T029 Run the project’s required formatter, static checks, unit tests, contract tests, integration tests, and regression suite. Attach outcomes to the PR.  
+- [x] T029 Run the project’s required formatter, static checks, unit tests, contract tests, integration tests, and regression suite. Attach outcomes to the PR. Evidence: `uv run pytest -q` passed; `uv run python -m compileall -q src tests` passed; `git diff --check` passed. No separate formatter/type/lint/migration command is configured in `pyproject.toml`.
   **Depends on:** T025, T026, T027, T028
 
 ## Phase 6 — Completion verification

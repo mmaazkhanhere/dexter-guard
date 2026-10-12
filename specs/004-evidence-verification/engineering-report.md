@@ -12,6 +12,12 @@ idempotency replay/conflict handling; the synchronous
 `POST /api/v1/verification-runs` route; redacted telemetry; and a versioned
 `verification_v1` prompt asset.
 
+The convergence follow-up adds an exact Unicode source-text index, versioned
+EV-001 through EV-014 German fixtures and critical-case manifest, immutable
+source/note/claim API acceptance coverage, content-free lifecycle telemetry,
+an operations runbook, and a versioned development-evaluation handoff for
+Spec 008.
+
 Semantic labels remain provider-owned. Deterministic code validates contract,
 coverage, provenance, source identity, offsets, quotations, and persistence; it
 does not infer clinical meaning. Execution failures remain `FAILED_*` outcomes
@@ -30,8 +36,8 @@ execution trace ID.
 
 ## Verification performed
 
-- `uv run pytest -q`: 130 passed; one pre-existing Starlette/httpx deprecation warning.
-- `uv run pytest tests/evidence_verification -q`: 32 passed.
+- `uv run pytest -q`: 130 passed before the convergence follow-up; the full suite is rerun for T029.
+- `uv run pytest tests/evidence_verification -q`: 62 passed after the convergence follow-up.
 - `uv run python -m compileall -q src tests`: passed.
 - `git diff --check`: passed.
 
@@ -42,11 +48,15 @@ idempotent replay, HTTP 400/409 behavior, and German qualifier regressions.
 
 ## Known limitations and remaining risks
 
-- A production LLM SDK/provider is not configured in this synthetic PoC; tests
-  use deterministic fakes behind the same structured adapter.
+- A production LLM SDK/provider is not configured in this synthetic PoC; the
+  development report therefore uses a deterministic configured fixture verifier
+  behind the same structured adapter. A real provider run must produce a new
+  report before external deployment.
 - Candidate-evidence discovery is intentionally not a separate retrieval
   subsystem; short transcripts are supplied in full and provider output remains
   advisory input.
+- The operations runbook and evaluation handoff explicitly keep persistence,
+  raw-text redaction, and held-out benchmark ownership outside this service.
 - The reviewer-owned Spec Kit checklist still requires an independent reviewer
   to close its integration-test markers. The implementation task record preserves
   that approval boundary rather than self-approving it. Spec 008 still owns
