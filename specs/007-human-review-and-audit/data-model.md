@@ -53,6 +53,11 @@ An immutable human event about one `ReviewFinding` on one note revision.
 | `successorRevision`, `suggestionId` | Conditional | Required for correction/accepted-suggestion records as applicable. |
 | `idempotencyKey` | Yes | Atomically bound to canonical decision command digest. |
 
+Decision commands carry `expectedRevision` (compare-and-swap), not a client-selected
+`noteRevision`. The server resolves the current revision inside the write transaction and
+records that resolved value in `ReviewDecision.noteRevision`; a mismatch returns
+`409 STALE_REVISION` without appending a decision or audit event.
+
 ### `SuggestedCorrection`
 
 | Field | Required | Constraints |
@@ -73,7 +78,7 @@ An immutable human event about one `ReviewFinding` on one note revision.
 | `claimSetId` | Yes | Exact current Spec 003 extraction run. |
 | `evidenceRunId`, `deterministicValidationRunId`, `coverageRunId` | Yes | Required component run IDs; may not refer to another revision/source. |
 | `status` | Yes | `VALID`, `INVALID`, or `FAILED`; every persisted aggregate is terminal and immutable. A valid empty Spec 003 claim set is `INVALID` with `EMPTY_CLAIM_SET_REQUIRES_REVIEW`. |
-| `componentStatuses` | Yes | Each component `SUCCEEDED`, `FAILED`, `INVALID`, or `UNAVAILABLE`; aggregate `VALID` requires all `SUCCEEDED` and reference validation. |
+| `componentStatuses` | Yes | Exactly one status for each of CLAIM_EXTRACTION, EVIDENCE_VERIFICATION, DETERMINISTIC_VALIDATION, and SOURCE_COVERAGE; aggregate `VALID` requires all four `SUCCEEDED` and reference validation. |
 | `createdAt`, `completedAt`, `correlationId` | Yes | Lifecycle/audit fields; terminal timestamp required for terminal state. |
 | `failureCode`, `failureMessage` | Conditional | Required for `INVALID`/`FAILED`; contains safe diagnostic only. |
 

@@ -103,3 +103,12 @@ This record captures design decisions based on repository contracts and architec
 | UQ-003 claim extraction transport | The local PoC uses an injected in-process `ClaimExtractionPort`; no public endpoint is added. |
 | UQ-004 SQLite setup | The review repository uses idempotent SQLite `CREATE TABLE IF NOT EXISTS` initialization; no migration dependency is introduced. |
 | UQ-005 empty claim set | A valid empty extraction result is an `INVALID` full-note aggregate (`EMPTY_CLAIM_SET_REQUIRES_REVIEW`) and blocks approval in this feature version. |
+
+## Post-validation contract closure
+
+The OpenAPI contract now makes the two approval-safety bindings explicit: finding-decision
+commands use `expectedRevision` for compare-and-swap, and accepted suggestions require
+non-null `suggestionId` and `successorRevision`. Full-note verification responses require
+all three upstream run identifiers and exactly four component statuses; a `VALID` aggregate
+must contain one successful status for each required component. These are contract-level
+constraints; persistence and service tests remain implementation tasks.

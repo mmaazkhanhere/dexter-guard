@@ -368,9 +368,9 @@ components:
     FindingDecisionRequest:
       type: object
       additionalProperties: false
-      required: [noteRevision, kind, reviewerLabel, idempotencyKey]
+      required: [expectedRevision, kind, reviewerLabel, idempotencyKey]
       properties:
-        noteRevision: { type: integer, minimum: 1 }
+        expectedRevision: { type: integer, minimum: 1 }
         kind: { enum: [ACKNOWLEDGED, DISPUTED, ADJUDICATED, SUGGESTION_ACCEPTED, SUGGESTION_REJECTED] }
         reviewerLabel: { type: string, minLength: 1 }
         rationale: { type: string, minLength: 1 }
@@ -409,6 +409,9 @@ components:
             required: [kind]
           then:
             required: [suggestionId, successorRevision]
+            properties:
+              suggestionId: { type: string, minLength: 1 }
+              successorRevision: { type: integer, minimum: 1 }
     ClaimReverificationRequest:
       type: object
       additionalProperties: false
@@ -451,7 +454,7 @@ components:
     FullNoteVerification:
       type: object
       additionalProperties: false
-      required: [fullVerificationId, noteId, noteRevision, source, claimSetId, componentStatuses, status, idempotencyKey, requestDigest, createdAt]
+      required: [fullVerificationId, noteId, noteRevision, source, claimSetId, evidenceRunId, deterministicValidationRunId, coverageRunId, componentStatuses, status, idempotencyKey, requestDigest, createdAt]
       properties:
         fullVerificationId: { type: string, minLength: 1 }
         noteId: { type: string, minLength: 1 }
@@ -461,7 +464,7 @@ components:
         evidenceRunId: { type: string, minLength: 1 }
         deterministicValidationRunId: { type: string, minLength: 1 }
         coverageRunId: { type: string, minLength: 1 }
-        componentStatuses: { type: array, minItems: 4, items: { $ref: '#/components/schemas/ComponentStatus' } }
+        componentStatuses: { type: array, minItems: 4, maxItems: 4, items: { $ref: '#/components/schemas/ComponentStatus' } }
         status: { enum: [VALID, INVALID, FAILED] }
         idempotencyKey: { type: string, minLength: 1 }
         requestDigest: { type: string, minLength: 1 }
@@ -470,6 +473,46 @@ components:
         failureMessage: { type: [string, 'null'] }
         createdAt: { type: string, format: date-time }
         completedAt: { type: [string, 'null'], format: date-time }
+      allOf:
+        - if:
+            properties: { status: { const: VALID } }
+            required: [status]
+          then:
+            properties:
+              componentStatuses:
+                allOf:
+                  - contains:
+                      type: object
+                      required: [component, status]
+                      properties:
+                        component: { const: CLAIM_EXTRACTION }
+                        status: { const: SUCCEEDED }
+                    minContains: 1
+                    maxContains: 1
+                  - contains:
+                      type: object
+                      required: [component, status]
+                      properties:
+                        component: { const: EVIDENCE_VERIFICATION }
+                        status: { const: SUCCEEDED }
+                    minContains: 1
+                    maxContains: 1
+                  - contains:
+                      type: object
+                      required: [component, status]
+                      properties:
+                        component: { const: DETERMINISTIC_VALIDATION }
+                        status: { const: SUCCEEDED }
+                    minContains: 1
+                    maxContains: 1
+                  - contains:
+                      type: object
+                      required: [component, status]
+                      properties:
+                        component: { const: SOURCE_COVERAGE }
+                        status: { const: SUCCEEDED }
+                    minContains: 1
+                    maxContains: 1
     ApproveRequest:
       type: object
       additionalProperties: false
