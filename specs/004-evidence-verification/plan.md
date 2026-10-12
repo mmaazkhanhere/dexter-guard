@@ -1,11 +1,13 @@
 # Spec 004 — Technical Plan
 
-**Input:** [spec.md](spec.md), [clarify.md](clarify.md), the project constitution, and [architecture.md](../../docs/architecture.md)
+**Input:** [spec.md](spec.md), [clarify.md](clarify.md), the project constitution, [architecture.md](../../docs/architecture.md), and [ADR 003](../../docs/adr/003-evidence-verification-boundary.md)
 **Outcome:** An evidence-linked verification service with deterministic integrity controls around structured semantic reasoning.
 
 ## Architecture alignment
 
 This feature extends the application architecture already defined in the repository. It does not introduce a second web service, a second source of truth for transcripts, or a parallel approval workflow. Before implementation, map the module, persistence, dependency-injection, API-routing, migration, logging, and test locations in this plan to the established locations in <code>docs/architecture.md</code>; use those conventions rather than creating replacements.
+
+[ADR 003](../../docs/adr/003-evidence-verification-boundary.md) records the durable execution, immutable-provenance, and idempotency decisions that govern this feature.
 
 The service boundary is intentionally layered:
 
@@ -53,7 +55,7 @@ Within that stack, use these technology-neutral component choices:
 | Testing | Existing unit, contract, integration, and fixture tooling | Supports regressions without a new test platform. |
 | Observability | Existing structured logs, metrics, trace/correlation IDs, and secret handling | Makes failures diagnosable without exposing unvalidated clinical text. |
 
-If the current architecture already has a durable job mechanism for model work, submit a durable run and return its identifier. Otherwise complete a bounded short run in the request path. Both modes must persist the same <code>VerificationRun</code> contract and use the same terminal success/failure rules.
+The PoC uses synchronous verification only: the endpoint performs one bounded verifier attempt in the request path and returns a terminal successful or failed <code>VerificationRun</code>. A timeout is a terminal <code>FAILED_VERIFIER</code> result. This contract defines neither HTTP 202 nor a polling endpoint. A later asynchronous design MUST be introduced as a separate, versioned API contract with job state and polling/callback semantics; it is not an alternative behavior of this endpoint.
 
 ## Domain model
 
@@ -63,12 +65,12 @@ The request must contain:
 
 - <code>sourceId</code> and exact <code>sourceVersion</code>;
 - <code>noteId</code> and exact <code>noteRevision</code>;
-- a non-empty stable claim-set identity and its atomic claims, or a reference that retrieves that exact claim set;
-- per claim: stable <code>claimId</code>, assertion text, and upstream note-revision ownership; normalized semantic attributes from Spec 003 are optional but recommended;
-- per claim: required resident identity equal to the source resident, or the explicit value <code>UNKNOWN</code>. An <code>UNKNOWN</code> identity cannot produce a successful run;
-- a required idempotency key. Retries with the same key and request identity MUST resolve to the same run and MUST NOT duplicate model or reviewer actions.
+- a non-empty stable claim-set identity—exactly the immutable Spec 003 <code>extractionRunId</code>—and one or more claim references;
+- per claim: stable <code>claimId</code> and the synthetic <code>residentTestId</code>. The request does not submit assertion text or mutable semantic attributes by value;
+- a synthetic resident identity that exactly equals the immutable source-record resident. <code>UNKNOWN</code>, a mismatch, or an unresolvable identity is rejected as <code>FAILED_VALIDATION</code>; this feature does not infer or disambiguate residents;
+- a required idempotency key. The service computes a canonical input digest from source ID/version, note ID/revision, claim-set ID, and the set of claim ID/resident-ID references. The key is atomically bound to that digest: the same key and digest return the existing run without duplicate model or reviewer actions; the same key with a different digest returns HTTP <code>409 IDEMPOTENCY_KEY_CONFLICT</code> and creates no run.
 
-Required semantic attributes, when Spec 003 provides them, include subject, predicate, value, polarity/negation, certainty/modality, attribution, temporality, and clinical-conclusion marker. They aid discovery and diagnostics but do not override the claim assertion. Known resident identity must match the immutable source resident.
+For every submitted <code>claimId</code>, the service MUST resolve the immutable Spec 003 claim record from that <code>extractionRunId</code> and reject an unknown ID, a record outside the requested claim set, a record outside the requested <code>noteId</code>/<code>noteRevision</code>, or a record whose resident differs from the source and request. The resolver obtains the canonical upstream <code>noteRevisionId</code> through the Spec 002 note-revision record; it MUST NOT parse or synthesize that identifier from strings. The resolved immutable assertion and normalized attributes—not client-supplied text—are used for discovery and semantic verification. Required attributes, when present, include subject, predicate, value, polarity/negation, certainty/modality, attribution, temporality, and clinical-conclusion marker.
 
 ### VerificationRun lifecycle
 
@@ -93,7 +95,7 @@ An invalid required source span is a <code>FAILED_EVIDENCE_INTEGRITY</code> outc
 
 Exactly one of <code>SUPPORTED</code>, <code>UNSUPPORTED</code>, <code>CONTRADICTED</code>, or <code>UNCERTAIN</code>.
 
-The status definitions and precedence are versioned as `EVIDENCE_STATUS-v1`; the version is persisted on every run.
+The status definitions and precedence are versioned as `EVIDENCE_STATUS-v1`; the version is persisted on every run. Certainty labels are governed by `EVIDENCE_ANNOTATION-v1`.
 
 #### SourceSpan
 
@@ -115,9 +117,9 @@ claimId: input claim identifier
 status: one EvidenceStatus
 explanation: concise reviewer-facing basis
 sourceSpans: validated spans; required except for UNSUPPORTED, which may omit them or supply only optional non-supporting context spans
-evidenceQuotes: source-derived quotations paired to spans; unsupported context quotations are marked CONTEXT_NON_SUPPORTING
+evidenceQuotes: source-derived quotations paired one-to-one with spans; unsupported context quotations are marked CONTEXT_NON_SUPPORTING
 discrepancies: zero or more typed semantic changes
-policyVersion: EVIDENCE_ANNOTATION-v1 for qualifier-governed outcome
+policyVersion: EVIDENCE_ANNOTATION-v1 on every finding
 verifierFinding: normalized verifier recommendation, retained when available
 deterministicRuleFindings: structured deterministic checks, including conflicts
 ~~~
@@ -128,12 +130,12 @@ Discrepancy types are <code>NEGATION</code>, <code>CERTAINTY</code>, <code>ATTRI
 
 The persisted run MUST include the evidence-status-policy version, the required idempotency key, and separate verifier and deterministic-rule findings when they disagree; the resolved public status MUST preserve the conservative blocking outcome.
 
-Persist and return run ID, input identity/digest, source ID/version, note ID/revision, status, findings or failure, verifier model ID/version, prompt version/hash, annotation-policy version, evidence-status-policy version, created/started/completed timestamps, correlation ID, and the required idempotency key. The public HTTP response exposes this execution metadata; only model/prompt values unavailable before invocation may be null.
+Persist and return run ID, input identity/digest, source ID/version, note ID/revision, status, findings or failure, verifier model ID/version, prompt version/hash, annotation-policy version, evidence-status-policy version, created/started/completed timestamps, correlation ID, execution trace ID, and the required idempotency key. The public HTTP response is the persisted `VerificationRun` representation, not a reduced projection: it exposes this execution metadata for FR-30/evaluation handoff. Only model/prompt values unavailable before invocation may be null.
 
 ## Verification algorithm
 
-1. **Parse and validate request shape.** Reject missing required fields, duplicate claim IDs, empty claim sets, invalid claim text, and invalid identity formats before semantic processing.
-2. **Validate provenance.** Resolve immutable source snapshot, candidate note revision, and claim set. Confirm each claim exists exactly once and belongs to requested note revision. Reject source/version mismatch and stale or cross-note claim references.
+1. **Parse and validate request shape.** Reject missing required fields, duplicate claim IDs, empty claim sets, `UNKNOWN` resident IDs, and invalid identity formats before semantic processing.
+2. **Validate provenance.** Resolve immutable source snapshot, candidate note revision, claim set, and every referenced claim. Confirm each claim exists exactly once, belongs to the requested claim set and note revision, and has the same synthetic resident as the source and request. Reject source/version mismatch, unknown claim IDs, stale or cross-note references, unrecognized client fields, and resident mismatch; do not infer a resident.
 3. **Prepare source representation.** Preserve exact source string and build a Unicode code-point index utility. Do not modify source text or use a normalized derivative for evidence offsets.
 4. **Discover candidate evidence.** Use claim text and normalized attributes to select useful passages. For short transcripts, present the whole source. Discovery scores are advisory and never decide evidence status.
 5. **Perform semantic comparison.** Call structured verifier with claim, only immutable source evidence, candidate passages or full source, status definitions, qualifier rules, and `EVIDENCE_ANNOTATION-v1`. Require one candidate result per claim, valid enum status, concise explanation, discrepancy types, and proposed spans.
@@ -165,19 +167,19 @@ Use immutable run records. The parent record stores provenance and lifecycle met
 - run identifier;
 - one finding per <code>(verificationRunId, claimId)</code>;
 - one immutable source identity per run;
-- the required input idempotency association.
+- the required atomic input-idempotency association: one key maps to exactly one canonical input digest and run. Reuse with the same digest returns that run; reuse with a different digest fails with `IDEMPOTENCY_KEY_CONFLICT` before model invocation or persistence of a new run.
 
 Persist a source-content digest when available from Spec 001. It supplements, but never replaces, required source ID/version lookup. Store prompt and annotation-policy versions, not hidden prompt reasoning.
 
 ### Runtime invariants beyond OpenAPI
 
-Pydantic request/response validators and service-level checks MUST enforce invariants that ordinary OpenAPI field schemas cannot express: submitted claim IDs are distinct; normalized finding claim IDs are distinct and exactly equal the submitted claim-ID set; every successful run has one finding per submitted claim and no foreign or missing finding; every span satisfies `0 <= start < end <= len(source)` under Unicode code-point indexing; every quotation equals the exact immutable-source substring for its span; and every `UNSUPPORTED` context quotation is paired to a valid span and marked `CONTEXT_NON_SUPPORTING`. These failures are contract or evidence-integrity failures, never replacement evidence statuses.
+Pydantic request/response validators and service-level checks MUST enforce invariants that ordinary OpenAPI field schemas cannot express: submitted claim IDs are distinct; every requested claim reference resolves to one immutable claim in the requested claim set and note revision with matching synthetic resident; normalized finding claim IDs are distinct and exactly equal the submitted claim-ID set; every successful run has one finding per submitted claim and no foreign or missing finding; every span satisfies `0 <= start < end <= len(source)` under Unicode code-point indexing; every quotation equals the exact immutable-source substring for its span; each span has exactly one quotation and vice versa; and every `UNSUPPORTED` context quotation is paired to a valid span and marked `CONTEXT_NON_SUPPORTING`. These failures are contract or evidence-integrity failures, never replacement evidence statuses.
 
 ## API design
 
 ### POST /api/v1/verification-runs
 
-The endpoint creates one verification attempt. Its response schema always includes run ID, lifecycle status, source and note identity, and either:
+The endpoint creates one synchronous, bounded verification attempt. It returns HTTP 200 only after a terminal outcome is durably recorded; there is no HTTP 202/polling behavior in the PoC. A repeated idempotency key with the same canonical input digest returns the existing terminal run under HTTP 200. Reusing a key for different input returns HTTP 409 `IDEMPOTENCY_KEY_CONFLICT`, with no model invocation or new run. Its response schema always includes run ID, lifecycle status, source and note identity, and either:
 
 - <code>findings</code> for a successful terminal run; or
 - <code>failure</code> for a terminal failure.
@@ -197,7 +199,7 @@ The PoC does not introduce production authentication or authorization, consisten
 | Unit | Unicode code-point offset conversion, span boundary/quotation integrity, status precedence, EVIDENCE_ANNOTATION-v1 fixture-label validation, negation scope, attribution, all-or-nothing coverage, and failure normalization. |
 | Contract | Request and response schemas, enum closure, mandatory provenance, success/failure exclusivity, stable error envelope, and unknown-field behavior. |
 | Integration | Immutable source and claim lookup, persistence transaction, API lifecycle, model adapter with deterministic stub, cross-note rejection, and preservation of any existing middleware boundary. |
-| Development acceptance | A real configured verifier runs against a fixed, versioned synthetic development dataset. Assert status, discrepancy labels, and evidence integrity—not exact explanation wording; record failures with model/prompt/policy versions. This dataset is not held out and does not establish release quality. |
+| Development acceptance | A real configured verifier runs against a fixed, versioned synthetic development dataset. Assert status, discrepancy labels, and evidence integrity—not exact explanation wording; emit the required versioned development-evaluation report with model/prompt/policy versions. A missing, malformed, or incomplete report blocks Spec 004 development acceptance. This dataset is not held out and does not establish release quality. |
 | Regression | EV-001 through EV-014 with German fixtures, including equivalent terminology and compound partial-negation cases. |
 | Evaluation handoff | Emit fixtures and labeled expected findings consumable by Spec 008; report classification errors and false positives there, not in production request flow. |
 
@@ -209,6 +211,12 @@ The PoC does not introduce production authentication or authorization, consisten
 - Track run success/failure counts, model latency/timeouts, inference cost, token usage, rejection reasons, warning counts, span-integrity failures, coverage failures, and status distribution.
 - Approval remains outside this spec. Consumers must treat any status other than successful verification as not approved.
 
+## Development evaluation gate
+
+Before Spec 004 can be accepted for development use with a configured verifier, the implementation MUST produce a valid [development evaluation report schema](contracts/development-evaluation-report.schema.json) for the fixed versioned synthetic development dataset. The report MUST identify the dataset and its digest, evaluator version, model/prompt/policy versions, totals and confusion counts, and these computed metrics: exact primary-classification accuracy, critical-error recall, supported-claim false-positive rate, and evidence-grounding validity. Critical errors are the labeled safety-critical positive cases defined by the fixture manifest; the manifest version is part of the report.
+
+This is a completeness and review gate: every required metric must be computed from the fixed dataset and recorded with its numerator/denominator. It is not a substitute for Spec 008’s held-out 95% recall target and does not itself make a release-quality claim. The designated reviewer decides whether the reported development behavior is acceptable; missing or invalid measurement blocks acceptance.
+
 ## Implementation readiness
 
-The plan is ready once its repository location mapping has been checked against the architecture document. It deliberately leaves no product-policy ambiguity: semantic model choice can vary, but the deterministic contracts and safe terminal behavior cannot.
+The plan is ready for implementation only after its repository location mapping and the reviewer-owned requirements checklist have been independently approved. It deliberately leaves no product-policy ambiguity: semantic model choice can vary, but the deterministic contracts and safe terminal behavior cannot.

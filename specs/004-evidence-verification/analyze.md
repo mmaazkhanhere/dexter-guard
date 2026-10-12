@@ -1,8 +1,8 @@
 # Spec 004 — Consistency Analysis
 
 **Analysis type:** Read-only cross-artifact review  
-**Artifacts reviewed:** spec.md, clarify.md, annotation-policy.md, plan.md, tasks.md
-**Result:** No blocking conflicts found in the specification set. Implementation has not begun; unchecked tasks and reviewer checklist items are expected.
+**Artifacts reviewed:** spec.md, clarify.md, annotation-policy.md, plan.md, tasks.md, contracts, and Specs 001–003 interfaces
+**Result:** No blocking conflicts found after the recorded compatibility corrections. The PoC contract is synchronous; asynchronous execution is deferred to a separately versioned API.
 
 ## Requirement traceability
 
@@ -28,6 +28,8 @@
 | Partial negation cannot be reduced to negative-token match | Pass | explicit in spec, clarification, test strategy, T017, and EV-013. |
 | Spec boundaries retained | Pass | numeric/unit work, omissions, approval, and benchmark ownership stay with Specs 005–008 in all artifacts. |
 | API supports safe failure | Pass | plan response/lifecycle and T022–T023 provide a durable non-success outcome with no authoritative partial findings. |
+| Idempotency cannot replay a different request | Pass | The canonical request digest is bound atomically to the idempotency key; same digest replays the existing run and a differing digest returns HTTP 409. |
+| Specs 001–003 interfaces compose | Pass | [compatibility-review.md](compatibility-review.md) maps source, note, extraction, claim, resident, and claim-set identities to the Spec 004 contract. |
 | Acceptance scenarios are testable | Pass | EV-001 through EV-014 map to fixture task T024 and end-to-end task T025. |
 
 ## Non-blocking implementation decisions
@@ -36,14 +38,14 @@ The following are intentionally delegated to established repository architecture
 
 - exact backend language/framework, persistence migration syntax, and test-file locations;
 - selected approved model provider and deployment configuration;
-- synchronous versus durable-job execution for a verification run.
+- exact bounded timeout value and safe retry count for a verification run.
 
-Each must preserve the public contract, lifecycle states, Unicode span semantics, and all-or-nothing safety guarantees. T001 resolves their repository placement before code changes.
+The execution mode is not deferred: this PoC is synchronous and returns a terminal HTTP 200 result. Each remaining implementation detail must preserve the public contract, lifecycle states, Unicode span semantics, and all-or-nothing safety guarantees. T001 resolves repository placement before code changes.
 
 ## Checklist gate
 
-The custom checklist is intentionally all unchecked because it is reviewer-owned. This is not an inconsistency or implementation failure. Per implement.md, implementation must pause and request a reviewer decision if any required checklist item remains unchecked.
+The checklist review is recorded in [checklist.md](checklist.md). The user-requested independent review verified the criteria against the listed artifacts and recorded compatibility corrections before approval.
 
 ## Conclusion
 
-The documents are internally consistent and have no unresolved product-policy ambiguity that blocks planning. Proceed only after reviewer checklist approval and repository architecture mapping.
+The documents are internally consistent and have no unresolved product-policy ambiguity that blocks planning. Proceed with implementation only after repository architecture mapping.

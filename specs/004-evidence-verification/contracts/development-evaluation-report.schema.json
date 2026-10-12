@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dexter-guard.local/specs/004/development-evaluation-report-v1.schema.json",
+  "title": "Spec 004 Development Evaluation Report",
+  "description": "Required development-acceptance measurement report for a configured verifier. This is not the Spec 008 held-out release evaluation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "reportSchemaVersion",
+    "datasetId",
+    "datasetVersion",
+    "datasetDigest",
+    "criticalCaseManifestVersion",
+    "evaluatorVersion",
+    "evaluatedAt",
+    "modelId",
+    "modelVersion",
+    "promptVersion",
+    "promptHash",
+    "annotationPolicyVersion",
+    "evidenceStatusPolicyVersion",
+    "totalClaims",
+    "classification",
+    "criticalErrorRecall",
+    "supportedClaimFalsePositiveRate",
+    "evidenceGroundingValidity"
+  ],
+  "properties": {
+    "reportSchemaVersion": { "const": "SPEC004_DEVELOPMENT_EVALUATION-v1" },
+    "datasetId": { "type": "string", "minLength": 1 },
+    "datasetVersion": { "type": "string", "minLength": 1 },
+    "datasetDigest": { "type": "string", "minLength": 1 },
+    "criticalCaseManifestVersion": { "type": "string", "minLength": 1 },
+    "evaluatorVersion": { "type": "string", "minLength": 1 },
+    "evaluatedAt": { "type": "string", "format": "date-time" },
+    "modelId": { "type": "string", "minLength": 1 },
+    "modelVersion": { "type": "string", "minLength": 1 },
+    "promptVersion": { "type": "string", "minLength": 1 },
+    "promptHash": { "type": "string", "minLength": 1 },
+    "annotationPolicyVersion": { "const": "EVIDENCE_ANNOTATION-v1" },
+    "evidenceStatusPolicyVersion": { "const": "EVIDENCE_STATUS-v1" },
+    "totalClaims": { "type": "integer", "minimum": 1 },
+    "classification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exactMatches", "total", "exactAccuracy", "confusionMatrix"],
+      "properties": {
+        "exactMatches": { "type": "integer", "minimum": 0 },
+        "total": { "type": "integer", "minimum": 1 },
+        "exactAccuracy": { "type": "number", "minimum": 0, "maximum": 1 },
+        "confusionMatrix": {
+          "type": "object",
+          "description": "Counts keyed by expected status and predicted status; exact format is versioned with the evaluator.",
+          "additionalProperties": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } }
+        }
+      }
+    },
+    "criticalErrorRecall": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["truePositives", "eligibleCriticalCases", "value"],
+      "properties": {
+        "truePositives": { "type": "integer", "minimum": 0 },
+        "eligibleCriticalCases": { "type": "integer", "minimum": 1 },
+        "value": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "supportedClaimFalsePositiveRate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["falsePositives", "predictedSupported", "value"],
+      "properties": {
+        "falsePositives": { "type": "integer", "minimum": 0 },
+        "predictedSupported": { "type": "integer", "minimum": 1 },
+        "value": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "evidenceGroundingValidity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["validFindings", "findingsRequiringGrounding", "value"],
+      "properties": {
+        "validFindings": { "type": "integer", "minimum": 0 },
+        "findingsRequiringGrounding": { "type": "integer", "minimum": 1 },
+        "value": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}

@@ -4,6 +4,10 @@
 **Applies to:** successful semantic-verification findings under [spec.md](spec.md)  
 **Purpose:** Provide canonical labels for fixture annotation and development acceptance. It does not turn model interpretation into deterministic text reasoning.
 
+`EVIDENCE_ANNOTATION-v1` is the only annotation-policy version for this
+feature. In particular, certainty labels are part of this policy and use that
+same version.
+
 ## Decision ownership
 
 The semantic verifier determines the proposed relationship between a claim and the immutable source: support, explicit contradiction, unresolved ambiguity, or insufficient support. Deterministic code validates only the response contract, claim coverage, enum values, required labels, source identity, character ranges, source-derived quotations, and run-state rules.
@@ -16,7 +20,7 @@ Deterministic code MUST reject invalid output, but MUST NOT infer that text sema
 |---|---|---|---|---|
 | AP-001 | Source directly establishes the complete claim and material qualifiers. | `SUPPORTED` | None unless another material qualifier changed. | At least one valid supporting span. |
 | AP-002 | Source explicitly states the opposite proposition, including explicit negation reversal. | `CONTRADICTED` | `NEGATION` when polarity/negation differs. | At least one valid conflicting span. |
-| AP-003 | No relevant source evidence supports the claim and no source evidence explicitly conflicts. | `UNSUPPORTED` | `CLINICAL_INFERENCE` when an unestablished diagnosis is asserted. | No span is required. An optional valid context span is allowed only when its paired quotation is marked `CONTEXT_NON_SUPPORTING`; it cannot be presented as support or conflict. |
+| AP-003 | No relevant source evidence supports the claim and no source evidence explicitly conflicts. | `UNSUPPORTED` | `CLINICAL_INFERENCE` when an unestablished diagnosis is asserted. | No span is required. Optional context is permitted only as a one-to-one valid span/quotation pair marked `CONTEXT_NON_SUPPORTING`; it cannot be presented as support or conflict. |
 | AP-004 | Relevant source evidence is qualified or ambiguous, so the asserted claim cannot be established or explicitly contradicted. | `UNCERTAIN` | The applicable qualifier label below. | At least one valid relevant span. |
 | AP-005 | Source says a symptom is possible/unclear; claim asserts it as certain. | `UNCERTAIN` | `CERTAINTY` | At least one valid relevant span. |
 | AP-006 | Source explicitly says confirmation cannot be made or was withheld; claim asserts confirmation. | `CONTRADICTED` | `CERTAINTY`; add `CLINICAL_INFERENCE` for an unsupported diagnosis. | At least one valid conflicting span. |

@@ -367,6 +367,7 @@ Verify audio input, multi-resident input, and unsupported request shapes are rej
 | Repository interface | Supports deterministic tests and future durable persistence. |
 | Structured errors | Makes API behavior predictable for demos and downstream consumers. |
 | No LLM dependency in the foundation | Keeps ingestion, validation, and persistence deterministic and independently testable. |
+| Evidence-verification boundary | ADR 003 fixes synchronous terminal execution, immutable upstream provenance, and request-digest idempotency for Spec 004. |
 
 ## 14. Completion criteria
 

@@ -3,7 +3,7 @@
 **Canonical feature specification:** This `spec.md` file is the authoritative behavioral specification for Spec 004.
 
 **Feature:** Evidence-grounded verification of nursing-note claims  
-**Status:** Ready for planning  
+**Status:** Pending independent requirements-quality review
 **Input dependencies:** immutable German transcript (Spec 001), candidate note revision (Spec 002), and atomic claims (Spec 003)  
 **Primary requirements:** FR-07, FR-08, FR-09, FR-10, FR-12, FR-13
 
@@ -12,6 +12,8 @@
 Build the reliability component that decides whether every atomic factual claim in a generated or externally supplied nursing note is grounded in the original German transcript. The service produces evidence-linked findings that deterministic validation, a caregiver reviewer, and later evaluation components can independently inspect.
 
 The source transcript is the only evidence source. A candidate note, surrounding note prose, prior verification output, or model memory must never support that note's own claims.
+
+Claims are supplied by immutable reference, not re-submitted by value: each request supplies a claim ID and the synthetic resident ID, then the service resolves the immutable Spec 003 claim record. `claimSetId` is the exact upstream immutable `extractionRunId`; it binds every requested claim to one extraction result. The resolved record must belong to that claim set and exact note revision. Unknown, stale, cross-note, altered, or resident-mismatched claim references are non-successful validation outcomes. The PoC never infers or disambiguates a resident; the supplied synthetic resident ID must match the source record.
 
 ## Scope
 
@@ -148,6 +150,17 @@ The definitions and precedence in this specification are versioned as `EVIDENCE_
 
 Canonical ground-truth classification for qualifier-sensitive fixtures is defined in [annotation-policy.md](annotation-policy.md) as `EVIDENCE_ANNOTATION-v1`. The semantic verifier applies that policy; deterministic code validates the resulting contract and evidence integrity without independently deciding semantic support or contradiction.
 
+Certainty is a label within `EVIDENCE_ANNOTATION-v1` and uses that canonical policy version.
+
+### ClaimInput
+
+`ClaimInput` is a provenance reference, not a claim payload. It contains only
+`claimId` and `residentTestId`; assertion text and normalized attributes are
+rejected as unknown request fields so they cannot be altered in transit. The
+service resolves `claimId` from the immutable claim repository and validates
+that its claim-set ID, note ID/revision, and synthetic resident exactly match
+the request and source record. `UNKNOWN` is not a valid resident input.
+
 ### SourceSpan
 
 The canonical domain shape follows `docs/architecture.md`: `source_id`, `source_version`, `start`, and `end`. Transport serializers may map these names to the repository's established API convention, but that mapping MUST be explicit, versioned, and tested. A derived quotation/excerpt is returned alongside the span, not stored as a `SourceSpan` field, and MUST be recomputed from the immutable source.
@@ -166,10 +179,10 @@ The canonical domain shape follows `docs/architecture.md`: `source_id`, `source_
 | claimId | Required stable claim identifier, unique in submitted claim set. |
 | status | Required EvidenceStatus; exactly one primary value. |
 | explanation | Required concise human-readable basis. |
-| sourceSpans | Required array; non-empty for supported, contradicted, and uncertain; may be empty only for unsupported. Optional unsupported context spans are allowed only with paired `CONTEXT_NON_SUPPORTING` evidence quotations. |
-| evidenceQuotes | Required source-derived quotations paired to spans. For an unsupported context span, the quotation MUST be marked `CONTEXT_NON_SUPPORTING` and cannot be presented as support or conflict. |
+| sourceSpans | Required array; non-empty for supported, contradicted, and uncertain; may be empty only for unsupported. Optional unsupported context spans are allowed only as one-to-one pairs with `CONTEXT_NON_SUPPORTING` evidence quotations. |
+| evidenceQuotes | Required source-derived quotations paired one-to-one with spans. For an unsupported context span, the quotation MUST be marked `CONTEXT_NON_SUPPORTING` and cannot be presented as support or conflict. |
 | discrepancies | Required structured array, with types such as NEGATION, CERTAINTY, ATTRIBUTION, CLINICAL_INFERENCE, and OTHER. |
-| policyVersion | Required for policy-governed certainty treatment; otherwise the run policy version applies. |
+| policyVersion | Required canonical `EVIDENCE_ANNOTATION-v1` version for every finding. |
 | verifierFinding | Retained normalized verifier recommendation when semantic verification was invoked. It MUST remain available if deterministic checks resolve the public status differently. |
 | deterministicRuleFindings | Structured deterministic check results, including conflicts with the verifier recommendation; they MUST NOT be silently discarded. |
 
@@ -180,7 +193,7 @@ The canonical domain shape follows `docs/architecture.md`: `source_id`, `source_
 | verificationRunId | Unique immutable run ID. |
 | source_id, source_version | Exact evidence snapshot. |
 | noteId, noteRevision | Exact candidate note revision. |
-| claimSetId or claimSetDigest | Identity of submitted claims. |
+| claimSetId | Exact immutable Spec 003 `extractionRunId` that owns the submitted claims. |
 | status | Successful only when all validation and verification obligations complete. |
 | findings | Present only for successful run; one finding for each and only each submitted valid claim. |
 | failure | Present for non-success; structured failure code and safe diagnostic detail. |
@@ -189,16 +202,19 @@ The canonical domain shape follows `docs/architecture.md`: `source_id`, `source_
 | evidenceStatusPolicyVersion | Version of the definitions and precedence for the four primary evidence statuses. |
 | idempotencyKey | Required request identity used to make retries resolve to the same run. |
 | modelId, modelVersion, promptVersion | Configured verifier identity and prompt version/hash; explicitly null only when unavailable before invocation. |
+| inputDigest, promptHash, executionTraceId | Input identity digest, prompt hash, and durable execution-trace identifier for replay and evaluation handoff. |
 | correlationId | Required execution trace identifier. |
 | createdAt, startedAt, completedAt | Required lifecycle timestamps for durable execution traceability. |
 
 The executable HTTP schema is [contracts/verification-runs.openapi.yaml](contracts/verification-runs.openapi.yaml). It defines success/failure exclusivity and makes `UNSUPPORTED` with no source spans a successful finding, while invalid required spans produce a non-successful `FAILED_EVIDENCE_INTEGRITY` run.
 
+`claimSetId` is the immutable Spec 003 `extractionRunId`. `idempotencyKey` is bound atomically to a canonical digest of the immutable request identity. Repeating the same key with the same digest returns the original run; repeating it with a different digest returns HTTP `409 IDEMPOTENCY_KEY_CONFLICT` and does not start another verification attempt.
+
 ## API
 
 ### POST /api/v1/verification-runs
 
-Creates a run for one source version and candidate note revision. The request identifies source snapshot, note revision, and claim set. A successful response returns the immutable run and evidence findings. Invalid input, stale provenance, span-integrity errors, and verifier failures return a stable non-success schema and must not imply verification or approval.
+Creates one bounded synchronous run for one source version and candidate note revision. The request identifies source snapshot, note revision, claim set, and immutable claim references. The service resolves those references; it never trusts submitted claim assertion text. HTTP 200 returns the terminal immutable run and either evidence findings or structured failure. The PoC has no HTTP 202 response or polling endpoint. Invalid input, stale provenance, span-integrity errors, and verifier failures return a stable non-success schema and must not imply verification or approval. Any asynchronous replacement requires a separately versioned API contract.
 
 The API neither accepts the candidate note as evidence nor mutates upstream records.
 
@@ -229,7 +245,7 @@ Tests must assert the exact claim ID, primary status, applicable discrepancy typ
 
 - **Safety:** Invalid provenance, spans, structured output, or claim coverage can never yield a successful result.
 - **Deterministic boundary:** Validate inputs, span integrity, contract shape, status normalization, claim coverage, and persistence deterministically. Semantic comparison may use a model through a structured contract.
-- **Traceability:** Reproduce each result to exact source snapshot, note revision, claim set, model/prompt, and annotation policy.
+- **Traceability:** Reproduce each result to exact source snapshot, note revision, immutable claim set, model/prompt, and annotation policy.
 - **Privacy:** Send only the minimum required transcript and claim material to an approved semantic verifier, following system data handling rules.
 - **Observability:** Expose lifecycle state, safe failure code, model/prompt identity, correlation identifiers, latency, inference cost, token usage, rejection reasons, and warning counts without treating invalid evidence as fact or exposing sensitive text.
 
@@ -237,4 +253,4 @@ Tests must assert the exact claim ID, primary status, applicable discrepancy typ
 
 Spec 001 supplies immutable source text/version, Spec 002 the immutable note revision, and Spec 003 stable atomic claims. Spec 005 owns numeric/unit mismatches; Spec 006 owns omissions/completeness.
 
-Done means every valid claim has one status, supported claims have valid grounding, unsupported differs from contradicted, qualifier regressions are covered, invalid provenance and model output cannot succeed, responses are schema-valid and traceable, automated tests pass, and results can be evaluated by the annotated synthetic benchmark in Spec 008.
+Done means every valid claim reference resolves to its exact immutable claim record and has one status, supported claims have valid grounding, unsupported differs from contradicted, qualifier regressions are covered, invalid provenance and model output cannot succeed, responses are schema-valid and traceable, automated tests pass, a complete versioned development evaluation report is reviewed, and results can be evaluated by the annotated synthetic benchmark in Spec 008. Implementation remains blocked until the independent reviewer approves [checklist.md](checklist.md).

@@ -11,9 +11,9 @@
   **Depends on:** T001
 - [ ] T003 [P] Inspect Specs 005–008 interfaces to confirm numerical/unit checks, omissions, approval, and evaluation remain outside this module.  
   **Depends on:** T001
-- [ ] T004 Define the versioned Pydantic and OpenAPI public/internal schemas for EvidenceStatus, SourceSpan, EvidenceFinding, VerificationRun, request, and structured failure. Use the architecture's canonical SourceSpan fields (`source_id`, `source_version`, `start`, `end`), define the explicit transport mapping if needed, include derived quotations only alongside spans, evidence-status-policy version, annotation-policy version, idempotency key, model/prompt identity, timestamps, and correlation ID, and encode enum closure and success/failure exclusivity.
+- [ ] T004 Define the versioned Pydantic and OpenAPI public/internal schemas for EvidenceStatus, SourceSpan, EvidenceFinding, VerificationRun, request, and structured failure. Use the architecture's canonical SourceSpan fields (`source_id`, `source_version`, `start`, `end`), define the explicit transport mapping if needed, include derived quotations only alongside spans, evidence-status-policy version, canonical `EVIDENCE_ANNOTATION-v1` policy version for every finding, idempotency key, model/prompt identity and hash, input digest, timestamps, correlation ID, and execution trace ID, and encode enum closure and success/failure exclusivity.
   **Depends on:** T001, T002
-- [ ] T005 Write Pydantic service-validator and API contract tests before service implementation. Enforce distinct submitted claim IDs; exact, unique response coverage with no missing or foreign claim IDs; success/failure exclusivity; valid end-exclusive Unicode source offsets; source-derived quotation-to-span equality; successful `UNSUPPORTED` findings with no spans or only `CONTEXT_NON_SUPPORTING` context; and invalid required-span failure responses.
+- [ ] T005 Write Pydantic service-validator and API contract tests before service implementation. Enforce distinct submitted claim IDs; immutable claim-reference resolution with unknown/stale/cross-note/resident-mismatch rejection; exact, unique response coverage with no missing or foreign claim IDs; success/failure exclusivity; valid end-exclusive Unicode source offsets; exact one-to-one source-derived quotation-to-span equality; successful `UNSUPPORTED` findings with no spans or only `CONTEXT_NON_SUPPORTING` context; required public execution metadata; and invalid required-span failure responses.
   **Depends on:** T004
 
 ## Phase 1 — Deterministic integrity foundation
@@ -26,7 +26,7 @@
   **Depends on:** T006
 - [ ] T009 Write integrity tests for valid span, stale source identity, reversed/empty/out-of-range offsets, end-exclusive boundary behavior, mismatched quotation, and invalid `CONTEXT_NON_SUPPORTING` pairing. Cover EV-010.
   **Depends on:** T008
-- [ ] T010 Implement input and provenance validation against existing source, note, and claim repositories. Enforce non-empty claim set, unique claim IDs, exact source version, exact note revision, claim ownership, required resident identity/`UNKNOWN` handling, and known-resident equality with the source.
+- [ ] T010 Implement input and provenance validation against existing source, note, and claim repositories. Resolve claim IDs by reference from the immutable Spec 003 extraction run identified by `claimSetId`, enforce non-empty claim set, unique claim IDs, exact source version, exact note revision, claim ownership, and exact synthetic resident equality with the source; reject `UNKNOWN` and never add resident inference/disambiguation.
   **Depends on:** T002, T004
 - [ ] T011 Write repository-backed tests for missing transcript, EV-011 source-version mismatch, unknown claim, duplicate claim, and cross-note/cross-revision claim rejection.  
   **Depends on:** T010
@@ -48,7 +48,7 @@
 
 ## Phase 3 — Verification run orchestration and persistence
 
-- [ ] T018 Create the immutable VerificationRun persistence model and repository/migration using the existing storage conventions. Enforce one finding per run and claim and preserve all mandatory provenance/version metadata.  
+- [ ] T018 Create the immutable VerificationRun persistence model and repository/migration using the existing storage conventions. Enforce one finding per run and claim, preserve all mandatory provenance/version metadata, and atomically bind each idempotency key to one canonical request digest; replay an exact match and reject a differing request with `IDEMPOTENCY_KEY_CONFLICT`.
   **Depends on:** T004, T010
 - [ ] T019 Implement run lifecycle transitions: RECEIVED, VALIDATING, VERIFYING, SUCCEEDED, and every defined terminal failure. Ensure only SUCCEEDED has authoritative findings.  
   **Depends on:** T016, T018
@@ -59,13 +59,13 @@
 
 ## Phase 4 — HTTP API and end-to-end regression suite
 
-- [ ] T022 Add POST /api/v1/verification-runs to the existing API router, its versioned OpenAPI contract, error-envelope, required idempotency, and correlation conventions. Use a local synthetic-demo access boundary and data minimization; do not add accounts, roles, permissions, authentication, or authorization.
+- [ ] T022 Add synchronous POST /api/v1/verification-runs to the existing API router, its versioned OpenAPI contract, bounded timeout, terminal HTTP 200 success/failure envelope, required idempotency, and correlation conventions. Do not add HTTP 202 or polling until a separate asynchronous contract is approved. Use a local synthetic-demo access boundary and data minimization; do not add accounts, roles, permissions, authentication, or authorization.
   **Depends on:** T020
-- [ ] T023 Write API contract tests for successful response, invalid HTTP request, identifiable failed run, response-schema stability, findings/failure exclusivity, required public execution metadata (model/prompt identity, timestamps, correlation ID, and policy versions), and minimum evidence exposure at the applicable review boundary.
+- [ ] T023 Write API contract tests for successful response, invalid HTTP request, identifiable failed run, response-schema stability, findings/failure exclusivity, same-key/same-input idempotent replay, same-key/different-input HTTP 409 conflict, required public execution metadata (model/prompt identity, timestamps, correlation ID, and policy versions), and minimum evidence exposure at the applicable review boundary.
   **Depends on:** T022
 - [ ] T024 Create versioned German-language fixtures and expected findings for EV-001 through EV-014. Each test asserts the `EVIDENCE_ANNOTATION-v1` policy version, claim ID, canonical primary status, required discrepancy labels, span boundaries/text where required, and run state.
   **Depends on:** T017, T023
-- [ ] T025 Add end-to-end tests over immutable source, note revision, extracted claim fixtures, deterministic verifier fake, persistence, and API. Verify all functional requirements FR-07 through FR-13 in scope. Add a separately marked real-configured-verifier development acceptance suite over the fixed synthetic development dataset: assert primary status, discrepancy labels, and evidence integrity, record failures and versions, and never assert exact explanation wording. Held-out evaluation remains Spec 008.
+- [ ] T025 Add end-to-end tests over immutable source, note revision, extracted claim fixtures, deterministic verifier fake, persistence, and API. Verify all functional requirements FR-07 through FR-13 in scope. Add a separately marked real-configured-verifier development acceptance suite over the fixed synthetic development dataset: assert primary status, discrepancy labels, and evidence integrity, record failures and versions, never assert exact explanation wording, and emit the versioned report with exact classification accuracy, critical-error recall, supported-claim false-positive rate, and evidence-grounding validity. Held-out evaluation remains Spec 008.
   **Depends on:** T024
 
 ## Phase 5 — Operations, privacy, and evaluation handoff
@@ -74,7 +74,7 @@
   **Depends on:** T020
 - [ ] T027 Document configuration, approved verifier settings, timeout/retry behavior, run retention, and operational troubleshooting in the project’s standard operations location.  
   **Depends on:** T014, T026
-- [ ] T028 Package the labeled synthetic fixtures and result export needed by Spec 008 to measure classification error and false positives without adding evaluation logic to the online request path.  
+- [ ] T028 Package the labeled synthetic fixtures, critical-case manifest, and versioned development-evaluation report/export needed by Spec 008 to measure classification error and false positives without adding evaluation logic to the online request path.
   **Depends on:** T024
 - [ ] T029 Run the project’s required formatter, static checks, unit tests, contract tests, integration tests, and regression suite. Attach outcomes to the PR.  
   **Depends on:** T025, T026, T027, T028

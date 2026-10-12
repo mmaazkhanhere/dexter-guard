@@ -5,12 +5,16 @@ info:
   description: >-
     Versioned transport contract for Spec 004. Canonical domain SourceSpan fields
     source_id, source_version, start, and end are serialized here as sourceId,
-    sourceVersion, start, and end. Quotations are separate derived fields.
+    sourceVersion, start, and end. Claims are immutable references resolved from
+    the claim repository; quotations are separate derived fields.
 paths:
   /api/v1/verification-runs:
     post:
       operationId: createVerificationRun
-      summary: Create an evidence-verification run for one immutable source and note revision
+      summary: Synchronously create a terminal evidence-verification run for one immutable source and note revision
+      description: >-
+        The PoC performs bounded synchronous verification and returns a durable
+        terminal run under HTTP 200. It defines no HTTP 202 response or polling endpoint.
       requestBody:
         required: true
         content:
@@ -19,7 +23,9 @@ paths:
               $ref: '#/components/schemas/VerificationRunRequest'
       responses:
         '200':
-          description: A durable successful or failed verification run.
+          description: >-
+            A durable successful or failed verification run. Repeating an idempotency
+            key with the same canonical request digest returns this existing run.
           content:
             application/json:
               schema:
@@ -32,6 +38,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: >-
+            The idempotency key is already bound to a different canonical request
+            digest. No new verification run is created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdempotencyConflictError'
 components:
   schemas:
     VerificationRunRequest:
@@ -61,9 +75,13 @@ components:
         claimSetId:
           type: string
           minLength: 1
+          description: Exact immutable Spec 003 extractionRunId that owns every referenced claim.
         idempotencyKey:
           type: string
           minLength: 1
+          description: >-
+            Atomically bound to the canonical input digest. Reuse with identical
+            input replays the original run; reuse with different input returns 409.
         claims:
           type: array
           minItems: 1
@@ -72,18 +90,22 @@ components:
     ClaimInput:
       type: object
       additionalProperties: false
-      required: [claimId, assertion, residentTestId]
+      required: [claimId, residentTestId]
       properties:
         claimId:
           type: string
           minLength: 1
-        assertion:
-          type: string
-          minLength: 1
+          description: >-
+            Immutable Spec 003 claim reference. The service must resolve it, reject
+            unknown/stale/cross-note references, and use the stored assertion rather
+            than client-submitted claim text.
         residentTestId:
           type: string
           minLength: 1
-          description: Must equal the source resident or be the explicit value UNKNOWN.
+          pattern: '^[A-Za-z0-9][A-Za-z0-9._-]*$'
+          not:
+            const: UNKNOWN
+          description: Must exactly equal the immutable source and resolved claim resident. The PoC does not infer residents.
     EvidenceStatus:
       type: string
       enum: [SUPPORTED, UNSUPPORTED, CONTRADICTED, UNCERTAIN]
@@ -154,6 +176,7 @@ components:
         - sourceSpans
         - evidenceQuotes
         - discrepancies
+        - policyVersion
         - verifierFinding
         - deterministicRuleFindings
       properties:
@@ -180,6 +203,7 @@ components:
         policyVersion:
           type: string
           const: EVIDENCE_ANNOTATION-v1
+          description: The canonical annotation-policy version; certainty has no separate policy version.
         verifierFinding:
           $ref: '#/components/schemas/VerifierFinding'
         deterministicRuleFindings:
@@ -200,6 +224,10 @@ components:
                     evidenceRole:
                       const: CONTEXT_NON_SUPPORTING
                   required: [evidenceRole]
+            description: >-
+              Unsupported findings may have zero spans and quotations, or one-to-one
+              context span/quotation pairs only. Pairing and source-substring checks
+              are enforced by the runtime contract validator.
         - if:
             properties:
               status:
@@ -232,12 +260,15 @@ components:
         - noteRevision
         - claimSetId
         - idempotencyKey
+        - inputDigest
         - evidenceStatusPolicyVersion
         - annotationPolicyVersion
         - modelId
         - modelVersion
         - promptVersion
+        - promptHash
         - correlationId
+        - executionTraceId
         - createdAt
         - startedAt
         - completedAt
@@ -260,6 +291,10 @@ components:
           type: string
         idempotencyKey:
           type: string
+        inputDigest:
+          type: string
+          minLength: 1
+          description: Digest of the immutable request identity used for replay and evaluation handoff.
         evidenceStatusPolicyVersion:
           type: string
           const: EVIDENCE_STATUS-v1
@@ -275,9 +310,16 @@ components:
         promptVersion:
           type: [string, 'null']
           description: Version or hash of the verifier prompt, or null when unavailable.
+        promptHash:
+          type: [string, 'null']
+          description: Immutable hash of the exact verifier prompt, or null when unavailable before invocation.
         correlationId:
           type: string
           minLength: 1
+        executionTraceId:
+          type: string
+          minLength: 1
+          description: Durable trace identifier linking provider activity, validation, and persistence.
         createdAt:
           type: string
           format: date-time
@@ -297,6 +339,18 @@ components:
           properties:
             status:
               const: SUCCEEDED
+            modelId:
+              type: string
+              minLength: 1
+            modelVersion:
+              type: string
+              minLength: 1
+            promptVersion:
+              type: string
+              minLength: 1
+            promptHash:
+              type: string
+              minLength: 1
             findings:
               type: array
               minItems: 1
@@ -327,3 +381,14 @@ components:
           type: string
         field:
           type: string
+    IdempotencyConflictError:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          const: IDEMPOTENCY_KEY_CONFLICT
+        message:
+          type: string
+          minLength: 1
