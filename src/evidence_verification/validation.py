@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 import hashlib
 import json
+import sqlite3
 
 from .contracts import EvidenceFinding, VerificationRunRequest, VerificationRunSucceeded
 
@@ -16,6 +17,15 @@ class VerificationIntegrityError(ValueError):
 
 class IdempotencyKeyConflictError(VerificationIntegrityError):
     """Raised when an idempotency key is reused for different request data."""
+
+
+@dataclass(frozen=True)
+class IdempotencyBinding:
+    """The durable idempotency association for one verification request."""
+
+    verification_run_id: str
+    input_digest: str
+    created: bool
 
 
 @dataclass(frozen=True)
@@ -65,6 +75,80 @@ def validate_idempotency_replay(
             "idempotency key is already bound to a different request identity"
         )
     return incoming_digest
+
+
+class SqliteIdempotencyRegistry:
+    """Atomically bind verification idempotency keys to canonical input digests.
+
+    A caller creates and persists a new run only when ``bind_or_replay`` returns
+    ``created=True``. The existing run ID is returned for an exact replay.
+    """
+
+    def __init__(self, connection: sqlite3.Connection) -> None:
+        self._connection = connection
+        self._connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS verification_idempotency (
+                idempotency_key TEXT PRIMARY KEY,
+                input_digest TEXT NOT NULL,
+                verification_run_id TEXT NOT NULL
+            )
+            """
+        )
+        self._connection.commit()
+
+    def bind_or_replay(
+        self,
+        request: VerificationRunRequest,
+        *,
+        verification_run_id: str,
+    ) -> IdempotencyBinding:
+        """Return an existing run for an exact replay or reserve a new binding.
+
+        ``BEGIN IMMEDIATE`` serializes competing inserts on one SQLite database,
+        so a matching retry cannot trigger a second model invocation.
+        """
+
+        input_digest = canonical_request_digest(request)
+        try:
+            self._connection.execute("BEGIN IMMEDIATE")
+            row = self._connection.execute(
+                """
+                SELECT input_digest, verification_run_id
+                FROM verification_idempotency
+                WHERE idempotency_key = ?
+                """,
+                (request.idempotency_key,),
+            ).fetchone()
+            if row is not None:
+                stored_digest, stored_run_id = row
+                if stored_digest != input_digest:
+                    raise IdempotencyKeyConflictError(
+                        "idempotency key is already bound to a different request identity"
+                    )
+                self._connection.commit()
+                return IdempotencyBinding(
+                    verification_run_id=stored_run_id,
+                    input_digest=stored_digest,
+                    created=False,
+                )
+            self._connection.execute(
+                """
+                INSERT INTO verification_idempotency
+                    (idempotency_key, input_digest, verification_run_id)
+                VALUES (?, ?, ?)
+                """,
+                (request.idempotency_key, input_digest, verification_run_id),
+            )
+            self._connection.commit()
+            return IdempotencyBinding(
+                verification_run_id=verification_run_id,
+                input_digest=input_digest,
+                created=True,
+            )
+        except Exception:
+            self._connection.rollback()
+            raise
 
 
 def validate_claim_references(
@@ -140,6 +224,8 @@ def validate_successful_run(
         raise VerificationIntegrityError("run note or claim-set identity does not match the request")
     if run.idempotency_key != request.idempotency_key:
         raise VerificationIntegrityError("run idempotency key does not match the request")
+    if run.input_digest != canonical_request_digest(request):
+        raise VerificationIntegrityError("run inputDigest does not match the canonical request identity")
 
     requested_ids = {claim.claim_id for claim in request.claims}
     finding_ids = [finding.claim_id for finding in run.findings]

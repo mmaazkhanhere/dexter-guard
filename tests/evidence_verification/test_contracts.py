@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import sqlite3
 
 import pytest
 import yaml
@@ -11,6 +12,7 @@ from evidence_verification.contracts import EvidenceFinding, VerificationRunRequ
 from evidence_verification.validation import (
     ImmutableClaimReference,
     IdempotencyKeyConflictError,
+    SqliteIdempotencyRegistry,
     VerificationIntegrityError,
     canonical_request_digest,
     validate_claim_references,
@@ -63,8 +65,12 @@ def finding(claim_id: str = "c1", *, status: str = "SUPPORTED", start: int = STA
     )
 
 
-def run(*findings: EvidenceFinding) -> VerificationRunSucceeded:
+def run(
+    *findings: EvidenceFinding,
+    digest_request: VerificationRunRequest | None = None,
+) -> VerificationRunSucceeded:
     now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    digest_request = digest_request or request(*(item.claim_id for item in findings))
     return VerificationRunSucceeded.model_validate(
         {
             "verificationRunId": "run-1",
@@ -74,7 +80,7 @@ def run(*findings: EvidenceFinding) -> VerificationRunSucceeded:
             "noteRevision": 2,
             "claimSetId": "claim-set-1",
             "idempotencyKey": "key-1",
-            "inputDigest": "sha256:input",
+            "inputDigest": canonical_request_digest(digest_request),
             "evidenceStatusPolicyVersion": "EVIDENCE_STATUS-v1",
             "annotationPolicyVersion": "EVIDENCE_ANNOTATION-v1",
             "modelId": "model-1",
@@ -145,10 +151,30 @@ def test_idempotency_replays_same_data_and_rejects_different_data() -> None:
         validate_idempotency_replay(changed, stored_input_digest=digest)
 
 
+def test_sqlite_idempotency_registry_replays_or_rejects_atomically() -> None:
+    registry = SqliteIdempotencyRegistry(sqlite3.connect(":memory:"))
+    original = request("c1")
+
+    created = registry.bind_or_replay(original, verification_run_id="run-1")
+    replayed = registry.bind_or_replay(original, verification_run_id="run-2")
+
+    assert created.created is True
+    assert replayed.created is False
+    assert replayed.verification_run_id == "run-1"
+    assert replayed.input_digest == created.input_digest
+
+    changed_payload = original.model_dump(by_alias=True)
+    changed_payload["sourceVersion"] = 2
+    changed = VerificationRunRequest.model_validate(changed_payload)
+    with pytest.raises(IdempotencyKeyConflictError, match="different request identity"):
+        registry.bind_or_replay(changed, verification_run_id="run-3")
+
+
 @pytest.mark.parametrize("findings", [(finding("c1"),), (finding("c1"), finding("c1")), (finding("c1"), finding("foreign"))])
 def test_successful_run_requires_exact_distinct_claim_coverage(findings: tuple[EvidenceFinding, ...]) -> None:
+    submitted_request = request("c1", "c2")
     with pytest.raises(VerificationIntegrityError, match="claim IDs|claimId"):
-        validate_successful_run(request("c1", "c2"), run(*findings), SOURCE)
+        validate_successful_run(submitted_request, run(*findings, digest_request=submitted_request), SOURCE)
 
 
 def test_source_span_is_end_exclusive_and_quote_is_source_derived() -> None:
@@ -161,6 +187,15 @@ def test_source_span_is_end_exclusive_and_quote_is_source_derived() -> None:
         validate_successful_run(request("c1"), run(finding(end=len(SOURCE) + 1)), SOURCE)
     with pytest.raises(VerificationIntegrityError, match="exact immutable-source substring"):
         validate_successful_run(request("c1"), run(finding(text="invented quote")), SOURCE)
+
+
+def test_successful_run_requires_the_canonical_input_digest() -> None:
+    valid_run = run(finding())
+    payload = valid_run.model_dump(by_alias=True)
+    payload["inputDigest"] = "sha256:wrong"
+    incorrect_digest_run = VerificationRunSucceeded.model_validate(payload)
+    with pytest.raises(VerificationIntegrityError, match="inputDigest"):
+        validate_successful_run(request("c1"), incorrect_digest_run, SOURCE)
 
 
 def test_source_identity_must_match_the_requested_immutable_source() -> None:

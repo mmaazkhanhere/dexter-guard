@@ -11,7 +11,9 @@ from .contracts import (
 )
 from .validation import (
     ImmutableClaimReference,
+    IdempotencyBinding,
     IdempotencyKeyConflictError,
+    SqliteIdempotencyRegistry,
     VerificationIntegrityError,
     canonical_request_digest,
     validate_claim_references,
@@ -25,7 +27,9 @@ __all__ = [
     "EvidenceRole",
     "EvidenceStatus",
     "ImmutableClaimReference",
+    "IdempotencyBinding",
     "IdempotencyKeyConflictError",
+    "SqliteIdempotencyRegistry",
     "SourceSpan",
     "VerificationIntegrityError",
     "VerificationRunRequest",
