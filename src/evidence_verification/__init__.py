@@ -41,6 +41,7 @@ from .validation import (
     validate_successful_run,
 )
 from .spans import SourceSpanValidationError, SourceTextIndex, derive_source_quote
+from .discovery import CandidateEvidence, discover_candidate_evidence
 
 __all__ = [
     "EvidenceFinding",
@@ -81,4 +82,6 @@ __all__ = [
     "SourceSpanValidationError",
     "SourceTextIndex",
     "derive_source_quote",
+    "CandidateEvidence",
+    "discover_candidate_evidence",
 ]

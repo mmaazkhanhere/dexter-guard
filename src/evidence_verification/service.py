@@ -35,6 +35,7 @@ from .provider import (
 )
 from .repository import InMemoryVerificationRepository, VerificationRunRepository
 from .observability import VerificationMetrics
+from .discovery import discover_candidate_evidence
 from .validation import (
     IdempotencyKeyConflictError,
     VerificationIntegrityError,
@@ -130,7 +131,8 @@ class VerificationService:
             )
 
         try:
-            response = self._invoke_verifier(claims, source.transcript_text, run_id)
+            candidate_evidence = discover_candidate_evidence(claims, source.transcript_text)
+            response = self._invoke_verifier(candidate_evidence, source.transcript_text, run_id)
         except (ProviderTimeoutError, FutureTimeoutError, TimeoutError):
             self.metrics.increment("provider_failures")
             return self._persist_failure(
