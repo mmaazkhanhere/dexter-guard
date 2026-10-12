@@ -7,7 +7,7 @@
 
 No installed `specify`/`speckit` command or template directory was found under `.specify`; the repository's established `specify → clarify → plan → tasks → analyze` artifact convention was followed manually. This is a documentation consistency review, not a simulated tool execution or implementation/test claim.
 
-**Result: internally consistent with explicit external dependency gates.** No application source, dependency, test, or upstream contract was changed. The feature is ready for independent requirements-quality review; implementation is blocked until the unchecked checklist gate and UQ-001–UQ-005 are resolved or accepted as explicit implementation dependencies.
+**Result: internally consistent after reconciling Spec 006 policy keys, display-only suggestions, and unresolved source-item blocking.** No application source, dependency, test, or upstream contract was changed. The feature is ready for independent requirements-quality review; implementation is blocked only by the unchecked reviewer-owned checklist gate.
 
 ## Requirement coverage
 
@@ -17,7 +17,7 @@ No installed `specify`/`speckit` command or template directory was found under `
 | FR-17 | Context, claims/evidence/highlights | `GET /reviews/{noteId}` | T009–T012 |
 | FR-18 | Independent decisions | `POST .../decisions` | T013–T015 |
 | FR-19 | Immutable revisions/conflict | `POST .../revisions` | T016–T017, T020 |
-| FR-20 | Safe optional suggestions | `SuggestedCorrection`, decisions/revisions | T018–T020 |
+| FR-20 | Safe optional suggestions | Structured `SuggestedCorrection`; raw Spec 006 suggestions remain display-only | T018–T020 |
 | FR-21 | Claim feedback only | `POST .../claim-reverification` | T021–T025 |
 | FR-22 | Exact full-note aggregate | `POST .../full-verifications` | T021–T025 |
 | FR-23 | Critical blocking | approval error contract | T026, T028 |
@@ -30,6 +30,7 @@ No installed `specify`/`speckit` command or template directory was found under `
 | --- | --- |
 | Correct immutable source-version spans | Spec scope/HR-001/HR-012; ReviewFinding/EvidenceDisplay constraints; T010/T024. |
 | Candidate never evidence for itself | Scope, plan highlighting boundary, database invariant 4; T010/T021. |
+| Spec 006 policy keys / unresolved items | Explicit omission-key mapping; unresolved source items block approval; raw suggestions cannot be applied | Spec 006 CL-004, CL-010, CL-014, CL-015; T009, T018, T031 |
 | Missing evidence differs from contradiction | Severity/context rules, HR-002, evidence availability schema; T010–T012. |
 | Suggestions do not add unsupported facts | SuggestedCorrection `USABLE` support requirements, HR-011; T018–T019. |
 | Edits invalidate obsolete verification | lifecycle, revision rules, HR-004/005/017; T016–T017/T024. |
@@ -43,9 +44,9 @@ No installed `specify`/`speckit` command or template directory was found under `
 - Spec 002 retains note creation/revision ownership; Spec 007 requests an immutable successor rather than mutating it.
 - Spec 003 retains claim extraction. Its review-facing invocation is not assumed available.
 - Spec 004 retains evidence statuses and semantic verification; Spec 007 only maps severity/displays results.
-- Spec 005 retains deterministic validation; its alignment prerequisite is an explicit external dependency.
+- Spec 005 retains deterministic validation; its planned adapter retains sole ownership of resolving existing alignments.
 - Spec 006 retains source coverage and upstream `severityPolicyKey`; final severity/approval remains Spec 007-owned.
 
-## External gates and open decisions
+## Resolved integration decisions
 
-UQ-001 through UQ-005 in [research.md](research.md) are intentionally unresolved, not hidden assumptions. In particular, the producer vocabulary for coverage severity keys and the complete source-fact/alignment adapter are required before a valid full-note verifier can be implemented. No workaround that reparses source/note prose, guesses severity, or weakens approval eligibility is permitted.
+The formerly open choices are fixed in [clarify.md](clarify.md) and [research.md](research.md): explicit mappings for the actual Spec 006 omission keys, a Spec 005-owned reference-only deterministic-validation adapter, in-process claim extraction, idempotent SQLite schema initialization, a blocking policy for empty claim sets, display-only raw coverage suggestions, and blocking unresolved source items. No workaround that reparses source/note prose, guesses severity, or weakens approval eligibility is permitted.

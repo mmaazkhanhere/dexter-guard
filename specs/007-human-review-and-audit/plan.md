@@ -52,9 +52,9 @@ The following are real dependencies; implementation must confirm them rather tha
 | --- | --- | --- |
 | Source resolver (001) | Source service/repository and source-span resolver; immutable identities exist. | `get_source(sourceId, sourceVersion)` and validated span resolution. |
 | Note repository (002) | `NursingNoteService.create_revision` and repository conventions exist; note APIs cover generate/import. | Revision adapter must accept expected revision and create immutable successor with reviewer label; do not invent a mutation endpoint. |
-| Claim extraction (003) | `ClaimExtractionService.extract_claims` and immutable claim repository exist. | Inject `ClaimExtractionPort.extract(noteRevisionId)` and retrieve exact claim set. Its public HTTP facade was not found; this is an external dependency. |
+| Claim extraction (003) | `ClaimExtractionService.extract_claims` and immutable claim repository exist. | Inject the local in-process `ClaimExtractionPort.extract(noteRevisionId)` and retrieve the exact claim set. No new public endpoint is introduced. |
 | Evidence verification (004) | Published synchronous terminal HTTP contract and `VerificationService.verify`. | Adapter sends the resolved current claim set with a fresh idempotency key and records returned run ID. |
-| Deterministic validation (005) | Published run endpoint/service; requires source facts, claim IDs, and explicit alignments. | `DeterministicValidationPort` must obtain only existing validated source facts/alignments. Origin/availability of full-note alignment set is unresolved; no prose parsing fallback is permitted. |
+| Deterministic validation (005) | Published run endpoint/service; requires source facts, claim IDs, and explicit alignments. | A Spec 005-owned `DeterministicValidationPort.run_for_revision` resolves existing immutable source facts/explicit alignments then invokes the service. Spec 007 supplies references only and never builds alignments from prose. |
 | Source coverage (006) | Published terminal run endpoint/service; consumes source-fact extraction run and claim set. | Adapter builds only documented reference-only request. The extraction run is an explicit prerequisite. |
 | API host | `source_ingestion.app.create_app` wires optional upstream services. | Add a separate review router/dependency injection, only after a review service exists; no current review route is claimed. |
 
@@ -65,11 +65,11 @@ The following are real dependencies; implementation must confirm them rather tha
 1. Resolve note and requested/current revision; resolve its immutable source reference.
 2. Load source text only for the authorised review response, current revision body, claim set/run references, upstream runs, review decisions, suggestions, dispositions, and audit events.
 3. Validate every evidence `SourceSpan` against the immutable source. Derive snippets from storage. For invalid/missing spans, expose an `evidenceAvailability` state (`AVAILABLE`, `MISSING`, `INVALID`) and no offsets suitable for highlighting.
-4. Map each upstream finding/failed component to one `ReviewFinding` using `REVIEW_SEVERITY-v1`; preserve upstream owner/ID/status/rule IDs verbatim.
+4. Map each upstream finding/failed component to one `ReviewFinding` using `REVIEW_SEVERITY-v1`; preserve upstream owner/ID/status/rule IDs verbatim. Map the actual Spec 006 policy keys, not Spec 007 severity labels, and mark unresolved source items as approval-blocking.
 
 ### Save/accept correction
 
-1. Validate current `expectedRevision`, non-empty content, synthetic-reviewer label, and optional suggestion/finding reference.
+1. Validate current `expectedRevision`, non-empty content, synthetic-reviewer label, and optional validated `SuggestedCorrection` reference. A raw Spec 006 suggestion is not an editable correction input.
 2. In a write transaction, assert latest revision equals expected, append successor revision, append `NOTE_REVISION_CREATED`, and record the edit source (manual or accepted suggestion).
 3. Project latest note as `AWAITING_FULL_VERIFICATION`. Do not mutate prior findings/runs; calculate their staleness from revision identity.
 4. Return the successor. A failed expected-revision condition writes nothing and returns `409 STALE_REVISION`.
@@ -83,11 +83,11 @@ The following are real dependencies; implementation must confirm them rather tha
 ### Full-note verification
 
 1. Read the exact latest revision in the transaction/snapshot used to create a `FullNoteVerification` request identity.
-2. Run/retrieve a fresh Spec 003 extraction result for that revision. A failed/empty result is handled according to the upstream contract and policy; it never silently reuses predecessor claims.
+2. Run/retrieve a fresh Spec 003 extraction result through the in-process port for that revision. A failed result, or a valid `EMPTY` result, makes the aggregate invalid (`EMPTY_CLAIM_SET_REQUIRES_REVIEW` for the latter); it never silently reuses predecessor claims.
 3. Invoke Spec 004 over the complete current claim set.
-4. Invoke Spec 005 only with validated existing source facts and explicit alignments; preserve `NOT_EVALUABLE` outcomes. If required inputs/dependency are unavailable, record an invalid/failed component and block approval rather than synthesize alignments.
+4. Invoke the Spec 005-owned `DeterministicValidationPort.run_for_revision` only with validated existing source facts and explicit alignments; preserve `NOT_EVALUABLE` outcomes. If required inputs/dependency are unavailable, record an invalid/failed component and block approval rather than synthesize alignments.
 5. Invoke Spec 006 with its source-fact extraction run, exact claim set, source identity/hash/normalization, and optional linked 004/005 runs.
-6. Validate that every success run binds to the identical source and note revision, has a valid terminal success shape, and contains expected coverage; otherwise create `INVALID`/`FAILED` aggregate. Persist the component references and outcome append-only.
+6. Validate that every success run binds to the identical source and note revision, has a valid terminal success shape, and contains expected coverage. A successful coverage run with unresolved source items is retained but marked not approval-eligible. Otherwise create `INVALID`/`FAILED` aggregate. Persist the component references and outcome append-only.
 7. The valid aggregate can set latest-note projection to `IN_REVIEW` or `ELIGIBLE_FOR_APPROVAL` only after policy checks. It is never an approval.
 
 No distributed transaction is introduced. Upstream immutable terminal run records can be created before the local aggregate commits; idempotency keys and aggregate request digest make retries safe. The aggregate is committed only when its complete terminal state is known. If a later edit wins, the completed aggregate remains historical and is naturally stale.
@@ -102,7 +102,7 @@ There is no attempt to lock human editing while verification runs. Immutable run
 
 ## Persistent storage strategy
 
-New review-owned tables/records are append-only logical history; upstream records remain their owners' tables/repositories.
+New review-owned tables/records are append-only logical history; upstream records remain their owners' tables/repositories. The review repository initializes its local SQLite schema idempotently with `CREATE TABLE IF NOT EXISTS`; no migration framework is introduced.
 
 | Record | Key / purpose |
 | --- | --- |
@@ -114,7 +114,7 @@ New review-owned tables/records are append-only logical history; upstream record
 | `note_disposition` | Immutable approval/rejection record bound to one revision and full verification when approved. |
 | `audit_event` | Append-only ordered actor/action/target/references/payload-digest record; full source/note bodies are not duplicated into telemetry. |
 
-SQLite constraints: unique revision identity; unique upstream finding reference per immutable upstream run; foreign keys to known note/source/review records; immutable insert-only repository methods; decision/disposition audit events written in the same transaction; and unique approval per revision. The final schema/migration mechanism remains to be selected from existing SQLite conventions because none was identified as a shared migration framework.
+SQLite constraints: unique revision identity; unique upstream finding reference per immutable upstream run; foreign keys to known note/source/review records; immutable insert-only repository methods; decision/disposition audit events written in the same transaction; and unique approval per revision.
 
 ## Error handling and privacy
 

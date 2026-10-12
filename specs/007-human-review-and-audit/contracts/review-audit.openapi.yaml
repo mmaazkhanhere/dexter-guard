@@ -293,7 +293,7 @@ components:
     SuggestedCorrection:
       type: object
       additionalProperties: false
-      required: [suggestionId, findingId, baseRevision, replacement, targetNoteSpan, supportStatus, supportSpans, createdAt]
+      required: [suggestionId, findingId, baseRevision, replacement, targetNoteSpan, supportStatus, supportSpans, generatedBy, createdAt]
       properties:
         suggestionId: { type: string, minLength: 1 }
         findingId: { type: string, minLength: 1 }
@@ -302,6 +302,7 @@ components:
         targetNoteSpan: { $ref: '#/components/schemas/NoteSpan' }
         supportStatus: { enum: [USABLE, UNUSABLE, REJECTED] }
         supportSpans: { type: array, items: { $ref: '#/components/schemas/SourceSpan' } }
+        generatedBy: { enum: [REVIEWER, SPEC_007_CORRECTION_ADAPTER] }
         createdAt: { type: string, format: date-time }
     ReviewContext:
       type: object

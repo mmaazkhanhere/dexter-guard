@@ -7,7 +7,7 @@ This is a validation guide for the planned feature, not implementation code. The
 - Python 3.11+ and the repository's existing virtual environment/tooling.
 - The existing local FastAPI host and configured in-process services for Specs 001–006.
 - Synthetic German source/note data only. Do not submit real resident or employee data.
-- Before end-to-end review validation, the unresolved adapters in [research.md](research.md) must be implemented: claim extraction, Spec 005 source-fact/alignment provision, and review persistence/router wiring.
+- Before end-to-end review validation, implement the planned adapters in [research.md](research.md): in-process claim extraction, Spec 005 source-fact/alignment provision, and review persistence/router wiring.
 
 ## Existing commands
 
@@ -57,7 +57,7 @@ The fixture is designed to expose negation, numeric, and assistance discrepancie
 2. Open the proposed `GET /api/v1/reviews/{noteId}` context for the latest revision.
 3. Inspect each finding. Selecting the negation/numeric/transfer finding should show the relevant candidate claim and the source excerpt only if its source span is valid. A deliberately malformed or source-version-mismatched span must display `INVALID` evidence availability, not a highlight.
 4. Try approving the initial note. The proposed approval endpoint must reject it because critical findings remain open and a valid final full-note verification is absent.
-5. Correct the note manually or accept a source-grounded suggestion. Submit the current `expectedRevision`; verify the response creates the next immutable revision and leaves the original in audit history.
+5. Correct the note manually or accept a separately validated `SuggestedCorrection`. A raw Spec 006 coverage suggestion remains display-only. Submit the current `expectedRevision`; verify the response creates the next immutable revision and leaves the original in audit history.
 6. Trigger a claim-level re-verification for one changed claim. Verify its response declares `approvalEligible: false`.
 7. Trigger full-note verification for the new revision. Confirm its aggregate references the exact source ID/version, current revision, new claim set, and terminal runs from Specs 004, 005, and 006.
 8. Edit the note again after a successful aggregate. Confirm the prior aggregate is stale and approval is blocked until another full-note verification completes.
@@ -75,6 +75,7 @@ The fixture is designed to expose negation, numeric, and assistance discrepancie
 | Malformed/failed full verification | Explicit failure; approval endpoint returns `409 APPROVAL_PRECONDITION_FAILED`. |
 | Concurrent save/approval | Losing command gets `409 STALE_REVISION`/precondition failure and writes no invalid disposition. |
 | Rejection after failed verification | Succeeds with reviewer label and reason. |
+| Successful coverage run with unresolved source item | Approval remains blocked despite runtime completeness or acknowledgement/adjudication. |
 
 ## Test execution after implementation
 

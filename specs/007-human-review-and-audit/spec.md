@@ -35,7 +35,7 @@ The PoC uses synthetic German nursing documentation only, one resident per trans
 | Spec 005 deterministic validation | Validation findings/runs | Owns numeric, unit, structural, and evidence-reference rules; Spec 007 assigns severity only. |
 | Spec 006 source coverage | Coverage findings/runs and suggestions | Owns source-to-note completeness assessment; Spec 007 assigns final severity and never changes assessment results. |
 
-The review-facing claim-extraction invocation, source-fact/alignment inputs needed by Spec 005, and one atomic cross-component full-note orchestration boundary are not yet published contracts. They are external implementation dependencies defined in this feature's plan and contracts; their availability must be confirmed before implementation starts.
+The review-facing claim-extraction invocation, the Spec 005 source-fact/alignment adapter, and the atomic full-note orchestration boundary are planned integration work, not existing public contracts. Their feature-local decisions are defined in this specification and plan; implementation must not substitute a prose-parsing or algorithm-duplicating workaround.
 
 ## Reviewer user stories
 
@@ -105,15 +105,16 @@ Severity is a documentation-fidelity priority, not a medical risk judgement. The
 1. Evidence-integrity/provenance failures (`EVD-001`–`EVD-003`, source-version/hash/quotation mismatch, invalid claim or span) and any terminal full-note component failure are **CRITICAL** operational findings.
 2. Spec 004 `CONTRADICTED` is **CRITICAL**. `UNSUPPORTED` and `UNCERTAIN` are **MAJOR**.
 3. Spec 005 `FAIL` outcomes other than the evidence-integrity rules and `NOT_EVALUABLE` outcomes are **MAJOR**; explicitly non-blocking informational rule warnings, if introduced by a versioned upstream contract, are **MINOR**.
-4. Spec 006 findings use its non-null `severityPolicyKey` only when it is recognised by the versioned mapping. The initial mapping is `critical` → **CRITICAL**, `major` → **MAJOR**, `minor` → **MINOR** (case-insensitive exact token after documented normalisation). An unrecognised or absent key is **MAJOR** for `MISSING`, `DISTORTED`, or `UNCERTAIN`, and **MINOR** only for a future explicitly informational coverage finding.
+4. Spec 006 findings retain their producer policy keys and Spec 007 maps the current `COVERAGE_EXPECTATION-v1` keys deterministically: `MEASUREMENT_OMISSION` → **CRITICAL**; `SYMPTOM_OMISSION`, `MOBILITY_ASSISTANCE_OMISSION`, `CARE_ACTION_OMISSION`, and `UNCERTAINTY_OMISSION` → **MAJOR**. An unrecognised or absent key is **MAJOR** for `MISSING`, `DISTORTED`, or `UNCERTAIN`, and **MINOR** only for a future explicitly informational coverage finding. Spec 007 severity labels are never sent back as Spec 006 policy keys.
 5. Any new/unknown upstream finding type is **CRITICAL** until `REVIEW_SEVERITY-v1` is revised and approved. This is a fail-safe compatibility rule, not an interpretation of the finding.
 
-The current Spec 006 contract permits a free-form optional `severityPolicyKey`; its producer-side vocabulary is an explicit external dependency. Ambiguous clinical importance is not inferred by a model. It must be encoded in a reviewed policy-key mapping or remain conservatively handled as above.
+The current Spec 006 contract permits a free-form optional `severityPolicyKey`; the current omission keys and their mapping above are the reviewed v1 vocabulary. Ambiguous clinical importance is not inferred by a model. An unknown producer key follows the conservative fallback and requires a policy update before it can receive a lower severity.
 
 ### Finding decisions
 
 - New imported findings are `OPEN`.
 - A valid accepted suggestion or manual edit creates a new revision; all findings attached to the predecessor become `STALE` for approval, while their decision events remain immutable.
+- Spec 006 `CoverageFinding.suggestion` is a source-derived display aid only under CL-014. It cannot be accepted directly. A separate `SuggestedCorrection` is `USABLE` only after Spec 007 validates a target note span, replacement text, and source support; otherwise it remains `UNUSABLE`.
 - An `ACKNOWLEDGED` decision records that a reviewer saw a finding but leaves it `OPEN`.
 - A `DISPUTED` decision requires non-blank rationale and leaves the finding `OPEN` until an adjudication records a decision.
 - An `ADJUDICATED` decision requires non-blank rationale, reviewer label, and an allowed outcome. It may set a non-critical finding to `ADJUDICATED`/resolved for that revision; it cannot resolve a critical evidence/integrity blocker without a later successful full-note verification of a successor/current revision. A critical finding cannot be cleared merely by acknowledgement, dispute, or adjudication.
@@ -137,6 +138,8 @@ The backend may approve only when, in one database transaction/compare-and-swap 
 4. no `OPEN` or `STALE` critical finding remains for that revision, and no current critical operational verification finding exists;
 5. all policy-required decision/adjudication records are complete; and
 6. no verification component is failed, invalid, or incomplete.
+
+A successful Spec 006 run containing any unresolved source item (`unresolvedSourceItems > 0` or an unresolved-item `UNCERTAIN` assessment) is never approval-eligible, even if runtime completeness is high or a reviewer records acknowledgement/adjudication. A later full-note run must resolve the source item before approval.
 
 The transaction writes the approval disposition and audit event only if the checks and latest-revision predicate still hold. A concurrent edit therefore makes approval fail with `409 STALE_REVISION`/`APPROVAL_PRECONDITION_FAILED`, not approve an earlier revision. Rejection requires only the current revision reference, reviewer label, and reason; it remains possible after verification failure.
 
@@ -163,6 +166,7 @@ All scenarios use synthetic German nursing documentation and synthetic resident 
 | HR-015 | **Given** a stale revision or a concurrent edit between eligibility evaluation and approval, **when** approval is requested, **then** atomic comparison fails and no approval is written. |
 | HR-016 | **Given** a fully corrected synthetic German note and valid successful components for its latest revision/source, **when** all policy-required decisions are complete and approval is requested, **then** it is approved and audit history contains the disposition. |
 | HR-017 | **Given** a full-note verification succeeds, **when** the note is edited afterward, **then** its status returns to `AWAITING_FULL_VERIFICATION` and a new full-note verification is required before approval. |
+| HR-018 | **Given** a successful Spec 006 run contains an unresolved source item, **when** approval is attempted, **then** the backend blocks approval regardless of runtime completeness or finding acknowledgement/adjudication. |
 
 ## Edge cases and failure behaviour
 
@@ -179,12 +183,12 @@ All scenarios use synthetic German nursing documentation and synthetic resident 
 - 100% of approval test attempts with stale, failed, invalid, incomplete, source-mismatched, or critical-open verification inputs are rejected by the backend.
 - 100% of accepted edits/suggestions create a new immutable revision; historical revisions and decisions remain retrievable.
 - 100% of rendered evidence excerpts in acceptance tests are derived from valid spans for the exact immutable source version; invalid/missing spans show no misleading highlight.
-- Synthetic German acceptance fixtures cover HR-001 through HR-017, including direct API guard-bypass attempts.
+- Synthetic German acceptance fixtures cover HR-001 through HR-018, including direct API guard-bypass attempts and unresolved-source-item blocking.
 
-## Assumptions and unresolved questions
+## Assumptions and resolved integration decisions
 
 1. The existing single-process FastAPI application is the integration host; a React application boundary exists only as a target architecture, not as an inspected implementation in this repository.
-2. The exact producer vocabulary for Spec 006 `severityPolicyKey` is not yet normative. `REVIEW_SEVERITY-v1` defines conservative consumer handling, but the shared vocabulary must be approved before implementation.
-3. Spec 005 requires immutable source-fact and alignment inputs. The source of review-orchestrated alignments and whether an empty applicable alignment set is a successful no-findings run or an explicit not-evaluable gate must be resolved through the Spec 005 boundary before implementation.
-4. Spec 003 has a service/repository contract but no verified public claim-extraction endpoint in the inspected route inventory. The full-note orchestrator needs an injected service port or a new versioned endpoint; the plan selects an injected port initially.
-5. The repository contains independent in-memory/SQLite abstractions but no inspected migration framework. The storage task must select the existing SQLite convention without adding infrastructure.
+2. Spec 006 keys are mapped by `REVIEW_SEVERITY-v1` as documented: `MEASUREMENT_OMISSION` is critical; symptom, mobility, care-action, and uncertainty omission keys are major; all other values follow conservative fallback behaviour.
+3. A Spec 005-owned reference-only deterministic-validation adapter resolves existing immutable source facts and explicit alignments; Spec 007 does not create them.
+4. The local PoC uses in-process claim extraction, not a new public endpoint.
+5. The review repository uses idempotent local SQLite schema initialization without introducing a migration dependency. A valid empty claim set blocks approval as `EMPTY_CLAIM_SET_REQUIRES_REVIEW`.

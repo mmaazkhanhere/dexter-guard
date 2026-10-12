@@ -61,7 +61,7 @@ An immutable human event about one `ReviewFinding` on one note revision.
 | `replacement`, `targetNoteSpan` | Yes | Non-empty replacement and valid exact candidate-note target span. |
 | `supportSpans` | Yes | One or more exact source spans required for `USABLE`; derived excerpts retained only with references. |
 | `supportStatus` | Yes | `USABLE`, `UNUSABLE`, `REJECTED`; unsupported/invalid never `USABLE`. |
-| `generatedBy` | Yes | `SPEC_006`, `REVIEWER`, or versioned source; an optional provider must be versioned. |
+| `generatedBy` | Yes | `REVIEWER` or a versioned Spec 007 correction adapter. Raw `SPEC_006` suggestion strings remain display-only and cannot be persisted as `USABLE` corrections. |
 | `createdAt`, `acceptedDecisionId`, `rejectedDecisionId` | Yes/conditional | Immutable lifecycle references; at most one terminal acceptance/rejection. |
 
 ### `FullNoteVerification`
@@ -72,7 +72,7 @@ An immutable human event about one `ReviewFinding` on one note revision.
 | `noteId`, `noteRevision`, `sourceId`, `sourceVersion` | Yes | Exact immutable binding, equal to all valid components. |
 | `claimSetId` | Yes | Exact current Spec 003 extraction run. |
 | `evidenceRunId`, `deterministicValidationRunId`, `coverageRunId` | Yes | Required component run IDs; may not refer to another revision/source. |
-| `status` | Yes | `RUNNING`, `VALID`, `INVALID`, `FAILED`; terminal records immutable. |
+| `status` | Yes | `RUNNING`, `VALID`, `INVALID`, `FAILED`; terminal records immutable. A valid empty Spec 003 claim set is `INVALID` with `EMPTY_CLAIM_SET_REQUIRES_REVIEW`. |
 | `componentStatuses` | Yes | Each component `SUCCEEDED`, `FAILED`, `INVALID`, or `UNAVAILABLE`; aggregate `VALID` requires all `SUCCEEDED` and reference validation. |
 | `createdAt`, `completedAt`, `correlationId` | Yes | Lifecycle/audit fields; terminal timestamp required for terminal state. |
 | `failureCode`, `failureMessage` | Conditional | Required for `INVALID`/`FAILED`; contains safe diagnostic only. |
@@ -143,7 +143,7 @@ An immutable human event about one `ReviewFinding` on one note revision.
 4. Candidate note spans identify candidate content only and cannot populate source evidence fields.
 5. A decision cannot cross note/revision/finding identity boundaries; required rationales are non-blank.
 6. A suggestion cannot be accepted if its base revision is stale, its support is not `USABLE`, or its target span no longer applies exactly.
-7. `VALID` full verification has exactly one successful, provenance-consistent component reference for 004, 005, and 006 and its exact current claim set.
+7. `VALID` full verification has exactly one successful, provenance-consistent component reference for 004, 005, and 006 and its exact current claim set. A successful Spec 006 run with any unresolved source item is not approval-valid.
 8. Approval has one valid same-revision full verification, passes eligibility atomically, and cannot coexist with a competing approval for the same revision.
 9. Rejection is permitted without a valid full verification but requires a reason.
 10. Existing audit records, prior note revisions, upstream runs/findings, and decisions are never overwritten or deleted by review actions.

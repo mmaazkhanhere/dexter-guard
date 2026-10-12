@@ -70,28 +70,36 @@ This record captures design decisions based on repository contracts and architec
 
 **Alternatives considered:** Re-run rules in review service (overlapping responsibility); trust any latest run without revision/source checks (stale approval); allow claim-level verification as final verification (incomplete).
 
-**Consequences:** A missing claim-extraction façade or 005 alignment input blocks aggregate validity and must be surfaced as an external dependency, not filled from prose.
+**Consequences:** The in-process claim-extraction port and Spec 005-owned alignment adapter are planned integration work; neither may be replaced by prose parsing or semantic matching in Spec 007.
 
 **References:** FR-21, FR-22; HR-006, HR-007, HR-014, HR-016.
 
 ## R-007: Deterministic severity policy
 
-**Decision:** `REVIEW_SEVERITY-v1` maps upstream immutable statuses, rule codes, and recognised coverage policy keys in a documented precedence order; unknown types fail conservatively as critical.
+**Decision:** `REVIEW_SEVERITY-v1` maps upstream immutable statuses, rule codes, and the actual Spec 006 `COVERAGE_EXPECTATION-v1` policy keys in a documented precedence order; unknown types fail conservatively as critical.
 
 **Rationale:** Spec 005 and ADR 005 reserve severity/approval ownership for Spec 007. The constitution prohibits model confidence as an approval authority.
 
 **Alternatives considered:** Use an LLM severity label (non-deterministic); have each upstream component assign final severity (competing policies); leave severity absent (violates FR-15).
 
-**Consequences:** Spec 006's free-form `severityPolicyKey` vocabulary needs a shared published mapping before implementation. Severity is a review priority, not a clinical-risk claim.
+**Consequences:** The current Spec 006 keys are mapped explicitly: `MEASUREMENT_OMISSION` to critical, and symptom/mobility/care-action/uncertainty omission keys to major. Unknown keys use the conservative fallback. Severity is a review priority, not a clinical-risk claim.
+
+## R-008: Coverage suggestions and unresolved source items
+
+**Decision:** A raw Spec 006 `CoverageFinding.suggestion` is display-only under CL-014. It is not a `SuggestedCorrection` and cannot be accepted directly. Spec 007 may persist a separate structured correction only after validating target note span, replacement text, and source support. Any successful coverage run with unresolved source items remains approval-blocking.
+
+**Rationale:** Spec 006 deliberately forbids applying its suggestion and requires unresolved source items to remain review-required and never authorize approval. This preserves that ownership while allowing FR-20’s explicit-acceptance workflow.
+
+**References:** Spec 006 CL-010, CL-014, CL-015; FR-20, FR-23; HR-011, HR-018.
 
 **References:** FR-15; HR-001, HR-013, HR-014.
 
-## Unresolved design questions
+## Resolved implementation decisions
 
-| ID | Question | Required resolution / owner |
-| --- | --- | --- |
-| UQ-001 | What exact `severityPolicyKey` tokens will Spec 006 producers emit? | Maintainer approves a shared versioned vocabulary; review adapter retains conservative fallback. |
-| UQ-002 | What component creates/retrieves complete validated source facts and explicit alignments for Spec 005 during full-note verification? | Spec 005/006 integration owner defines a reference-only adapter; no review-service matching fallback. |
-| UQ-003 | Is claim extraction exposed only in-process or by a new versioned API? | Architecture owner selects injected port first or approves a public Spec 003 contract change. |
-| UQ-004 | Which existing SQLite migration pattern should create review tables? | Repository maintainer confirms before persistence work; no new migration tool/dependency is assumed. |
-| UQ-005 | Is a non-empty claim set required for full-note verification when extraction reports valid `EMPTY`? | Product/verification owners define the policy. Until resolved, full-note aggregate is not approval-valid. |
+| Former question | Resolution |
+| --- | --- |
+| Former severity-key question | Spec 006’s current omission keys are mapped by `REVIEW_SEVERITY-v1`: `MEASUREMENT_OMISSION` to critical; symptom, mobility, care-action, and uncertainty omission keys to major; unknown/absent values use the conservative fallback. |
+| UQ-002 Spec 005 inputs | A Spec 005-owned `DeterministicValidationPort.run_for_revision` resolves only existing immutable source facts and explicit alignments; Spec 007 never performs matching. |
+| UQ-003 claim extraction transport | The local PoC uses an injected in-process `ClaimExtractionPort`; no public endpoint is added. |
+| UQ-004 SQLite setup | The review repository uses idempotent SQLite `CREATE TABLE IF NOT EXISTS` initialization; no migration dependency is introduced. |
+| UQ-005 empty claim set | A valid empty extraction result is an `INVALID` full-note aggregate (`EMPTY_CLAIM_SET_REQUIRES_REVIEW`) and blocks approval in this feature version. |
