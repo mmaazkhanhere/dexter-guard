@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from .approval import ApprovalEligibilityPolicy, ReviewServiceError
-from .contracts import AuditEvent, FullNoteVerification, NoteDisposition, ReviewDecision, ReviewFinding
+from .contracts import AuditEvent, FullNoteVerification, NoteDisposition, ReviewDecision, ReviewFinding, SuggestedCorrection
 from .repository import InMemoryReviewRepository, ReviewRepositoryError
 
 
@@ -61,6 +61,26 @@ class ReviewService:
         if self.get_note(finding.note_id, finding.note_revision).source_id != finding.source_id:
             raise ReviewServiceError("PROVENANCE_CONFLICT")
         self.repository.findings[finding.review_finding_id] = finding
+
+    def add_suggestion(self, suggestion: SuggestedCorrection) -> None:
+        if suggestion.note_id not in self.repository.latest:
+            raise ReviewServiceError("NOTE_NOT_FOUND")
+        if suggestion.support_status == "USABLE" and not suggestion.support_spans:
+            raise ReviewServiceError("SUGGESTION_NOT_USABLE")
+        self.repository.suggestions[suggestion.suggestion_id] = suggestion
+
+    def accept_suggestion(self, note_id: str, *, suggestion_id: str, expected_revision: int, reviewer_label: str) -> NoteRecord:
+        suggestion = self.repository.suggestions.get(suggestion_id)
+        if suggestion is None or suggestion.note_id != note_id or suggestion.support_status != "USABLE":
+            raise ReviewServiceError("SUGGESTION_NOT_USABLE")
+        note = self.get_note(note_id)
+        if note.revision != expected_revision or suggestion.base_revision != expected_revision:
+            raise ReviewServiceError("STALE_REVISION")
+        start = suggestion.target_note_span.start_code_point
+        end = suggestion.target_note_span.end_code_point_exclusive
+        if note.content[start:end] != suggestion.target_note_span.text:
+            raise ReviewServiceError("SUGGESTION_TARGET_MISMATCH")
+        return self.save_revision(note_id, expected_revision=expected_revision, content=note.content[:start] + suggestion.replacement + note.content[end:], reviewer_label=reviewer_label)
 
     def record_decision(self, note_id: str, finding_id: str, *, expected_revision: int, kind: str, reviewer_label: str, rationale: str | None = None) -> ReviewDecision:
         finding = self.repository.findings.get(finding_id)
