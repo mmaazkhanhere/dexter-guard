@@ -34,8 +34,8 @@ Spec 004 preselected pairs ──────┘              │
 4. For every source and claim evidence reference, independently apply `EVD-001`, `EVD-002`, and `EVD-003` using the canonical zero-based, start-inclusive/end-exclusive Unicode code-point convention.
 5. Validate the requested note binding. A resolved claim with a missing/null revision yields `STR-002`; a non-null note ID/revision mismatch is `409/PROVENANCE_CONFLICT` and returns no run. For each selected alignment in input order, validate prerequisites. `UNAVAILABLE`, `AMBIGUOUS`, and `REJECTED` yield traceable `ALIGN-001` `NOT_EVALUABLE` findings; invalid unit/category fields yield structural results before any numeric conversion. Reject an unsupported category while resolving an immutable referenced record, before rule execution.
 6. Convert permitted scalar values exactly with `Decimal`; compare canonical values. Compare typed blood pressure components exactly. Evaluate explicit approximation separately.
-7. Collect only `FAIL` and `NOT_EVALUABLE` records for reviewer response by default. Keep optional internal/pass trace for debugging and fixture assertions.
-8. Sort by declared input alignment order and catalog rule order. Persist and return the immutable result with source identity, requested note ID/revision, `DVE-CONTRACT-v1`, `DVE-RULESET-v1`, canonical input digest, and deterministic engine version.
+7. Collect only `FAIL` and `NOT_EVALUABLE` records for reviewer response. Keep `NUM-002` `PASS` only in an internal rule trace for debugging and fixture assertions; it is not a public response outcome or request option.
+8. Sort comparison findings by declared input alignment order and catalog rule order. Sort evidence findings after comparison findings by owner kind (`sourceFactIds` request order, then `claimIds` request order), owner record order, evidence-reference order, and catalog rule order; evaluate each unique evidence-reference ID once. Persist and return the immutable result with source identity, requested note ID/revision, `DVE-CONTRACT-v1`, `DVE-RULESET-v1`, canonical input digest, and deterministic engine version. Repeatability assertions canonicalize away `validationRunId` before byte comparison; all other normalized fields and ordering must match.
 
 ### Rule precedence
 
@@ -84,7 +84,7 @@ Spec 005 has no external severity field. Spec 007 maps the rule result to the pr
 | Level | Coverage |
 | --- | --- |
 | Unit | Decimal parsing/conversion; scalar and BP value shapes; category-unit matrix; numeric/BP/precision rules; deterministic ordering; no LLM port/import. |
-| Property/boundary | Equivalent conversions; decimal edge values; invalid combinations; zero/negative/reversed/end-boundary Unicode spans; repeated execution equality. |
+| Property/boundary | Equivalent conversions; decimal edge values; invalid combinations; non-positive/non-integer blood-pressure components; zero/negative/reversed/end-boundary Unicode spans; repeated execution equality after removing `validationRunId`; duplicate evidence-reference evaluation. |
 | Contract | OpenAPI/Pydantic closure; unknown fields; resolved-record category validation; requested note binding; finding conditional fields; `ApiError` codes; version constants. |
 | Integration | Immutable source lookup; wrong-note provenance conflict; unavailable storage; run append/replay with complete revision/digest/engine metadata; source-fact/claim/alignment integrity; API mapping. |
 | Acceptance | AT-001 through AT-021 using versioned synthetic German fixtures, exact rule/outcome/reference and API-error assertions. |

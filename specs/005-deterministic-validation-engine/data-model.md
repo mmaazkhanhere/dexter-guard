@@ -38,11 +38,11 @@ Unit            = CELSIUS | MILLILITRE | LITRE | MILLIGRAM | GRAM | MMHG
 | `MEDICATION_QUANTITY` | `MILLIGRAM`, `GRAM` | `MILLIGRAM` | exact decimal scalar |
 | `BLOOD_PRESSURE` | `MMHG` | `MMHG` | `{ systolic: positive integer, diastolic: positive integer }` |
 
-Conversion uses `Decimal`: `1 L = 1000 ml`; `1 g = 1000 mg`. Scalar `value` is a decimal text representation accepted by DVE-002; a non-parseable string is permitted at the contract boundary so `STR-001` can report it. Blood-pressure `value` is an object with exactly `systolic` and `diastolic` integer-or-text components; any text component must parse as an integer or `STR-001` is emitted. Values are not rounded, ranged, or inferred. The raw display value may be retained for review but cannot drive comparison.
+Conversion uses `Decimal`: `1 L = 1000 ml`; `1 g = 1000 mg`. Scalar `value` is a decimal text representation accepted by DVE-002; a non-parseable string is permitted at the contract boundary so `STR-001` can report it. Blood-pressure `value` is an object with exactly `systolic` and `diastolic` integer-or-text components; each component must parse as a positive integer, otherwise `STR-001` is emitted. Values are not rounded, clinically ranged, or inferred. The raw display value may be retained for review but cannot drive comparison.
 
 ## Result semantics
 
-- `PASS`: a rule was evaluated and found no discrepancy. Default reviewer responses omit pass records.
+- `PASS`: an internal rule was evaluated and found no discrepancy. `PASS` is not a public `ValidationFinding` outcome; public reviewer responses omit pass records.
 - `FAIL`: a rule found an objective discrepancy or structural/evidence error. `requires_review=true`.
 - `NOT_EVALUABLE`: rule prerequisites are absent or unsafe. It is an explicit non-pass, contains a reason code, and does not claim contradiction.
 

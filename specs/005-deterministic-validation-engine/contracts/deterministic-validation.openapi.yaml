@@ -120,8 +120,11 @@ components:
           additionalProperties: false
           required: [systolic, diastolic]
           properties:
-            systolic: { type: [integer, string] }
-            diastolic: { type: [integer, string] }
+            # The transport boundary accepts integer/text representations so
+            # persisted malformed records can be reported as STR-001. The
+            # domain validator requires a positive integer for both fields.
+            systolic: { type: [integer, string], description: "Must parse as a positive integer; invalid or non-positive values yield STR-001." }
+            diastolic: { type: [integer, string], description: "Must parse as a positive integer; invalid or non-positive values yield STR-001." }
         unit: { enum: [CELSIUS, MILLILITRE, LITRE, MILLIGRAM, GRAM, MMHG] }
         approximation: { enum: [EXACT, APPROXIMATE, UNSPECIFIED] }
     SourceFact:
