@@ -353,6 +353,7 @@ class VerificationService:
         candidates = list(response.findings)
         ids = [candidate.claim_id for candidate in candidates]
         if len(ids) != len(set(ids)) or set(ids) != expected_ids:
+            self.metrics.increment("coverage_failures")
             raise MalformedVerifierOutputError("Verifier findings must cover exactly the submitted claim IDs.")
         normalized: list[EvidenceFinding] = []
         for candidate in candidates:
@@ -372,17 +373,18 @@ class VerificationService:
             normalized.append(finding)
         return tuple(normalized)
 
-    @staticmethod
-    def _quotes_for(candidate: VerifierCandidateFinding, spans: tuple[object, ...], source_text: str) -> tuple[dict[str, object], ...]:
+    def _quotes_for(self, candidate: VerifierCandidateFinding, spans: tuple[object, ...], source_text: str) -> tuple[dict[str, object], ...]:
         supplied = list(candidate.evidence_quotes)
         if supplied:
             if len(supplied) != len(spans):
+                self.metrics.increment("span_integrity_failures")
                 raise VerificationIntegrityError("evidence quotations must pair one-to-one with source spans")
             by_key = {(span.source_id, span.source_version, span.start, span.end): span for span in spans}
             result: list[dict[str, object]] = []
             for quote in supplied:
                 key = (quote.span.source_id, quote.span.source_version, quote.span.start, quote.span.end)
                 if key not in by_key or quote.text != source_text[quote.span.start : quote.span.end]:
+                    self.metrics.increment("span_integrity_failures")
                     raise VerificationIntegrityError("evidence quotation must equal its exact immutable-source substring")
                 result.append({"span": quote.span, "text": quote.text, "evidenceRole": quote.evidence_role})
             return tuple(result)
@@ -405,7 +407,25 @@ class VerificationService:
         try:
             persisted = self.repository.save(run)
             self.metrics.increment("successful_runs")
-            self._log("verification_completed", status="SUCCEEDED", run_id=run.verification_run_id)
+            self.metrics.record_terminal(
+                status="SUCCEEDED",
+                latency_ms=(run.completed_at - run.created_at).total_seconds() * 1000,
+                metadata={
+                    "model_version": run.model_version,
+                    "prompt_version": run.prompt_version,
+                    "annotation_policy_version": run.annotation_policy_version,
+                },
+            )
+            self._log(
+                "verification_completed",
+                status="SUCCEEDED",
+                run_id=run.verification_run_id,
+                model_id=run.model_id,
+                model_version=run.model_version,
+                prompt_version=run.prompt_version,
+                annotation_policy_version=run.annotation_policy_version,
+                evidence_status_policy_version=run.evidence_status_policy_version,
+            )
             return persisted
         except Exception:
             self.metrics.increment("persistence_failures")
@@ -429,6 +449,16 @@ class VerificationService:
 
     def _persist_failure(self, request: VerificationRunRequest, **kwargs: object) -> VerificationRun:
         failure = self._failure_run(request, **kwargs)
+        self.metrics.record_terminal(
+            status=failure.status,
+            latency_ms=(failure.completed_at - failure.created_at).total_seconds() * 1000,
+            metadata={
+                "model_version": failure.model_version,
+                "prompt_version": failure.prompt_version,
+                "annotation_policy_version": failure.annotation_policy_version,
+            },
+            failure_code=failure.failure.code,
+        )
         try:
             persisted = self.repository.save(failure)
         except Exception:

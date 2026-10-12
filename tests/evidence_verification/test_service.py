@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from evidence_verification import EvidenceStatus, VerificationService
+from evidence_verification import EvidenceStatus, InMemoryVerificationLogger, VerificationMetrics, VerificationService
 
 
 class SourceRepo:
@@ -255,4 +255,43 @@ def test_provider_timeout_is_a_non_authoritative_failed_run() -> None:
     assert result.status == "FAILED_VERIFIER"
     assert result.failure.code == "PROVIDER_TIMEOUT"
     assert not hasattr(result, "findings")
+
+
+def test_telemetry_records_versions_latency_and_safe_rejection_metadata() -> None:
+    metrics = VerificationMetrics()
+    logger = InMemoryVerificationLogger()
+    verifier = FakeVerifier(
+        lambda source: {
+            "findings": [{
+                "claimId": "claim-1",
+                "status": "SUPPORTED",
+                "explanation": "belegt",
+                "sourceSpans": [span("verneint Schmerzen", source)],
+                "discrepancies": [],
+            }]
+        }
+    )
+    target = VerificationService(
+        source_repository=SourceRepo(),
+        claim_repository=ClaimRepo(),
+        verifier=verifier,
+        metrics=metrics,
+        logger=logger,
+        id_factory=lambda: "telemetry-run",
+        correlation_factory=iter(("telemetry-correlation", "telemetry-trace")).__next__,
+    )
+
+    result = target.verify(request(idempotencyKey="telemetry"))
+    snapshot = metrics.snapshot()
+
+    assert result.status == "SUCCEEDED"
+    assert snapshot.last_latency_ms is not None
+    assert snapshot.model_versions == ("fake-1",)
+    assert snapshot.prompt_versions == ("verification-v1",)
+    assert snapshot.policy_versions == ("EVIDENCE_ANNOTATION-v1",)
+    event = logger.events[-1][1]
+    assert event["model_id"] == "fake-model"
+    assert "source_text" not in event
+    assert "claim_text" not in event
+
 
