@@ -1,5 +1,16 @@
 # Spec 004 — Implementation Tasks
 
+## Implementation completion record
+
+The current implementation branch completed the strict run/failure/verifier
+contracts, structured provider adapter and bounded retry boundary, fail-closed
+orchestration with source/claim provenance and span integrity, SQLite and
+in-memory persistence with idempotent replay, and the synchronous HTTP endpoint.
+German qualifier cases are covered in `tests/evidence_verification/test_service.py`.
+
+Reviewer-owned checklist items and remaining operational/evaluation handoff
+tasks remain intentionally open; this record does not alter reviewer approval.
+
 **Source artifacts:** [spec.md](spec.md), [clarify.md](clarify.md), [annotation-policy.md](annotation-policy.md), [contracts/verification-runs.openapi.yaml](contracts/verification-runs.openapi.yaml), [plan.md](plan.md), and [checklist.md](checklist.md)
 **Execution rule:** Do not begin implementation until the reviewer-owned checklist gate is satisfied. Tasks are dependency ordered; [P] means work may proceed in parallel after its listed dependencies.
 
