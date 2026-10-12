@@ -1,0 +1,178 @@
+openapi: 3.1.0
+info:
+  title: Deterministic Validation Engine API
+  version: 1.0.0
+paths:
+  /api/v1/deterministic-validation-runs:
+    post:
+      summary: Execute DVE-RULESET-v1 without an LLM
+      operationId: createDeterministicValidationRun
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidationRequest'
+      responses:
+        '200':
+          description: Completed deterministic validation run
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationRun'
+        '422':
+          description: Schema-invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchemaError'
+components:
+  schemas:
+    ValidationRequest:
+      type: object
+      additionalProperties: false
+      required: [sourceId, sourceVersion, sourceFactIds, claimIds, alignmentIds, rulesetVersion]
+      properties:
+        rulesetVersion: { const: DVE-RULESET-v1 }
+        sourceId: { type: string, minLength: 1 }
+        sourceVersion: { type: integer, minimum: 1 }
+        sourceFactIds:
+          type: array
+          minItems: 1
+          items: { type: string, minLength: 1 }
+          uniqueItems: true
+        claimIds:
+          type: array
+          minItems: 1
+          items: { type: string, minLength: 1 }
+          uniqueItems: true
+        alignmentIds:
+          type: array
+          minItems: 1
+          items: { type: string, minLength: 1 }
+          uniqueItems: true
+    TranscriptSnapshot:
+      type: object
+      additionalProperties: false
+      required: [sourceId, sourceVersion, transcriptText]
+      properties:
+        sourceId: { type: string, minLength: 1 }
+        sourceVersion: { type: integer, minimum: 1 }
+        transcriptText: { type: string, minLength: 1 }
+    EvidenceReference:
+      type: object
+      additionalProperties: false
+      required: [evidenceReferenceId, sourceId, sourceVersion, start, end, quotedText]
+      properties:
+        evidenceReferenceId: { type: string, minLength: 1 }
+        sourceId: { type: string, minLength: 1 }
+        sourceVersion: { type: integer, minimum: 1 }
+        start: { type: integer, minimum: 0 }
+        end: { type: integer, minimum: 1 }
+        quotedText: { type: string }
+    Measurement:
+      oneOf:
+        - $ref: '#/components/schemas/ScalarMeasurement'
+        - $ref: '#/components/schemas/BloodPressureMeasurement'
+    ScalarMeasurement:
+      type: object
+      additionalProperties: false
+      required: [category, value, unit, approximation]
+      properties:
+        category: { enum: [TEMPERATURE, FLUID_INTAKE, MEDICATION_QUANTITY] }
+        value: { type: string }
+        unit: { enum: [CELSIUS, MILLILITRE, LITRE, MILLIGRAM, GRAM, MMHG] }
+        approximation: { enum: [EXACT, APPROXIMATE, UNSPECIFIED] }
+    BloodPressureMeasurement:
+      type: object
+      additionalProperties: false
+      required: [category, value, unit, approximation]
+      properties:
+        category: { const: BLOOD_PRESSURE }
+        value:
+          type: object
+          additionalProperties: false
+          required: [systolic, diastolic]
+          properties:
+            systolic: { type: [integer, string] }
+            diastolic: { type: [integer, string] }
+        unit: { enum: [CELSIUS, MILLILITRE, LITRE, MILLIGRAM, GRAM, MMHG] }
+        approximation: { enum: [EXACT, APPROXIMATE, UNSPECIFIED] }
+    SourceFact:
+      type: object
+      additionalProperties: false
+      required: [sourceFactId, sourceId, sourceVersion, measurement, evidence]
+      properties:
+        sourceFactId: { type: string, minLength: 1 }
+        sourceId: { type: string, minLength: 1 }
+        sourceVersion: { type: integer, minimum: 1 }
+        measurement: { $ref: '#/components/schemas/Measurement' }
+        evidence:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/EvidenceReference' }
+    Claim:
+      type: object
+      additionalProperties: false
+      required: [claimId, noteId, noteRevision, measurement, evidence]
+      properties:
+        claimId: { type: string, minLength: 1 }
+        noteId: { type: string, minLength: 1 }
+        noteRevision: { type: integer, minimum: 1 }
+        measurement: { $ref: '#/components/schemas/Measurement' }
+        evidence:
+          type: array
+          items: { $ref: '#/components/schemas/EvidenceReference' }
+    Alignment:
+      type: object
+      additionalProperties: false
+      required: [alignmentId, sourceFactId, claimId, status]
+      properties:
+        alignmentId: { type: string, minLength: 1 }
+        sourceFactId: { type: string, minLength: 1 }
+        claimId: { type: string, minLength: 1 }
+        status: { enum: [ALIGNED, UNAVAILABLE, AMBIGUOUS, REJECTED] }
+    ValidationFinding:
+      type: object
+      additionalProperties: false
+      required: [ruleId, ruleVersion, rulesetVersion, outcome, evidenceReferenceIds, severity, requiresReview, reasonCode, message]
+      properties:
+        ruleId: { type: string, pattern: '^(ALIGN|NUM|STR|EVD)-[0-9]{3}$' }
+        ruleVersion: { const: '1' }
+        rulesetVersion: { const: DVE-RULESET-v1 }
+        outcome: { enum: [FAIL, NOT_EVALUABLE] }
+        sourceFactId: { type: [string, 'null'] }
+        claimId: { type: [string, 'null'] }
+        alignmentId: { type: [string, 'null'] }
+        evidenceReferenceIds:
+          type: array
+          items: { type: string, minLength: 1 }
+          uniqueItems: true
+        severity: { enum: [INFO, LOW, MEDIUM, HIGH, CRITICAL] }
+        expectedValue: { type: [string, number, object, 'null'] }
+        observedValue: { type: [string, number, object, 'null'] }
+        unit: { type: [string, 'null'] }
+        reasonCode: { type: string }
+        message: { type: string }
+        requiresReview: { type: boolean }
+    ValidationRun:
+      type: object
+      additionalProperties: false
+      required: [validationRunId, sourceId, sourceVersion, contractVersion, rulesetVersion, findings]
+      properties:
+        validationRunId: { type: string }
+        sourceId: { type: string }
+        sourceVersion: { type: integer }
+        contractVersion: { const: DVE-CONTRACT-v1 }
+        rulesetVersion: { const: DVE-RULESET-v1 }
+        findings:
+          type: array
+          items: { $ref: '#/components/schemas/ValidationFinding' }
+    SchemaError:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code: { const: SCHEMA_ERROR }
+        message: { type: string }
+        path: { type: string }
