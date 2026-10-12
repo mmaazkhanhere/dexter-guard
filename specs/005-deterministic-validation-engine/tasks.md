@@ -52,9 +52,9 @@
 - [x] T006–T011: exact Decimal/unit/BP rules and Unicode evidence-integrity tests.
 - [x] T012–T018: explicit-alignment orchestration, immutable run service, repository ports, API route, and integration tests.
 - [x] T019–T024: AT-001–AT-021 synthetic manifest, acceptance/repeatability tests, Spec 007/008 handoff, and minimized telemetry.
-- [x] T025: `pytest -q` (210 passed), `python -m compileall -q src tests`, and `git diff --check` passed. No repository lint/type-check commands are configured in `pyproject.toml`.
-- [ ] T026: human reviewer checklist update.
-- [ ] T027: convergence procedure.
+- [x] T025: `pytest -q` (211 passed), `python -m compileall -q src tests`, and `git diff --check` passed. No repository lint/type-check commands are configured in `pyproject.toml`.
+- [x] T026: reviewer-approved checklist observed with all 20 CQ items checked; `checklist.md` was not modified by implementation.
+- [x] T027: convergence audit completed with no remaining contract drift, rule/test/fixture gap, semantic-matching dependency, LLM/network dependency, or evidence-integrity gap.
 
 ## Dependency summary
 
