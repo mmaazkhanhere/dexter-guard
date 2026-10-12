@@ -6,6 +6,9 @@
 
 ## Phase 0 — Setup and existing-contract integration
 
+**Spec Kit user-story convention:** Each task inherits the `[US#]` label assigned in the
+User-story task structure table below; the mapping is authoritative for task traceability.
+
 - [ ] T001 Map actual router, SQLite repository, migration, React, typed-client, and test conventions in `specs/007-human-review-and-audit/compatibility-review.md`. **Depends on:** independent checklist approval. **Requirements:** all. **Done when:** inspected interfaces and gaps are recorded without changing source code.
 - [ ] T002 Validate Specs 001–006 identities, error envelopes, and service availability against their actual contracts; verify the resolved integration decisions. **Target:** `compatibility-review.md`, `research.md`. **Depends on:** T001. **Requirements:** FR-15, FR-17, FR-21, FR-22. **Done when:** every adapter input is evidenced and no source-text/claim-text authority is invented.
 - [ ] T003 [P] Add focused synthetic German review fixtures for HR-001–HR-018, with immutable source/note/revision/run IDs and expected audit events, including unresolved-source-item approval blocking. **Target:** `tests/human_review/fixtures/`. **Depends on:** T002. **Requirements:** all. **Done when:** fixture manifest has no real data and maps every HR scenario to expected outcomes.
@@ -20,6 +23,7 @@
 
 ## Phase 2 — Review retrieval and evidence highlighting (P1)
 
+<!-- [US1] Inspect an evidence-grounded finding -->
 - [ ] T009 Implement `ReviewContextService` with source/note/claim/upstream-run readers and deterministic `REVIEW_SEVERITY-v1` mapping. **Target:** `src/human_review/context.py`, `policy.py`. **Depends on:** T002, T005. **Requirements:** FR-15, FR-17. **Done when:** it preserves upstream fields and yields exactly one severity per review finding.
 - [ ] T010 Implement source-span validation/excerpt derivation for review display; distinguish `AVAILABLE`, `MISSING`, and `INVALID` without fallback text search. **Target:** `src/human_review/context.py`. **Depends on:** T009. **Requirements:** FR-17. **Done when:** mismatched source version, offset, and quote tests cannot yield a highlight.
 - [ ] T011 [P] Write policy/context unit tests for contradiction, unsupported, uncertain, 005 rules, coverage keys, unknown types, and failed components. **Target:** `tests/human_review/test_policy.py`, `test_context.py`. **Depends on:** T009. **Requirements:** FR-15, FR-17, FR-23. **Done when:** every severity row and evidence availability state is asserted deterministically.
@@ -33,6 +37,7 @@
 
 ## Phase 4 — Editing, revision tracking, and suggestions (P1/P3)
 
+<!-- [US2] Correct and re-verify a note; [US6] Use a suggested correction safely -->
 - [ ] T016 Implement compare-and-append `RevisionService` using the existing note revision boundary, atomic audit append, and stale-result projection. **Target:** `src/human_review/revisions.py`. **Depends on:** T002, T007. **Requirements:** FR-19, FR-25. **Done when:** stale writer writes nothing and successor is `AWAITING_FULL_VERIFICATION`.
 - [ ] T017 Write revision/concurrency tests for manual edit, stale revision rejection, final-disposition immutability, preserved predecessor body, and old run staleness. **Target:** `tests/human_review/test_revisions.py`. **Depends on:** T016. **Requirements:** FR-19, FR-22, FR-25. **Done when:** HR-005 and HR-017 pass against SQLite/in-memory contract doubles and edits after approval/rejection return `FINAL_DISPOSITION_IMMUTABLE`.
 - [ ] T018 Implement structured correction validation, persistence, accept/reject decisions, and delegation to revision service. Treat raw Spec 006 suggestion strings as display-only; only a validated target span/replacement/source-support record can create a successor revision. **Target:** `src/human_review/suggestions.py`. **Depends on:** T010, T013, T016. **Requirements:** FR-20, FR-25. **Done when:** raw coverage suggestions cannot be applied and only validated corrections can create a successor revision.
@@ -41,6 +46,7 @@
 
 ## Phase 5 — Re-verification integration (P1)
 
+<!-- [US2] Correct and re-verify a note; [US3] Safely approve or reject -->
 - [ ] T021 Define and implement the in-process Spec 003 extraction adapter, Spec 005-owned reference-only deterministic-validation adapter, and Spec 004/006 terminal-run adapters; validate exact source/note/claim-set provenance. **Target:** `src/human_review/ports.py`, `verification.py`. **Depends on:** T002, T005. **Requirements:** FR-21, FR-22. **Done when:** adapters use reference-only upstream inputs and never parse prose/reimplement algorithms.
 - [ ] T022 Implement claim-level re-verification aggregate marked `approvalEligible=false` and persist its feedback/audit reference. **Target:** `src/human_review/verification.py`. **Depends on:** T021. **Requirements:** FR-21, FR-25. **Done when:** HR-006 passes and claim-level response cannot enter approval predicate.
 - [ ] T023 Implement terminal full-note verification aggregate: fresh current claim set, explicit 004/005/006 component run references, component closure/provenance validation, failure/invalid outcomes, and idempotent retry. **Target:** `src/human_review/verification.py`. **Depends on:** T021, T007. **Requirements:** FR-22, FR-25. **Done when:** persisted aggregate has only `VALID`, `INVALID`, or `FAILED`; it is `VALID` only for complete same-source/same-revision successes; missing adapter/invalid output blocks it.
@@ -49,6 +55,7 @@
 
 ## Phase 6 — Approval and rejection guards (P1)
 
+<!-- [US3] Safely approve or reject -->
 - [ ] T026 Implement pure `ApprovalEligibilityPolicy` and atomic approval service transaction. **Target:** `src/human_review/approval.py`. **Depends on:** T013, T016, T023. **Requirements:** FR-23, FR-24. **Done when:** all six policy predicates in spec.md are re-evaluated server-side inside the write transaction.
 - [ ] T027 Implement rejection disposition service independent of verification success, requiring current revision, reviewer label, reason, idempotency, and audit event. **Target:** `src/human_review/approval.py`. **Depends on:** T007, T016. **Requirements:** FR-24, FR-25. **Done when:** failure-state rejection succeeds without an approval verification ID.
 - [ ] T028 Write direct API/service guard-bypass and concurrent edit/approve race tests. **Target:** `tests/human_review/test_approval.py`, `test_api.py`. **Depends on:** T026, T027. **Requirements:** FR-22–FR-25. **Done when:** HR-008, HR-009, HR-014, HR-015, HR-016 pass and no invalid approval row exists.
@@ -56,11 +63,32 @@
 
 ## Phase 7 — Audit history, integration, and regression
 
+<!-- [US5] Inspect an audit trail -->
 - [ ] T030 Implement ordered audit-history projection and retrieval endpoint/UI timeline. **Target:** `src/human_review/audit.py`, `api.py`, frontend location discovered in T001. **Depends on:** T007, T013, T016, T023, T027. **Requirements:** FR-25. **Done when:** original/corrected revisions, runs, decisions, suggestions, and disposition are returned without overwrite.
 - [ ] T031 Implement end-to-end synthetic German acceptance tests for HR-001–HR-018 and direct API bypass cases, including unresolved source-item blocking. **Target:** `tests/human_review/test_acceptance.py`. **Depends on:** T012, T015, T020, T025, T029, T030. **Requirements:** all. **Done when:** every scenario in spec.md maps to an executable test and uses synthetic data only.
 - [ ] T032 [P] Add content-minimized observability and tests for IDs, versions, statuses, latency/retry/rejection counts, and no full source/note/prompt logging. **Target:** `src/human_review/observability.py`, `tests/human_review/test_observability.py`. **Depends on:** T023, T026. **Requirements:** FR-22, FR-25. **Done when:** constitution privacy/operational controls are asserted.
 - [ ] T033 Run focused and full tests, compile check, contract validation, and `git diff --check`; record actual commands/results in implementation evidence. **Target:** implementation PR/evaluation record. **Depends on:** T031, T032. **Requirements:** all / definition of done. **Done when:** commands pass and no undocumented deviation remains.
 - [ ] T034 Run read-only specification/task/contract convergence analysis; append only concrete gap tasks if found, implement them, and repeat to convergence. **Target:** `specs/007-human-review-and-audit/analyze.md`. **Depends on:** T033. **Requirements:** all. **Done when:** analysis has no unresolved internal inconsistency; external dependencies remain explicitly tracked.
+
+## User-story task structure
+
+The task phases above are grouped by implementation dependency, while each group maps to the
+following Spec Kit user stories. This mapping is the authoritative `[US#]` label for every
+task in the listed range:
+
+| User story | Task range | Outcome |
+| --- | --- | --- |
+| [US1] Inspect an evidence-grounded finding | T001–T012, T035 | Review context, validated evidence, severity, and evaluation fixture handoff |
+| [US4] Record independent finding decisions | T013–T015 | Append-only acknowledgement, dispute, and adjudication |
+| [US2] Correct and re-verify a note | T016–T025 | Immutable revisions and claim/full-note verification |
+| [US6] Use a suggested correction safely | T018–T020 | Validated explicit-acceptance correction flow |
+| [US3] Safely approve or reject | T026–T029, T036 | Atomic approval guards and rejection disposition |
+| [US5] Inspect an audit trail | T030–T034 | Ordered audit history, integration, and regression evidence |
+
+## Constitution and evaluation closure
+
+- [ ] T035 [P] [US1] Create the Spec 008 evaluation handoff linking HR-001–HR-018 fixtures to the required versioned 100+ synthetic German benchmark, held-out metrics, model/ruleset versions, and release thresholds. **Target:** `docs/evaluation/spec007-handoff.md`. **Depends on:** T003, T031. **Requirements:** constitution Principle V, all. **Done when:** the handoff identifies the benchmark owner and records that no improvement or clinical-safety claim is made without the Spec 008 gate.
+- [ ] T036 [P] [US3] Adopt or revise ADR 006 after T001–T002 compatibility evidence is available; record any ownership, transaction, timeout, retry, or error-contract deviation. **Target:** `docs/adr/006-human-review-and-audit-boundary.md`, `compatibility-review.md`. **Depends on:** T001, T002. **Requirements:** constitution Engineering Standards, FR-22–FR-25. **Done when:** the ADR has reviewer approval or an explicit documented exception with owner, risk, compensating control, and expiry.
 
 ## Requirement traceability
 

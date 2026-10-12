@@ -1,6 +1,13 @@
 # Spec 007 Requirements Quality Checklist
 
-**Reviewer-owned gate:** Mark an item `[x]` only after an independent reviewer establishes the stated condition. This planning change does not mark any item complete. Checked items represent requirements-quality review, not implementation completion.
+**Reviewer-owned gate:** An independent reviewer must approve the checked items before
+implementation. The architecture self-review recorded below found no documentation defect,
+but it does not substitute for reviewer sign-off or implementation evidence. Checked items
+represent requirements-quality review, not implementation completion.
+
+**Architecture self-review:** PASS for CQ-001–CQ-024 on 2026-10-12. Upstream implementation
+compatibility remains an explicit external dependency documented in
+`compatibility-review.md`; T001–T002 must complete that verification before implementation.
 
 ## Completeness
 
@@ -34,3 +41,12 @@
 - [ ] CQ-019 Missing Spec 003 facade, Spec 005 alignment, Spec 006 severity-key vocabulary, and migration dependencies are explicit rather than assumed.
 - [ ] CQ-020 Tasks are dependency ordered, use standard checkboxes/parallel markers, and include contract, state, UI, integration, acceptance, and regression tests.
 - [ ] CQ-021 All required acceptance scenarios use synthetic German nursing documentation only.
+
+## Constitution and dependency closure
+
+- [ ] CQ-022 The Spec 008 benchmark handoff is explicit; Spec 007 does not claim the required
+  100+ scenario evaluation or release thresholds have already run.
+- [ ] CQ-023 Concrete Specs 001–006 implementations, versions, timeout/retry behavior, and
+  migrations are treated as external dependencies until T001–T002 verify them in the target
+  repository.
+- [ ] CQ-024 Cross-component review, approval, and audit ownership is recorded in ADR 006.

@@ -50,3 +50,18 @@ No installed `specify`/`speckit` command or template directory was found under `
 ## Resolved integration decisions
 
 The formerly open choices are fixed in [clarify.md](clarify.md) and [research.md](research.md): explicit mappings for the actual Spec 006 omission keys, a Spec 005-owned reference-only deterministic-validation adapter, in-process claim extraction, idempotent SQLite schema initialization, a blocking policy for empty claim sets, display-only raw coverage suggestions, and blocking unresolved source items. No workaround that reparses source/note prose, guesses severity, or weakens approval eligibility is permitted.
+
+## Constitution and archive-status findings
+
+- The feature is constitution-aligned for evidence fidelity, human authority, fail-closed
+  approval, synthetic-only scope, contract-first boundaries, and append-only provenance.
+- Concrete Specs 001–006 implementation interfaces are not established by the available
+  planning archive. This is now an explicit external dependency in
+  `compatibility-review.md`; T001–T002 must verify it before implementation.
+- The constitutionally required 100+ scenario benchmark and release thresholds remain owned
+  by Spec 008. Spec 007 contributes feature fixtures and must not claim evaluation improvement
+  without that handoff.
+- ADR 006 records the cross-component review/approval/audit boundary and requires revision if
+  compatibility evidence changes the decision.
+- The requirements checklist has a passing architecture self-review, while independent
+  reviewer sign-off remains a deliberate implementation gate.

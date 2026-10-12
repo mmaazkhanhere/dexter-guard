@@ -112,3 +112,22 @@ non-null `suggestionId` and `successorRevision`. Full-note verification response
 all three upstream run identifiers and exactly four component statuses; a `VALID` aggregate
 must contain one successful status for each required component. These are contract-level
 constraints; persistence and service tests remain implementation tasks.
+
+## R-009: External contract and evaluation gates
+
+**Decision:** Treat concrete Specs 001–006 ports/repositories and the Spec 008 benchmark
+package as external dependencies until T001–T002 verify their versions and interfaces in the
+implementation repository. Spec 007 will not infer missing adapters, timeout limits, retry
+budgets, or evaluation thresholds.
+
+**Rationale:** The available planning archive does not establish those implementation
+artifacts. The constitution requires contract-first integration, explicit failure behavior, and
+a versioned 100+ scenario benchmark before release claims.
+
+**Alternatives considered:** Assume interfaces exist (unsafe); duplicate upstream logic
+(violates ownership); reduce benchmark scope (violates the constitution).
+
+**Consequences:** Implementation is gated on a compatibility report and Spec 008 evaluation
+handoff. Missing evidence remains an explicit blocker rather than an invented interface.
+
+**References:** Constitution IV, V, VII; T001–T002, T035; ADR 006.

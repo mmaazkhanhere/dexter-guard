@@ -162,6 +162,23 @@ Highlight renderer inputs are typed spans with explicit coordinate system. Candi
 | Privacy/provenance/audit | Synthetic-only, reviewer labels, append-only revisions/events, content-minimized logs. | Pass by plan |
 | Observable degradation | Explicit failed/invalid component state, status separation, idempotency, typed errors, no hidden success. | Pass by plan |
 
+## External dependency gates
+
+The concrete Specs 001–006 ports, repositories, endpoint contracts, and the Spec 008
+evaluation package are external dependencies. Their presence and versions are not established
+by the available planning archive. T001–T002 must produce the compatibility report before
+implementation; no adapter, timeout, retry budget, migration behavior, or error contract may
+be inferred. Any inherited operational limits must be copied from the verified upstream
+contract, and missing limits must be versioned before the dependent service is enabled.
+
+Spec 007 contributes feature acceptance fixtures but does not replace the constitutionally
+required Spec 008 benchmark of at least 100 synthetic German scenarios, held-out measurements,
+and release thresholds. No improvement or clinical-safety claim may be made without that
+evaluation gate.
+
+The cross-component review boundary, atomic approval transaction, and append-only audit
+persistence are captured in [ADR 006](../../docs/adr/006-human-review-and-audit-boundary.md).
+
 ## Complexity justification
 
 The full-note aggregate, atomic approval transaction, and append-only audit model are necessary complexity because the constitution requires final approval to bind a specific revision and validation run, and because cross-component results may otherwise become stale between UI display and approval. No asynchronous infrastructure, identity system, medical rules, or duplicate verifier is introduced.

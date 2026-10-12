@@ -37,6 +37,17 @@ The PoC uses synthetic German nursing documentation only, one resident per trans
 
 The review-facing claim-extraction invocation, the Spec 005 source-fact/alignment adapter, and the atomic full-note orchestration boundary are planned integration work, not existing public contracts. Their feature-local decisions are defined in this specification and plan; implementation must not substitute a prose-parsing or algorithm-duplicating workaround.
 
+Upstream implementation compatibility is an explicit external dependency. The available
+Spec 007 planning archive does not establish that the concrete Specs 001–006 repositories,
+ports, or deployed contracts are present. T001–T002 must verify those interfaces before
+implementation; adapter availability, timeout/retry semantics, and migration compatibility
+remain unresolved and cannot be inferred.
+
+Evaluation remains delegated to Spec 008. Spec 007 contributes synthetic feature fixtures and
+traceable review outcomes; the constitutionally required versioned German benchmark of at
+least 100 scenarios, held-out measurements, and release thresholds must be consumed from
+the approved Spec 008 evaluation package before any quality-improvement claim or release.
+
 ## Reviewer user stories
 
 ### P1 — Inspect an evidence-grounded finding
