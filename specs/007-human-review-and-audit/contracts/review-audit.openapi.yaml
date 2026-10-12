@@ -1,0 +1,485 @@
+openapi: 3.1.0
+info:
+  title: Dexter Guard Human Review and Audit API
+  version: REVIEW-AUDIT-CONTRACT-v1
+  description: >-
+    Proposed Spec 007 contract. No endpoint in this file is claimed to be
+    implemented. The API composes immutable references from Specs 001-006 and
+    never accepts client-supplied transcript, claim, or evidence text as authority.
+paths:
+  /api/v1/reviews/{noteId}:
+    get:
+      operationId: getReviewContext
+      summary: Retrieve review context for one immutable note revision
+      parameters:
+        - $ref: '#/components/parameters/NoteId'
+        - name: revision
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1 }
+          description: Defaults to the latest revision; explicit historical revision is read-only.
+      responses:
+        '200':
+          description: Review context with only validated display evidence.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewContext' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '503': { $ref: '#/components/responses/DependencyUnavailable' }
+  /api/v1/reviews/{noteId}/revisions:
+    post:
+      operationId: saveReviewNoteRevision
+      summary: Append a reviewer-created immutable successor revision
+      parameters: [ { $ref: '#/components/parameters/NoteId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SaveRevisionRequest' }
+      responses:
+        '201':
+          description: Immutable successor revision created; it awaits full-note verification.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RevisionSavedResponse' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/StaleRevision' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /api/v1/reviews/{noteId}/findings/{findingId}/decisions:
+    post:
+      operationId: recordFindingDecision
+      summary: Append a finding-level human decision
+      parameters:
+        - $ref: '#/components/parameters/NoteId'
+        - $ref: '#/components/parameters/FindingId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FindingDecisionRequest' }
+      responses:
+        '201':
+          description: Decision recorded; it does not mutate the upstream finding.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewDecision' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /api/v1/reviews/{noteId}/findings/{findingId}/claim-reverification:
+    post:
+      operationId: triggerClaimReverification
+      summary: Create/replay a claim-level feedback verification; never approval-eligible
+      parameters:
+        - $ref: '#/components/parameters/NoteId'
+        - $ref: '#/components/parameters/FindingId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClaimReverificationRequest' }
+      responses:
+        '200':
+          description: Terminal claim feedback result, which is explicitly not approval-eligible.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClaimReverificationResponse' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '503': { $ref: '#/components/responses/DependencyUnavailable' }
+  /api/v1/reviews/{noteId}/full-verifications:
+    post:
+      operationId: triggerFullNoteVerification
+      summary: Orchestrate full-note verification for the exact latest revision
+      parameters: [ { $ref: '#/components/parameters/NoteId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FullVerificationRequest' }
+      responses:
+        '200':
+          description: Immutable terminal full-note verification aggregate, including failed/invalid outcomes.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FullNoteVerification' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '503': { $ref: '#/components/responses/DependencyUnavailable' }
+  /api/v1/reviews/{noteId}/approve:
+    post:
+      operationId: approveReviewNote
+      summary: Atomically approve the latest eligible revision
+      parameters: [ { $ref: '#/components/parameters/NoteId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApproveRequest' }
+      responses:
+        '201':
+          description: Approval disposition recorded atomically.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NoteDisposition' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/ApprovalPreconditionFailed' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /api/v1/reviews/{noteId}/reject:
+    post:
+      operationId: rejectReviewNote
+      summary: Record a human rejection even if verification failed
+      parameters: [ { $ref: '#/components/parameters/NoteId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RejectRequest' }
+      responses:
+        '201':
+          description: Rejection disposition recorded.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NoteDisposition' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/StaleRevision' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /api/v1/reviews/{noteId}/audit:
+    get:
+      operationId: getReviewAuditHistory
+      summary: Retrieve append-only audit history for all accessible revisions of a note
+      parameters: [ { $ref: '#/components/parameters/NoteId' } ]
+      responses:
+        '200':
+          description: Ordered immutable events; prior revisions are not overwritten.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuditHistoryResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/DependencyUnavailable' }
+components:
+  parameters:
+    NoteId:
+      name: noteId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    FindingId:
+      name: findingId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+  responses:
+    InvalidRequest:
+      description: The JSON request is malformed or cannot identify a review command.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    ValidationError:
+      description: A field violates the versioned review contract.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    NotFound:
+      description: The referenced note, revision, finding, source, or run does not exist.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    Conflict:
+      description: A reference is stale, cross-bound, or an idempotency key has another request digest.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    StaleRevision:
+      description: expectedRevision is not the current revision; no revision/disposition was written.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ErrorResponse'
+              - type: object
+                properties: { code: { const: STALE_REVISION } }
+    ApprovalPreconditionFailed:
+      description: Approval guard rejected stale, failed, invalid, incomplete, or critical-open verification.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ErrorResponse'
+              - type: object
+                properties: { code: { const: APPROVAL_PRECONDITION_FAILED } }
+    DependencyUnavailable:
+      description: A required upstream service or repository was unavailable; it cannot be treated as verified.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+  schemas:
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code: { type: string, minLength: 1 }
+        message: { type: string, minLength: 1 }
+        field: { type: [string, 'null'] }
+        path: { type: [string, 'null'] }
+        correlationId: { type: [string, 'null'] }
+    SourceReference:
+      type: object
+      additionalProperties: false
+      required: [sourceId, sourceVersion]
+      properties:
+        sourceId: { type: string, minLength: 1 }
+        sourceVersion: { type: integer, minimum: 1 }
+    SourceSpan:
+      type: object
+      additionalProperties: false
+      required: [sourceId, sourceVersion, start, end]
+      properties:
+        sourceId: { type: string, minLength: 1 }
+        sourceVersion: { type: integer, minimum: 1 }
+        start: { type: integer, minimum: 0 }
+        end: { type: integer, minimum: 1 }
+    NoteSpan:
+      type: object
+      additionalProperties: false
+      required: [startCodePoint, endCodePointExclusive, text]
+      properties:
+        startCodePoint: { type: integer, minimum: 0 }
+        endCodePointExclusive: { type: integer, minimum: 1 }
+        text: { type: string, minLength: 1 }
+    EvidenceDisplay:
+      type: object
+      additionalProperties: false
+      required: [availability, spans, excerpts]
+      properties:
+        availability: { enum: [AVAILABLE, MISSING, INVALID] }
+        spans: { type: array, items: { $ref: '#/components/schemas/SourceSpan' } }
+        excerpts: { type: array, items: { type: string, minLength: 1 } }
+      allOf:
+        - if: { properties: { availability: { const: AVAILABLE } }, required: [availability] }
+          then:
+            properties:
+              spans: { minItems: 1 }
+              excerpts: { minItems: 1 }
+        - if: { properties: { availability: { enum: [MISSING, INVALID] } }, required: [availability] }
+          then:
+            properties:
+              spans: { maxItems: 0 }
+              excerpts: { maxItems: 0 }
+    ReviewFinding:
+      type: object
+      additionalProperties: false
+      required: [reviewFindingId, origin, noteId, noteRevision, sourceId, sourceVersion, severity, severityPolicyVersion, severityRationale, explanation, evidence, state, createdAt]
+      properties:
+        reviewFindingId: { type: string, minLength: 1 }
+        origin: { enum: [SPEC_004, SPEC_005, SPEC_006, REVIEW_OPERATIONAL] }
+        originRunId: { type: [string, 'null'] }
+        originFindingId: { type: [string, 'null'] }
+        noteId: { type: string, minLength: 1 }
+        noteRevision: { type: integer, minimum: 1 }
+        sourceId: { type: string, minLength: 1 }
+        sourceVersion: { type: integer, minimum: 1 }
+        claimId: { type: [string, 'null'] }
+        claimSpan: { anyOf: [ { $ref: '#/components/schemas/NoteSpan' }, { type: 'null' } ] }
+        upstreamStatus: { type: [string, 'null'] }
+        ruleCode: { type: [string, 'null'] }
+        severity: { enum: [CRITICAL, MAJOR, MINOR] }
+        severityPolicyVersion: { const: REVIEW_SEVERITY-v1 }
+        severityRationale: { type: string, minLength: 1 }
+        explanation: { type: string, minLength: 1 }
+        evidence: { $ref: '#/components/schemas/EvidenceDisplay' }
+        state: { enum: [OPEN, RESOLVED, ADJUDICATED, STALE] }
+        createdAt: { type: string, format: date-time }
+    SuggestedCorrection:
+      type: object
+      additionalProperties: false
+      required: [suggestionId, findingId, baseRevision, replacement, targetNoteSpan, supportStatus, supportSpans, createdAt]
+      properties:
+        suggestionId: { type: string, minLength: 1 }
+        findingId: { type: string, minLength: 1 }
+        baseRevision: { type: integer, minimum: 1 }
+        replacement: { type: string, minLength: 1 }
+        targetNoteSpan: { $ref: '#/components/schemas/NoteSpan' }
+        supportStatus: { enum: [USABLE, UNUSABLE, REJECTED] }
+        supportSpans: { type: array, items: { $ref: '#/components/schemas/SourceSpan' } }
+        createdAt: { type: string, format: date-time }
+    ReviewContext:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, noteId, revision, latestRevision, noteStatus, source, transcriptText, candidateNote, findings, decisions, suggestions, fullVerification, approvalEligible]
+      properties:
+        contractVersion: { const: REVIEW-AUDIT-CONTRACT-v1 }
+        noteId: { type: string, minLength: 1 }
+        revision: { type: integer, minimum: 1 }
+        latestRevision: { type: integer, minimum: 1 }
+        noteStatus: { enum: [DRAFT, IN_REVIEW, AWAITING_FULL_VERIFICATION, ELIGIBLE_FOR_APPROVAL, APPROVED, REJECTED] }
+        source: { $ref: '#/components/schemas/SourceReference' }
+        transcriptText: { type: string, minLength: 1 }
+        candidateNote: { type: string, minLength: 1 }
+        findings: { type: array, items: { $ref: '#/components/schemas/ReviewFinding' } }
+        decisions: { type: array, items: { $ref: '#/components/schemas/ReviewDecision' } }
+        suggestions: { type: array, items: { $ref: '#/components/schemas/SuggestedCorrection' } }
+        fullVerification: { anyOf: [ { $ref: '#/components/schemas/FullNoteVerification' }, { type: 'null' } ] }
+        approvalEligible: { type: boolean }
+    SaveRevisionRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedRevision, content, reviewerLabel, idempotencyKey]
+      properties:
+        expectedRevision: { type: integer, minimum: 1 }
+        content: { type: string, minLength: 1 }
+        reviewerLabel: { type: string, minLength: 1 }
+        findingId: { type: string, minLength: 1 }
+        idempotencyKey: { type: string, minLength: 1 }
+    RevisionSavedResponse:
+      type: object
+      additionalProperties: false
+      required: [noteId, revision, previousRevision, noteStatus, auditEventId]
+      properties:
+        noteId: { type: string, minLength: 1 }
+        revision: { type: integer, minimum: 1 }
+        previousRevision: { type: integer, minimum: 1 }
+        noteStatus: { const: AWAITING_FULL_VERIFICATION }
+        auditEventId: { type: string, minLength: 1 }
+    FindingDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [noteRevision, kind, reviewerLabel, idempotencyKey]
+      properties:
+        noteRevision: { type: integer, minimum: 1 }
+        kind: { enum: [ACKNOWLEDGED, DISPUTED, ADJUDICATED, SUGGESTION_ACCEPTED, SUGGESTION_REJECTED] }
+        reviewerLabel: { type: string, minLength: 1 }
+        rationale: { type: string, minLength: 1 }
+        suggestionId: { type: string, minLength: 1 }
+        idempotencyKey: { type: string, minLength: 1 }
+    ReviewDecision:
+      type: object
+      additionalProperties: false
+      required: [reviewDecisionId, findingId, noteId, noteRevision, kind, outcome, reviewerLabel, recordedAt]
+      properties:
+        reviewDecisionId: { type: string, minLength: 1 }
+        findingId: { type: string, minLength: 1 }
+        noteId: { type: string, minLength: 1 }
+        noteRevision: { type: integer, minimum: 1 }
+        kind: { enum: [ACKNOWLEDGED, DISPUTED, ADJUDICATED, MANUAL_CORRECTION_RECORDED, SUGGESTION_ACCEPTED, SUGGESTION_REJECTED] }
+        outcome: { enum: [NO_STATE_CHANGE, OPEN, ADJUDICATED, RESOLVED, STALE] }
+        reviewerLabel: { type: string, minLength: 1 }
+        rationale: { type: [string, 'null'] }
+        successorRevision: { type: [integer, 'null'], minimum: 1 }
+        suggestionId: { type: [string, 'null'] }
+        recordedAt: { type: string, format: date-time }
+    ClaimReverificationRequest:
+      type: object
+      additionalProperties: false
+      required: [noteRevision, claimId, reviewerLabel, idempotencyKey]
+      properties:
+        noteRevision: { type: integer, minimum: 1 }
+        claimId: { type: string, minLength: 1 }
+        reviewerLabel: { type: string, minLength: 1 }
+        idempotencyKey: { type: string, minLength: 1 }
+    ClaimReverificationResponse:
+      type: object
+      additionalProperties: false
+      required: [reviewVerificationId, noteId, noteRevision, claimId, source, upstreamVerificationRunId, status, approvalEligible]
+      properties:
+        reviewVerificationId: { type: string, minLength: 1 }
+        noteId: { type: string, minLength: 1 }
+        noteRevision: { type: integer, minimum: 1 }
+        claimId: { type: string, minLength: 1 }
+        source: { $ref: '#/components/schemas/SourceReference' }
+        upstreamVerificationRunId: { type: string, minLength: 1 }
+        status: { enum: [SUCCEEDED, FAILED, INVALID] }
+        approvalEligible: { const: false }
+    FullVerificationRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedRevision, reviewerLabel, idempotencyKey]
+      properties:
+        expectedRevision: { type: integer, minimum: 1 }
+        reviewerLabel: { type: string, minLength: 1 }
+        idempotencyKey: { type: string, minLength: 1 }
+    ComponentStatus:
+      type: object
+      additionalProperties: false
+      required: [component, runId, status]
+      properties:
+        component: { enum: [CLAIM_EXTRACTION, EVIDENCE_VERIFICATION, DETERMINISTIC_VALIDATION, SOURCE_COVERAGE] }
+        runId: { type: [string, 'null'] }
+        status: { enum: [SUCCEEDED, FAILED, INVALID, UNAVAILABLE] }
+        failureCode: { type: [string, 'null'] }
+    FullNoteVerification:
+      type: object
+      additionalProperties: false
+      required: [fullVerificationId, noteId, noteRevision, source, claimSetId, componentStatuses, status, idempotencyKey, requestDigest, createdAt]
+      properties:
+        fullVerificationId: { type: string, minLength: 1 }
+        noteId: { type: string, minLength: 1 }
+        noteRevision: { type: integer, minimum: 1 }
+        source: { $ref: '#/components/schemas/SourceReference' }
+        claimSetId: { type: [string, 'null'] }
+        componentStatuses: { type: array, minItems: 4, items: { $ref: '#/components/schemas/ComponentStatus' } }
+        status: { enum: [RUNNING, VALID, INVALID, FAILED] }
+        idempotencyKey: { type: string, minLength: 1 }
+        requestDigest: { type: string, minLength: 1 }
+        correlationId: { type: [string, 'null'] }
+        failureCode: { type: [string, 'null'] }
+        failureMessage: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
+        completedAt: { type: [string, 'null'], format: date-time }
+    ApproveRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedRevision, fullVerificationId, reviewerLabel, idempotencyKey]
+      properties:
+        expectedRevision: { type: integer, minimum: 1 }
+        fullVerificationId: { type: string, minLength: 1 }
+        reviewerLabel: { type: string, minLength: 1 }
+        rationale: { type: string, minLength: 1 }
+        idempotencyKey: { type: string, minLength: 1 }
+    RejectRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedRevision, reviewerLabel, reason, idempotencyKey]
+      properties:
+        expectedRevision: { type: integer, minimum: 1 }
+        reviewerLabel: { type: string, minLength: 1 }
+        reason: { type: string, minLength: 1 }
+        idempotencyKey: { type: string, minLength: 1 }
+    NoteDisposition:
+      type: object
+      additionalProperties: false
+      required: [dispositionId, noteId, noteRevision, kind, reviewerLabel, decidedAt]
+      properties:
+        dispositionId: { type: string, minLength: 1 }
+        noteId: { type: string, minLength: 1 }
+        noteRevision: { type: integer, minimum: 1 }
+        kind: { enum: [APPROVED, REJECTED] }
+        reviewerLabel: { type: string, minLength: 1 }
+        reason: { type: [string, 'null'] }
+        fullVerificationId: { type: [string, 'null'] }
+        decidedAt: { type: string, format: date-time }
+    AuditEvent:
+      type: object
+      additionalProperties: false
+      required: [eventId, sequence, occurredAt, actorLabel, eventType, noteId, noteRevision, targetType, targetId, references, payloadDigest]
+      properties:
+        eventId: { type: string, minLength: 1 }
+        sequence: { type: integer, minimum: 1 }
+        occurredAt: { type: string, format: date-time }
+        actorLabel: { type: string, minLength: 1 }
+        eventType: { type: string, minLength: 1 }
+        noteId: { type: string, minLength: 1 }
+        noteRevision: { type: integer, minimum: 1 }
+        targetType: { type: string, minLength: 1 }
+        targetId: { type: string, minLength: 1 }
+        references: { type: array, items: { type: string, minLength: 1 } }
+        payloadDigest: { type: string, minLength: 1 }
+        rationale: { type: [string, 'null'] }
+    AuditHistoryResponse:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, noteId, events]
+      properties:
+        contractVersion: { const: REVIEW-AUDIT-CONTRACT-v1 }
+        noteId: { type: string, minLength: 1 }
+        events: { type: array, items: { $ref: '#/components/schemas/AuditEvent' } }
