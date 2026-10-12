@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -212,4 +213,46 @@ def test_stale_claim_revision_fails_validation() -> None:
     assert result.status == "FAILED_VALIDATION"
     assert result.failure.code == "CLAIM_REVISION_MISMATCH"
     assert verifier.calls == 0
+
+
+def test_stale_source_version_fails_validation_without_authoritative_findings() -> None:
+    verifier = FakeVerifier(lambda _: {"findings": []})
+    result = service(verifier).verify(request(sourceVersion=2, idempotencyKey="stale-source"))
+    assert result.status == "FAILED_VALIDATION"
+    assert result.failure.code == "SOURCE_NOT_FOUND"
+    assert not hasattr(result, "findings")
+    assert verifier.calls == 0
+
+
+def test_cross_note_claim_fails_validation_without_provider_invocation() -> None:
+    verifier = FakeVerifier(lambda _: {"findings": []})
+    result = service(verifier, claims=ClaimRepo(note_revision_id="other-note:r1")).verify(
+        request(idempotencyKey="cross-note")
+    )
+    assert result.status == "FAILED_VALIDATION"
+    assert result.failure.code == "CLAIM_REVISION_MISMATCH"
+    assert not hasattr(result, "findings")
+    assert verifier.calls == 0
+
+
+def test_provider_timeout_is_a_non_authoritative_failed_run() -> None:
+    class SlowVerifier(FakeVerifier):
+        def verify(self, *, claims, source_text, run_id):
+            self.calls += 1
+            time.sleep(0.05)
+            return {"findings": []}
+
+    verifier = SlowVerifier(lambda _: {"findings": []})
+    target = VerificationService(
+        source_repository=SourceRepo(),
+        claim_repository=ClaimRepo(),
+        verifier=verifier,
+        provider_timeout_seconds=0.001,
+        id_factory=lambda: "timeout-run",
+        correlation_factory=iter(("timeout-correlation", "timeout-trace")).__next__,
+    )
+    result = target.verify(request(idempotencyKey="timeout"))
+    assert result.status == "FAILED_VERIFIER"
+    assert result.failure.code == "PROVIDER_TIMEOUT"
+    assert not hasattr(result, "findings")
 

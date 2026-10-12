@@ -6,7 +6,8 @@ The current implementation branch completed the strict run/failure/verifier
 contracts, structured provider adapter and bounded retry boundary, fail-closed
 orchestration with source/claim provenance and span integrity, SQLite and
 in-memory persistence with idempotent replay, and the synchronous HTTP endpoint.
-German qualifier cases are covered in `tests/evidence_verification/test_service.py`.
+German qualifier cases, stale-source/cross-note provenance, and provider-timeout
+failures are covered in `tests/evidence_verification/test_service.py`.
 
 Reviewer-owned checklist items and remaining operational/evaluation handoff
 tasks remain intentionally open; this record does not alter reviewer approval.

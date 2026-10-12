@@ -30,15 +30,15 @@ execution trace ID.
 
 ## Verification performed
 
-- `uv run pytest -q`: 127 passed; one pre-existing Starlette/httpx deprecation warning.
-- `uv run pytest tests/evidence_verification -q`: 29 passed.
+- `uv run pytest -q`: 130 passed; one pre-existing Starlette/httpx deprecation warning.
+- `uv run pytest tests/evidence_verification -q`: 32 passed.
 - `uv run python -m compileall -q src tests`: passed.
 - `git diff --check`: passed.
 
 The tests include malformed/unknown/duplicate verifier findings, timeout and
-provider failure paths, stale claim revision, resident mismatch, quotation
-mismatch, invalid spans, unsupported-without-evidence, idempotent replay, HTTP
-400/409 behavior, and German qualifier regressions.
+provider failure paths, stale source versions, stale/cross-note claims, resident
+mismatch, quotation mismatch, invalid spans, unsupported-without-evidence,
+idempotent replay, HTTP 400/409 behavior, and German qualifier regressions.
 
 ## Known limitations and remaining risks
 
@@ -47,9 +47,9 @@ mismatch, invalid spans, unsupported-without-evidence, idempotent replay, HTTP
 - Candidate-evidence discovery is intentionally not a separate retrieval
   subsystem; short transcripts are supplied in full and provider output remains
   advisory input.
-- The reviewer-owned Spec Kit checklist still has open integration-test review
-  markers. The implementation task record preserves that state rather than
-  self-approving it. Spec 008 still owns held-out evaluation thresholds and
-  release reporting.
+- The reviewer-owned Spec Kit checklist still requires an independent reviewer
+  to close its integration-test markers. The implementation task record preserves
+  that approval boundary rather than self-approving it. Spec 008 still owns
+  held-out evaluation thresholds and release reporting.
 - Numeric/unit validation, completeness/omission analysis, approval decisions,
   and audit workflows remain outside Spec 004 as required.
