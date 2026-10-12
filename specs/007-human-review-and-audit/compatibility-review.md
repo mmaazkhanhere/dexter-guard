@@ -1,11 +1,12 @@
 # Spec 007 Compatibility Review
 
-**Status:** Required pre-implementation evidence; not completed by this documentation-only change.
+**Status:** T001-T002 complete; implementation compatibility is partially available and
+remaining adapter gaps are explicit below.
 
-The available Spec 007 planning archive does not establish the concrete implementation
-interfaces for Specs 001–006. This file records the required verification boundary without
-claiming that unavailable source files, ports, repositories, or endpoint contracts were
-inspected.
+The concrete repository was inspected on 2026-10-12. Existing implementations are local
+Python modules with frozen Pydantic contracts, in-memory repositories, SQLite note/source
+repositories, and FastAPI adapters. Spec 007 uses injected ports for the missing aggregate
+boundary rather than inventing upstream HTTP endpoints.
 
 Before T005 or any dependent implementation begins, T001–T002 must record, for each upstream
 specification:
@@ -30,3 +31,18 @@ The required Spec 007 ports are reference-only adapters:
 
 Until this report is completed, no implementation task may claim upstream integration
 compatibility or approval readiness.
+
+## Inspected implementation evidence
+
+| Upstream | Actual owner/interface | Verified contract and behavior | Remaining gap |
+| --- | --- | --- | --- |
+| Spec 001 | `source_ingestion.contracts.SourceDocument`, `SourceSpan`; `SourceRepository.get`; `SourceIngestionService.resolve_span` | Immutable `(source_id, source_version)` identity, zero-based end-exclusive code-point spans, structured source errors | Spec 007 needs an injected source reader for review display; no review-specific endpoint is assumed. |
+| Spec 002 | `nursing_notes.contracts.NoteRevisionRecord`; `NoteRepository.get/create`; `InMemoryNoteRepository` and `SQLiteNoteRepository` | Append-only revisions, predecessor check, source binding, `NOTE_VERSION_CONFLICT` | Spec 007 successor creation must use a compatible boundary; current local service slice stores a review projection and does not mutate upstream rows. |
+| Spec 003 | `claim_extraction.models.ExtractionResult`; `ClaimExtractionService.extract_claims/get_current_result`; `ClaimRepository` | `SUCCEEDED`, `EMPTY`, `FAILED`; exact note revision/body/source references; bounded provider timeout/retry in service | No review-facing facade; Spec 007 `ClaimExtractionPort` is injected and reference-only. |
+| Spec 004 | `evidence_verification.contracts.VerificationRun`; `VerificationService.verify`; repository | Terminal succeeded/failed statuses, exact source/note/claim-set binding, idempotency and provider failure outcomes | No atomic full-note aggregate across 004/005/006; Spec 007 composes ports. |
+| Spec 005 | `deterministic_validation.contracts.ValidationRun`; `DeterministicValidationService.execute` | Immutable source/note references and explicit source-fact/claim/alignment IDs; unavailable alignment is typed | No public `run_for_revision` adapter; Spec 007 port remains dependency-injected and must not create alignments. |
+| Spec 006 | `source_coverage.contracts.CoverageRun`; `SourceCoverageService.execute` | Terminal success/failure, exact source/note/claim-set identity, unresolved source-item count and policy keys | Raw suggestions remain display-only; unresolved source items remain approval-blocking. |
+
+Timeout/retry behavior remains owned by each upstream service. Spec 007 treats unavailable,
+malformed, failed, or mismatched adapter output as non-approval evidence. No migration
+dependency is introduced; review SQLite schema initialization is local and idempotent.

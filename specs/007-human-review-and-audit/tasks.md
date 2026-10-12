@@ -1,6 +1,9 @@
 # Spec 007 Implementation Tasks
 
-**Execution gate:** Do not begin T001 until an independent reviewer completes [requirements-quality.md](checklists/requirements-quality.md). This file plans implementation; all tasks remain unchecked because application implementation is explicitly out of scope for this change.
+**Execution gate:** The independent requirements-quality review is complete in
+[requirements-quality.md](checklists/requirements-quality.md). T001-T002 are complete from
+the compatibility inspection recorded in `compatibility-review.md`; implementation tasks
+remain unchecked until each task's full acceptance criteria pass.
 
 **Dependencies:** Specs 001–006 contracts, the resolved integration decisions in [research.md](research.md), and the Spec 007 OpenAPI contract. `[P]` means independently parallelizable after listed dependencies.
 
@@ -9,8 +12,8 @@
 **Spec Kit user-story convention:** Each task inherits the `[US#]` label assigned in the
 User-story task structure table below; the mapping is authoritative for task traceability.
 
-- [ ] T001 Map actual router, SQLite repository, migration, React, typed-client, and test conventions in `specs/007-human-review-and-audit/compatibility-review.md`. **Depends on:** independent checklist approval. **Requirements:** all. **Done when:** inspected interfaces and gaps are recorded without changing source code.
-- [ ] T002 Validate Specs 001–006 identities, error envelopes, and service availability against their actual contracts; verify the resolved integration decisions. **Target:** `compatibility-review.md`, `research.md`. **Depends on:** T001. **Requirements:** FR-15, FR-17, FR-21, FR-22. **Done when:** every adapter input is evidenced and no source-text/claim-text authority is invented.
+- [x] T001 Map actual router, SQLite repository, migration, React, typed-client, and test conventions in `specs/007-human-review-and-audit/compatibility-review.md`. **Depends on:** independent checklist approval. **Requirements:** all. **Done when:** inspected interfaces and gaps are recorded without changing source code.
+- [x] T002 Validate Specs 001–006 identities, error envelopes, and service availability against their actual contracts; verify the resolved integration decisions. **Target:** `compatibility-review.md`, `research.md`. **Depends on:** T001. **Requirements:** FR-15, FR-17, FR-21, FR-22. **Done when:** every adapter input is evidenced and no source-text/claim-text authority is invented.
 - [ ] T003 [P] Add focused synthetic German review fixtures for HR-001–HR-018, with immutable source/note/revision/run IDs and expected audit events, including unresolved-source-item approval blocking. **Target:** `tests/human_review/fixtures/`. **Depends on:** T002. **Requirements:** all. **Done when:** fixture manifest has no real data and maps every HR scenario to expected outcomes.
 - [ ] T004 [P] Add contract validation tests from `contracts/review-audit.openapi.yaml`, including terminal full-verification status, explicit 004/005/006 run IDs, suggestion-acceptance successor requirements, final-disposition conflict, error envelope, enum/version closure, conditional fields, and unknown-field rejection. **Target:** `tests/human_review/test_contracts.py`. **Depends on:** T002. **Requirements:** FR-15, FR-17–FR-25. **Done when:** proposed request/response schemas are testable and contract version is asserted.
 
