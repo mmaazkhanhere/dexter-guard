@@ -11,10 +11,11 @@
 | `EvidenceReference` | stable `evidence_reference_id`, source identity, `start`, `end`, `quoted_text` | ID is unique within a run; span is non-empty and uses Unicode code-point offsets. |
 | `Measurement` | `category`, typed `value`, `unit`, `approximation` | Scalar or typed BP value; no raw-text inference. |
 | `SourceFact` | `source_fact_id`, source identity, `measurement`, evidence references | Source identity equals validation run snapshot. |
-| `Claim` | `claim_id`, `note_id`, positive `note_revision`, `measurement`, evidence references | Claim is immutable upstream data. |
-| `Alignment` | `alignment_id`, `source_fact_id`, `claim_id`, `status` | Every submitted fact and claim appears exactly once; only `ALIGNED` is comparable. |
-| `ValidationFinding` | catalog metadata, outcome, source/claim/alignment/evidence-reference IDs, reason, severity, review flag | `evidence_reference_ids` is always present; a `FAIL` or `NOT_EVALUABLE` is retained; pass trace is optional. |
-| `ValidationRun` | run ID, source identity, ruleset/contract version, ordered results | Records input digest and all output findings/outcomes immutably. |
+| `Claim` | `claim_id`, `note_id`, nullable `note_revision`, `measurement`, evidence references | Missing/null revision is reported as `STR-002`; a non-null mismatch is provenance failure. |
+| `Alignment` | `alignment_id`, `source_fact_id`, `claim_id`, `status` | Each record is one comparison pair; fact/claim IDs may recur across different pairs. |
+| `ValidationFinding` | catalog metadata, outcome, source/claim/alignment/evidence-reference IDs, expected/observed/unit, reason, review flag | Expected/observed/unit are always present and nullable; conditional non-null/reference rules are DVE-011. |
+| `ValidationRun` | run ID, source identity, note ID/revision, input digest, engine/ruleset/contract version, ordered results | Records immutable run binding and all output findings/outcomes. |
+| `ApiError` | stable code, safe message, optional correlation ID | Returned for non-successful resolution or execution; never contains a partial run/findings payload. |
 
 ## Enumerations
 
@@ -26,7 +27,7 @@ Category        = TEMPERATURE | FLUID_INTAKE | MEDICATION_QUANTITY | BLOOD_PRESS
 Unit            = CELSIUS | MILLILITRE | LITRE | MILLIGRAM | GRAM | MMHG
 ```
 
-`ALIGN-001` is the rule result for a non-`ALIGNED` `AlignmentStatus`; it is not a semantic evidence classification.
+`ALIGN-001` is the rule result for a non-`ALIGNED` `AlignmentStatus`; it is not a semantic evidence classification. Alignments are preselected comparison pairs, not a claim-coverage assertion or a semantic lookup request.
 
 ## Category and unit policy
 
@@ -45,4 +46,4 @@ Conversion uses `Decimal`: `1 L = 1000 ml`; `1 g = 1000 mg`. Scalar `value` is a
 - `FAIL`: a rule found an objective discrepancy or structural/evidence error. `requires_review=true`.
 - `NOT_EVALUABLE`: rule prerequisites are absent or unsafe. It is an explicit non-pass, contains a reason code, and does not claim contradiction.
 
-An invalid request envelope does not create a partial `ValidationRun`; it is rejected using the stable `SCHEMA_ERROR` envelope. Once a run has valid identity, individual malformed data may yield findings as the contract permits.
+An invalid request envelope does not create a partial `ValidationRun`; it is rejected using the stable `SCHEMA_ERROR` envelope. A resolved persisted claim with a missing/null `note_revision` creates `STR-002`; a resolved claim whose note identity conflicts with the run is `PROVENANCE_CONFLICT`. Missing records, dependency failures, and unexpected failures return the API error contract and never a partial `ValidationRun`.

@@ -9,7 +9,7 @@ Verify that the implemented codebase completely satisfies Spec 005's specificati
 1. Confirm the checklist gate was completed by a reviewer and all completed tasks have evidence.
 2. Compare implemented public models/API to [contracts/deterministic-validation.openapi.yaml](contracts/deterministic-validation.openapi.yaml) and `DVE-CONTRACT-v1`.
 3. Trace every `NUM-*`, `STR-*`, and `EVD-*` catalog rule to implementation, a focused test, and one acceptance fixture where applicable.
-4. Re-run AT-001 through AT-016 and inspect exact rule IDs, outcome, references, canonical values/units, structural/schema behavior, and no-finding valid-equivalence behavior.
+4. Re-run AT-001 through AT-021 and inspect exact rule IDs, outcome, references, canonical values/units, structural/schema behavior, complete run metadata, API errors, repeated-pair behavior, and no-finding valid-equivalence behavior.
 5. Inspect imports/mocks/runtime telemetry to prove rule execution makes no LLM or network call and does not perform semantic alignment.
 6. Inspect source/version/span/quotation validation and ensure no Unicode offset normalization or stale-source fallback occurs.
 7. Check deterministic repeatability, result ordering, Decimal serialization, immutability/provenance, minimized logging, and Spec 007/008 handoffs.

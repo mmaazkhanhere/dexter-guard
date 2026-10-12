@@ -40,7 +40,7 @@ The engine validates consistency, not clinical truth. A temperature, intake, blo
 | --- | --- |
 | Source fact | Immutable, normalized structured observation tied to source transcript identity and evidence references. |
 | Claim | Immutable normalized extracted assertion belonging to one candidate note revision. |
-| Alignment | A trusted upstream record that explicitly links one source fact and one claim as the same comparable measurement. |
+| Alignment | A trusted upstream preselected comparison pair that explicitly links one source fact and one claim as the same comparable measurement. |
 | Comparable | Alignment is `ALIGNED`, both values parse, categories match, and required unit semantics are available. |
 | Not evaluable | A non-successful comparison outcome caused by unavailable or ambiguous comparison prerequisites; it is never a pass. |
 | Finding | A traceable rule result; `FAIL` findings contain a discrepancy and `NOT_EVALUABLE` findings explain the unmet precondition. |
@@ -92,25 +92,28 @@ As Specs 007 and 008, I need stable findings that can be rendered, reviewed, and
 
 1. The same valid immutable input and ruleset version returns byte-for-byte equivalent normalized results, except a caller-supplied run identifier where present.
 2. Results have deterministic order: input alignment order, then rule catalog order.
-3. Every finding identifies `rule_id`, `rule_version`, `ruleset_version`, `outcome`, related IDs, severity, reviewer requirement, and machine-readable reason.
-4. Spec 005 provides a severity hint only. Spec 007 owns the final severity policy and approval effect.
+3. Every finding identifies `rule_id`, `rule_version`, `ruleset_version`, `outcome`, related IDs, reviewer requirement, and machine-readable reason.
+4. Spec 007 exclusively owns severity and approval policy; Spec 005 exposes neither as an external finding field.
 5. The engine makes no network or LLM call.
 
 ## Functional requirements
 
 - **FR-11:** Detect numerical and unit mismatches through exact, documented normalization; valid equivalents must not produce findings.
 - **FR-16:** Execute deterministic, versioned validations for contracts, numeric values, units, and source evidence references without probabilistic inference.
-- **DVE-001:** Each submitted source fact and claim in a validation run MUST appear in exactly one immutable alignment record. A numeric comparison is evaluated only when that record has `status=ALIGNED`, references exactly one source fact and claim, and declares a shared measurement category. `UNAVAILABLE`, `AMBIGUOUS`, or `REJECTED` alignment records emit one `ALIGN-001` `NOT_EVALUABLE` result with the matching stable reason and do not emit `NUM-001` through `NUM-005`. A run missing a required alignment record is rejected as `SCHEMA_ERROR`/provenance-invalid; it must not return an empty successful comparison.
+- **DVE-001:** Each submitted alignment is one explicit, immutable preselected comparison pair: it references exactly one source fact and one claim whose resolved measurements have a shared category. Multiple alignment records MAY reference the same source fact or the same claim, supporting repeated observations and one-to-many representation without semantic matching. Only `ALIGNED` pairs are numerically compared. `UNAVAILABLE`, `AMBIGUOUS`, or `REJECTED` pairs emit one `ALIGN-001` `NOT_EVALUABLE` result with the matching stable reason and do not emit `NUM-001` through `NUM-005`. Unaligned selected facts or claims are outside that run's comparison scope; an unknown, duplicate, or internally inconsistent submitted alignment reference is rejected as a provenance error.
 - **DVE-002:** Canonical numeric parsing accepts only documented decimal representations (German comma or dot decimal separator; optional sign; no locale guessing). Parsing failure yields `STR-001`.
-- **DVE-003:** The Ruleset `DVE-RULESET-v1` permits only `TEMPERATURE`, `FLUID_INTAKE`, `MEDICATION_QUANTITY`, and `BLOOD_PRESSURE`. The reference-only public request cannot submit a category; when a referenced immutable source fact or claim resolves to an unknown category, the resolver rejects the run as `SCHEMA_ERROR`/provenance-invalid. No unsupported category is silently compared.
+- **DVE-003:** The Ruleset `DVE-RULESET-v1` permits only `TEMPERATURE`, `FLUID_INTAKE`, `MEDICATION_QUANTITY`, and `BLOOD_PRESSURE`. The reference-only public request cannot submit a category; when a referenced immutable source fact or claim resolves to an unknown category, the resolver rejects the run as `409/PROVENANCE_CONFLICT`. No unsupported category is silently compared.
 - **DVE-004:** Unit conversion is exact decimal arithmetic. v1 allows Celsius↔Celsius, millilitre↔litre for fluid volume, and milligram↔gram for medication mass. Category/unit pairing is defined in `data-model.md`; no implicit conversion is allowed.
 - **DVE-005:** Equal values after a permitted conversion yield no `NUM-001`; the engine may expose an informational `NUM-002` pass record only when an API consumer requests rule trace output. Default reviewer findings omit passes.
 - **DVE-006:** Incompatible dimensions yield `NUM-003`; unknown/invalid category-unit pairs yield `STR-003`, not a numeric mismatch.
 - **DVE-007:** Blood pressure must be a typed two-component value with unit `mmHg`; parse and compare systolic and diastolic values separately. Any changed component yields one `NUM-005` finding naming changed components.
 - **DVE-008:** Approximation comparison uses only `EXACT`, `APPROXIMATE`, or `UNSPECIFIED` structured values. `APPROXIMATE → EXACT` yields `NUM-004`; any `UNSPECIFIED` state is `NOT_EVALUABLE` for this rule.
 - **DVE-009:** Evidence integrity is evaluated for each supplied evidence reference independent of numeric comparability. `EVD-001`–`EVD-003` are failures and take precedence over a positive numeric pass for that reference.
-- **DVE-010:** Schema-invalid request envelopes are rejected with `SCHEMA_ERROR`; field-valid items with a rule precondition failure yield individually traceable `NOT_EVALUABLE` findings.
-- **DVE-011:** A failed finding includes `expected_value` and `observed_value` where meaningful, exact source/claim/alignment/evidence-reference IDs, a stable reason, and `requires_review=true`. Missing values are explicit `null`, never invented. `evidence_reference_ids` is required and may be an empty array only when no evidence reference is relevant to that rule.
+- **DVE-010:** Schema-invalid request envelopes are rejected with `SCHEMA_ERROR`; field-valid comparison pairs with a rule precondition failure yield individually traceable `NOT_EVALUABLE` findings. Missing source/fact/claim/alignment records, provenance conflicts, and unavailable storage use the operational error contract, never a successful validation response.
+- **DVE-011:** Every finding contains `expected_value`, `observed_value`, and `unit` (explicit `null` when not meaningful), exact source/claim/alignment/evidence-reference IDs as applicable, a stable reason, and `requires_review=true`. `ALIGN-*`, `NUM-*`, and `STR-*` findings require non-null source-fact, claim, and alignment IDs; `EVD-*` findings require at least one evidence-reference ID and at least one related source-fact or claim ID. `NUM-001`, `NUM-003`, `NUM-004`, and `NUM-005` require non-null expected/observed values and unit. `evidence_reference_ids` is required and may be empty only where the rule has no relevant evidence reference.
+- **DVE-013:** The public `ValidationRun` response MUST bind results to `note_id`, positive `note_revision`, `input_digest`, and deterministic `engine_version`, in addition to source identity, contract version, and ruleset version.
+- **DVE-014:** A request missing a required transport field is `422/SCHEMA_ERROR`. A resolved immutable claim whose `note_revision` is null/missing is a completed `STR-002` finding; a resolved claim whose note ID or non-null note revision differs from the requested note binding is `409/PROVENANCE_CONFLICT` and produces no findings.
+- **DVE-015:** Missing immutable records return `404` with a stable `*_NOT_FOUND` code; provenance conflicts return `409/PROVENANCE_CONFLICT`; unavailable repository/storage dependencies return `503/DEPENDENCY_UNAVAILABLE`; unexpected failures return `500/INTERNAL_ERROR`. These responses contain an `ApiError`, never a `ValidationRun` or partial findings.
 - **DVE-012:** The engine preserves all outcomes; it does not collapse a deterministic failure into a semantic status from Spec 004 or overwrite a Spec 004 finding.
 
 ## Rule catalog
@@ -145,7 +148,6 @@ The public request is provenance by reference: it contains exact source identity
   "source_fact_id": "fact-001",
   "claim_id": "claim-001",
   "evidence_reference_ids": ["evidence-fact-001"],
-  "severity": "CRITICAL",
   "expected_value": "37.2",
   "observed_value": "38.2",
   "unit": "celsius",
@@ -154,7 +156,7 @@ The public request is provenance by reference: it contains exact source identity
 }
 ```
 
-`severity` is a v1 transport hint (`INFO`, `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`) attached by the calling policy/configuration. Spec 005's default mapping is documented in the plan solely to make fixtures stable; Spec 007 is the authority for final severity and blocking behavior.
+Spec 005 does not expose a severity value. Spec 007 maps rule findings to the project severity vocabulary (`minor`, `major`, `critical`) and determines approval effects.
 
 ## Acceptance scenarios
 
@@ -175,13 +177,18 @@ The public request is provenance by reference: it contains exact source identity
 | AT-013 | Aligned scalar source or claim has non-parseable value text | `FAIL`, `STR-001`; dependent NUM rules skipped. |
 | AT-014 | Resolved claim lacks its note revision | `FAIL`, `STR-002`; comparison not treated as successful. |
 | AT-015 | Fluid-intake record uses `CELSIUS` | `FAIL`, `STR-003`; no unit conversion or numeric mismatch. |
-| AT-016 | Referenced immutable source fact or claim resolves to an unsupported measurement category | Reject `SCHEMA_ERROR`/provenance-invalid. |
+| AT-016 | Referenced immutable source fact or claim resolves to an unsupported measurement category | `409`, `PROVENANCE_CONFLICT`; no findings. |
+| AT-017 | Evidence span has `start == end` | `FAIL`, `EVD-001`; no verified evidence accepted. |
+| AT-018 | Resolved claim belongs to a different note revision than the request | `409`, `PROVENANCE_CONFLICT`; no findings. |
+| AT-019 | One source fact is preselected in two explicit alignments for two claims | Each alignment is evaluated independently; no alignment-coverage or semantic-matching failure. |
+| AT-020 | Requested immutable source/version is unavailable | `404`, `SOURCE_NOT_FOUND` or `SOURCE_VERSION_NOT_FOUND`; no findings. |
+| AT-021 | Source/fact/claim/alignment repository is unavailable | `503`, `DEPENDENCY_UNAVAILABLE`; no findings. |
 
 ## Non-functional requirements and definition of done
 
 - Pure rule execution is deterministic, offline, reproducible, and independently testable with `pytest`.
 - The engine uses synthetic fixtures only and does not log full transcript or claim text outside approved evidence excerpts.
-- Every output is traceable to immutable source identity, source fact ID, claim ID, alignment ID where applicable, rule ID/version, and ruleset version.
+- Every completed run is traceable to immutable source identity, note ID/revision, source fact ID, claim ID, alignment ID where applicable, input digest, engine/rule/ruleset versions, and evidence-reference IDs.
 - Unit, contract, property/boundary, integration, and acceptance tests pass, including all AT cases.
 - The versioned response contract is sufficient for Spec 007 rendering and the rule/fixture manifest is sufficient for Spec 008 evaluation.
 - The reviewer-owned [checklist.md](checklist.md) must be approved before implementation.

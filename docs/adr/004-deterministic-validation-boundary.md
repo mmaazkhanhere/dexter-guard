@@ -12,7 +12,7 @@ The constitution requires explicit rules for numeric/unit/schema/evidence checks
 
 ## Decision
 
-Spec 005 consumes normalized immutable facts and claims plus an explicit upstream alignment record. It evaluates numeric rules only when the alignment is one-to-one and `ALIGNED`; otherwise it returns a traceable `NOT_EVALUABLE` result. Evidence-reference integrity is checked independently of alignment.
+Spec 005 consumes normalized immutable facts and claims plus explicit upstream preselected comparison pairs. Each pair links one fact to one claim and is compared only when `ALIGNED`; a fact or claim may recur in multiple pairs. Otherwise the engine returns a traceable `NOT_EVALUABLE` result. Evidence-reference integrity is checked independently of alignment.
 
 Spec 005 uses no LLM, embedding, semantic retrieval, keyword matching, or clinical-range inference to decide counterpart identity, support, contradiction, diagnosis, or approval. It preserves its rule results beside—not inside—Spec 004 semantic evidence findings. Spec 007 owns how independent findings affect final review severity and approval.
 

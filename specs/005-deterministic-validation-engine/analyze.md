@@ -12,7 +12,7 @@
 | Requirement | Specification | Design control | Tasks |
 | --- | --- | --- | --- |
 | FR-11 numerical/unit mismatch | US-1/US-2; DVE-002–DVE-008; AT-001–006, AT-013–015 | Decimal normalizer, category matrix, typed BP | T006–T009, T019–T021 |
-| FR-16 deterministic validation | US-3–US-5; DVE-009–DVE-012; AT-007–012, AT-016 | Pure engine, schema/evidence validation, fixed ordering | T004–T005, T010–T018, T021 |
+| FR-16 deterministic validation | US-3–US-5; DVE-009–DVE-015; AT-007–012, AT-016–021 | Pure engine, schema/evidence validation, fixed ordering, typed API errors | T004–T005, T010–T018, T021 |
 | No invented semantic match | Scope; DVE-001; AT-011 | ADR 004 and `ALIGN-001` alignment gate | T002–T003, T012, T014 |
 | Evidence integrity | US-4; DVE-009; AT-008–010 | Exact source/version/span/quote validator | T010–T011, T018, T020 |
 | Spec 007 / 008 handoff | US-5; DoD | Stable finding contract and versioned fixtures | T022–T023 |
@@ -23,11 +23,12 @@
 | --- | --- | --- |
 | Numeric equality and conversions are exact | Pass | CL-003/004, data-model unit table, plan primitives, T006–T009. |
 | Valid equivalences do not warn | Pass | DVE-005, AT-001/003, T009/T020. |
-| Missing/ambiguous comparison is never a pass | Pass | DVE-001 requires one alignment per selected fact/claim and emits `ALIGN-001`; CL-001/008/013, AT-011, T005/T012/T014. |
+| Missing/ambiguous comparison is never a pass | Pass | DVE-001 evaluates only preselected pairs and emits `ALIGN-001`; CL-001/008, AT-011, T005/T012/T014. |
 | Approximation is structured-only | Pass | DVE-008, CL-005, T009. |
 | Evidence offset convention matches architecture/Spec 004 | Pass | CL-009, data model, plan, T010/T011. |
 | Semantic verification is not duplicated | Pass | Scope, CL-002, ADR 004, T002/T012. |
-| Severity ownership is not conflicted | Pass | spec/clarify/plan reserve final policy for Spec 007. |
+| Severity ownership is not conflicted | Pass | Spec 005 omits external severity; spec/clarify/plan reserve project-vocabulary mapping and final policy for Spec 007. |
+| Revision binding and operational failures are explicit | Pass | DVE-013–DVE-015, CL-016, API contract, AT-018/020/021, T004/T005/T016/T018. |
 | Rule results require no LLM | Pass | scope, plan, and no-model test T014. |
 | Contract validity and source authority are testable | Pass | Public request is reference-only; typed measurement shapes and stable evidence-reference IDs are explicit; resolved internal data is separate; OpenAPI/Pydantic plan and T004/T005/T018. |
 

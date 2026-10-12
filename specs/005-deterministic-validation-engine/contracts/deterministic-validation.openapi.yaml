@@ -26,16 +26,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SchemaError'
+        '404':
+          description: Requested immutable record or source version does not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Resolved immutable records conflict with the requested provenance binding
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '503':
+          description: Required repository or storage dependency is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: Unexpected execution failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
 components:
   schemas:
     ValidationRequest:
       type: object
       additionalProperties: false
-      required: [sourceId, sourceVersion, sourceFactIds, claimIds, alignmentIds, rulesetVersion]
+      required: [sourceId, sourceVersion, noteId, noteRevision, sourceFactIds, claimIds, alignmentIds, rulesetVersion]
       properties:
         rulesetVersion: { const: DVE-RULESET-v1 }
         sourceId: { type: string, minLength: 1 }
         sourceVersion: { type: integer, minimum: 1 }
+        noteId: { type: string, minLength: 1 }
+        noteRevision: { type: integer, minimum: 1 }
         sourceFactIds:
           type: array
           minItems: 1
@@ -118,7 +144,7 @@ components:
       properties:
         claimId: { type: string, minLength: 1 }
         noteId: { type: string, minLength: 1 }
-        noteRevision: { type: integer, minimum: 1 }
+        noteRevision: { type: [integer, 'null'], minimum: 1 }
         measurement: { $ref: '#/components/schemas/Measurement' }
         evidence:
           type: array
@@ -135,7 +161,7 @@ components:
     ValidationFinding:
       type: object
       additionalProperties: false
-      required: [ruleId, ruleVersion, rulesetVersion, outcome, evidenceReferenceIds, severity, requiresReview, reasonCode, message]
+      required: [ruleId, ruleVersion, rulesetVersion, outcome, sourceFactId, claimId, alignmentId, evidenceReferenceIds, expectedValue, observedValue, unit, requiresReview, reasonCode, message]
       properties:
         ruleId: { type: string, pattern: '^(ALIGN|NUM|STR|EVD)-[0-9]{3}$' }
         ruleVersion: { const: '1' }
@@ -148,21 +174,58 @@ components:
           type: array
           items: { type: string, minLength: 1 }
           uniqueItems: true
-        severity: { enum: [INFO, LOW, MEDIUM, HIGH, CRITICAL] }
         expectedValue: { type: [string, number, object, 'null'] }
         observedValue: { type: [string, number, object, 'null'] }
         unit: { type: [string, 'null'] }
-        reasonCode: { type: string }
+        reasonCode:
+          enum: [ALIGNMENT_UNAVAILABLE, ALIGNMENT_AMBIGUOUS, ALIGNMENT_REJECTED, NUMERIC_MISMATCH, INCOMPATIBLE_UNIT, PRECISION_MISMATCH, COMPOSITE_MEASUREMENT_MISMATCH, INVALID_STRUCTURED_FIELD_TYPE, MISSING_REQUIRED_REFERENCE, INVALID_UNIT_CATEGORY_PAIRING, INVALID_SOURCE_SPAN, SOURCE_VERSION_MISMATCH, EVIDENCE_TEXT_MISMATCH]
         message: { type: string }
-        requiresReview: { type: boolean }
+        requiresReview: { const: true }
+      allOf:
+        - if:
+            properties:
+              ruleId: { pattern: '^(ALIGN|NUM|STR)-[0-9]{3}$' }
+            required: [ruleId]
+          then:
+            properties:
+              sourceFactId: { type: string, minLength: 1 }
+              claimId: { type: string, minLength: 1 }
+              alignmentId: { type: string, minLength: 1 }
+        - if:
+            properties:
+              ruleId: { pattern: '^EVD-[0-9]{3}$' }
+            required: [ruleId]
+          then:
+            properties:
+              evidenceReferenceIds:
+                type: array
+                minItems: 1
+            anyOf:
+              - properties:
+                  sourceFactId: { type: string, minLength: 1 }
+              - properties:
+                  claimId: { type: string, minLength: 1 }
+        - if:
+            properties:
+              ruleId: { pattern: '^NUM-(001|003|004|005)$' }
+            required: [ruleId]
+          then:
+            properties:
+              expectedValue: { not: { type: 'null' } }
+              observedValue: { not: { type: 'null' } }
+              unit: { type: string, minLength: 1 }
     ValidationRun:
       type: object
       additionalProperties: false
-      required: [validationRunId, sourceId, sourceVersion, contractVersion, rulesetVersion, findings]
+      required: [validationRunId, sourceId, sourceVersion, noteId, noteRevision, inputDigest, engineVersion, contractVersion, rulesetVersion, findings]
       properties:
         validationRunId: { type: string }
         sourceId: { type: string }
         sourceVersion: { type: integer }
+        noteId: { type: string }
+        noteRevision: { type: integer }
+        inputDigest: { type: string, pattern: '^[a-f0-9]{64}$' }
+        engineVersion: { type: string, minLength: 1 }
         contractVersion: { const: DVE-CONTRACT-v1 }
         rulesetVersion: { const: DVE-RULESET-v1 }
         findings:
@@ -176,3 +239,12 @@ components:
         code: { const: SCHEMA_ERROR }
         message: { type: string }
         path: { type: string }
+    ApiError:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          enum: [SOURCE_NOT_FOUND, SOURCE_VERSION_NOT_FOUND, SOURCE_FACT_NOT_FOUND, CLAIM_NOT_FOUND, ALIGNMENT_NOT_FOUND, PROVENANCE_CONFLICT, DEPENDENCY_UNAVAILABLE, INTERNAL_ERROR]
+        message: { type: string }
+        correlationId: { type: string }

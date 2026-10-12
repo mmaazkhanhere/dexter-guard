@@ -18,7 +18,7 @@
 - [ ] CQ-008 `NOT_EVALUABLE`, `FAIL`, pass, and schema rejection are distinct and have no false-pass path.
 - [ ] CQ-009 Approximation behavior relies only on structured data and does not infer German uncertainty from prose.
 - [ ] CQ-010 Evidence-offset semantics and exact quotation matching agree with the architecture and Spec 004.
-- [ ] CQ-011 Severity is explicitly a Spec 005 hint and final review/approval authority remains with Spec 007.
+- [ ] CQ-011 Spec 005 exposes no external severity and final severity/review/approval authority remains with Spec 007.
 - [ ] CQ-012 No requirement permits diagnosis, plausible-range reasoning, auto-correction, or LLM outcome determination.
 
 ## Consistency and testability
@@ -29,3 +29,5 @@
 - [ ] CQ-016 Spec 007 and Spec 008 consuming needs are concretely represented without assigning their policy/evaluation ownership to Spec 005.
 - [ ] CQ-017 The ADR captures the cross-component semantic-alignment decision and alternatives.
 - [ ] CQ-018 No unresolved ambiguity could change safety, evidence attribution, contract compatibility, or review behavior.
+- [ ] CQ-019 Completed run responses bind source and note revisions, input digest, and engine/ruleset versions for downstream review.
+- [ ] CQ-020 Missing references, provenance conflicts, dependency failures, and unexpected failures have distinct non-success API contracts and acceptance coverage.
