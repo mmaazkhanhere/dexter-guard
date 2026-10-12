@@ -189,3 +189,14 @@ class AuditEvent(Contract):
     references: tuple[StrictStr, ...] = ()
     payload_digest: StrictStr = Field(alias="payloadDigest", min_length=1)
     rationale: StrictStr | None = None
+
+
+class ClaimReverificationResponse(Contract):
+    review_verification_id: StrictStr = Field(alias="reviewVerificationId", min_length=1)
+    note_id: StrictStr = Field(alias="noteId", min_length=1)
+    note_revision: StrictInt = Field(alias="noteRevision", ge=1)
+    claim_id: StrictStr = Field(alias="claimId", min_length=1)
+    source: SourceReference
+    upstream_verification_run_id: StrictStr = Field(alias="upstreamVerificationRunId", min_length=1)
+    status: Literal["SUCCEEDED", "FAILED", "INVALID"]
+    approval_eligible: Literal[False] = Field(alias="approvalEligible")

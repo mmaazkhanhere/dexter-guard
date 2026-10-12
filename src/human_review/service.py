@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from .approval import ApprovalEligibilityPolicy, ReviewServiceError
-from .contracts import AuditEvent, FullNoteVerification, NoteDisposition, ReviewDecision, ReviewFinding, SuggestedCorrection
+from .contracts import AuditEvent, ClaimReverificationResponse, FullNoteVerification, NoteDisposition, ReviewDecision, ReviewFinding, SuggestedCorrection
 from .repository import InMemoryReviewRepository, ReviewRepositoryError
 
 
@@ -131,3 +131,9 @@ class ReviewService:
 
     def audit(self, note_id: str):
         return self.repository.audit(note_id)
+
+    def context(self, note_id: str, transcript_text: str):
+        note = self.get_note(note_id)
+        findings = tuple(f for f in self.repository.findings.values() if f.note_id == note_id and f.note_revision == note.revision)
+        decisions = tuple(d for d in self.repository.decisions if d.note_id == note_id)
+        return {"contractVersion": "REVIEW-AUDIT-CONTRACT-v1", "noteId": note_id, "revision": note.revision, "latestRevision": self.repository.latest[note_id], "noteStatus": "REJECTED" if any(d.note_id == note_id and d.kind == "REJECTED" for d in self.repository.dispositions) else "IN_REVIEW", "source": {"sourceId": note.source_id, "sourceVersion": note.source_version}, "transcriptText": transcript_text, "candidateNote": note.content, "findings": [f.model_dump(mode="json", by_alias=True) for f in findings], "decisions": [d.model_dump(mode="json", by_alias=True) for d in decisions], "suggestions": [], "fullVerification": None, "approvalEligible": False}

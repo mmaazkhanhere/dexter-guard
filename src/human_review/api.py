@@ -63,8 +63,28 @@ def create_router(service: ReviewService) -> APIRouter:
     return router
 
 
-def create_app(service: ReviewService | None = None) -> FastAPI:
+def create_app(service: ReviewService | None = None, *, source_reader=None, claim_reverifier=None) -> FastAPI:
     service = service or ReviewService()
     app = FastAPI(title="Dexter Guard Human Review and Audit", version="REVIEW-AUDIT-CONTRACT-v1")
     app.include_router(create_router(service))
+    if source_reader is not None:
+        @app.get("/api/v1/reviews/{note_id}")
+        def review_context(note_id: str):
+            try:
+                note = service.get_note(note_id)
+                return service.context(note_id, source_reader(note.source_id, note.source_version))
+            except ReviewServiceError as error:
+                return _error(error)
+
+    if claim_reverifier is not None:
+        @app.post("/api/v1/reviews/{note_id}/claim-reverification")
+        def claim_reverification(note_id: str, payload: dict[str, Any]):
+            try:
+                note = service.get_note(note_id)
+                if note.revision != payload["noteRevision"]:
+                    raise ReviewServiceError("STALE_REVISION")
+                run_id = claim_reverifier(note_id, note.revision, payload["claimId"])
+                return {"reviewVerificationId": f"claim-feedback-{run_id}", "noteId": note_id, "noteRevision": note.revision, "claimId": payload["claimId"], "source": {"sourceId": note.source_id, "sourceVersion": note.source_version}, "upstreamVerificationRunId": run_id, "status": "SUCCEEDED", "approvalEligible": False}
+            except (ReviewServiceError, KeyError) as error:
+                return _error(error if isinstance(error, ReviewServiceError) else ReviewServiceError("INVALID_REQUEST"))
     return app
