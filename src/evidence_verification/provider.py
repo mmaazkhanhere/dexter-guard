@@ -120,7 +120,10 @@ class StructuredVerifierAdapter:
         for _ in range(self.max_attempts):
             try:
                 raw = self._call(method, claims=claims, source_text=source_text, run_id=run_id)
-                return parse_verifier_output(raw)
+                response = parse_verifier_output(raw)
+                if response.policy_version != ANNOTATION_POLICY_VERSION:
+                    raise MalformedVerifierOutputError("Verifier output used an unsupported annotation policy version.")
+                return response
             except (ProviderTimeoutError, TimeoutError) as error:
                 last_error = error
             except (ProviderUnavailableError, MalformedVerifierOutputError) as error:

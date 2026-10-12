@@ -21,6 +21,13 @@ from .provider import (
     VerifierCandidateFinding,
     VerifierResponse,
 )
+from .repository import (
+    IdempotencyReservation,
+    InMemoryVerificationRepository,
+    SQLiteVerificationRepository,
+    VerificationRepositoryError,
+)
+from .service import VerificationService, VerificationServiceError
 from .validation import (
     ImmutableClaimReference,
     IdempotencyBinding,
@@ -56,6 +63,12 @@ __all__ = [
     "StructuredVerifierAdapter",
     "VerifierCandidateFinding",
     "VerifierResponse",
+    "IdempotencyReservation",
+    "InMemoryVerificationRepository",
+    "SQLiteVerificationRepository",
+    "VerificationRepositoryError",
+    "VerificationService",
+    "VerificationServiceError",
     "canonical_request_digest",
     "validate_claim_references",
     "validate_idempotency_replay",
