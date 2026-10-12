@@ -16,15 +16,15 @@ tasks remain intentionally open; this record does not alter reviewer approval.
 
 ## Phase 0 — Architecture and contract baseline
 
-- [ ] T001 Read the constitution and architecture document; map this plan to the existing backend module, API router, persistence, migration, configuration, model-client, fixtures, and test locations. Record the mapping in the PR description. No new platform or parallel service.  
+- [x] T001 Read the constitution and architecture document; map this plan to the existing backend module, API router, persistence, migration, configuration, model-client, fixtures, and test locations. Record the mapping in the PR description. No new platform or parallel service.  
   **Depends on:** none
 - [ ] T002 [P] Inspect Specs 001–003 contracts and fixtures. Document the exact source snapshot, note revision, claim-set, and normalized-claim fields available to verification.  
   **Depends on:** T001
 - [ ] T003 [P] Inspect Specs 005–008 interfaces to confirm numerical/unit checks, omissions, approval, and evaluation remain outside this module.  
   **Depends on:** T001
-- [ ] T004 Define the versioned Pydantic and OpenAPI public/internal schemas for EvidenceStatus, SourceSpan, EvidenceFinding, VerificationRun, request, and structured failure. Use the architecture's canonical SourceSpan fields (`source_id`, `source_version`, `start`, `end`), define the explicit transport mapping if needed, include derived quotations only alongside spans, evidence-status-policy version, canonical `EVIDENCE_ANNOTATION-v1` policy version for every finding, idempotency key, model/prompt identity and hash, input digest, timestamps, correlation ID, and execution trace ID, and encode enum closure and success/failure exclusivity.
+- [x] T004 Define the versioned Pydantic and OpenAPI public/internal schemas for EvidenceStatus, SourceSpan, EvidenceFinding, VerificationRun, request, and structured failure. Use the architecture's canonical SourceSpan fields (`source_id`, `source_version`, `start`, `end`), define the explicit transport mapping if needed, include derived quotations only alongside spans, evidence-status-policy version, canonical `EVIDENCE_ANNOTATION-v1` policy version for every finding, idempotency key, model/prompt identity and hash, input digest, timestamps, correlation ID, and execution trace ID, and encode enum closure and success/failure exclusivity.
   **Depends on:** T001, T002
-- [ ] T005 Write Pydantic service-validator and API contract tests before service implementation. Enforce distinct submitted claim IDs; immutable claim-reference resolution with unknown/stale/cross-note/resident-mismatch rejection; exact, unique response coverage with no missing or foreign claim IDs; success/failure exclusivity; valid end-exclusive Unicode source offsets; exact one-to-one source-derived quotation-to-span equality; successful `UNSUPPORTED` findings with no spans or only `CONTEXT_NON_SUPPORTING` context; required public execution metadata; and invalid required-span failure responses.
+- [x] T005 Write Pydantic service-validator and API contract tests before service implementation. Enforce distinct submitted claim IDs; immutable claim-reference resolution with unknown/stale/cross-note/resident-mismatch rejection; exact, unique response coverage with no missing or foreign claim IDs; success/failure exclusivity; valid end-exclusive Unicode source offsets; exact one-to-one source-derived quotation-to-span equality; successful `UNSUPPORTED` findings with no spans or only `CONTEXT_NON_SUPPORTING` context; required public execution metadata; and invalid required-span failure responses.
   **Depends on:** T004
 
 ## Phase 1 — Deterministic integrity foundation
@@ -44,35 +44,35 @@ tasks remain intentionally open; this record does not alter reviewer approval.
 
 ## Phase 2 — Semantic-verifier boundary and policy
 
-- [ ] T012 Define the semantic-verifier port and strictly schema-validated response object. It accepts claims and source-only evidence; it cannot persist, approve, or mutate upstream records.  
+- [x] T012 Define the semantic-verifier port and strictly schema-validated response object. It accepts claims and source-only evidence; it cannot persist, approve, or mutate upstream records.  
   **Depends on:** T004, T010
 - [ ] T013 Implement advisory candidate-evidence discovery using claim text and upstream normalized attributes. Ensure short transcripts can be supplied in full and retrieval absence never decides status.  
   **Depends on:** T012
-- [ ] T014 Implement the approved model adapter using structured output, configured timeout, bounded safe retry policy tied to the same idempotent run identifier, model/prompt version capture, and redacted diagnostics.
+- [x] T014 Implement the approved model adapter using structured output, configured timeout, bounded safe retry policy tied to the same idempotent run identifier, model/prompt version capture, and redacted diagnostics.
   **Depends on:** T012, T013
-- [ ] T015 Write adapter contract tests with a deterministic fake for malformed JSON, invalid enum, duplicated/missing/foreign claim IDs, missing explanation, timeout, and provider failure. Cover EV-012.  
+- [x] T015 Write adapter contract tests with a deterministic fake for malformed JSON, invalid enum, duplicated/missing/foreign claim IDs, missing explanation, timeout, and provider failure. Cover EV-012.  
   **Depends on:** T014
-- [ ] T016 Implement deterministic response validation and EVIDENCE_ANNOTATION-v1 application: enum/contract validation, coverage enforcement, required spans by status, required discrepancy labels, and qualifier-policy handling. The semantic verifier—not deterministic code—classifies semantic support, contradiction, or uncertainty. Preserve conflicting verifier/rule findings and resolve only documented mechanical policy constraints conservatively.
+- [x] T016 Implement deterministic response validation and EVIDENCE_ANNOTATION-v1 application: enum/contract validation, coverage enforcement, required spans by status, required discrepancy labels, and qualifier-policy handling. The semantic verifier—not deterministic code—classifies semantic support, contradiction, or uncertainty. Preserve conflicting verifier/rule findings and resolve only documented mechanical policy constraints conservatively.
   **Depends on:** T008, T014
-- [ ] T017 Write policy unit tests for explicit contradiction, absent support, genuine ambiguity, certainty escalation, explicitly unconfirmable certainty claim, patient-report attribution escalation, unsupported clinical inference, negation reversal, and partial negation.  
+- [x] T017 Write policy unit tests for explicit contradiction, absent support, genuine ambiguity, certainty escalation, explicitly unconfirmable certainty claim, patient-report attribution escalation, unsupported clinical inference, negation reversal, and partial negation.  
   **Depends on:** T016
 
 ## Phase 3 — Verification run orchestration and persistence
 
-- [ ] T018 Create the immutable VerificationRun persistence model and repository/migration using the existing storage conventions. Enforce one finding per run and claim, preserve all mandatory provenance/version metadata, and atomically bind each idempotency key to one canonical request digest; replay an exact match and reject a differing request with `IDEMPOTENCY_KEY_CONFLICT`.
+- [x] T018 Create the immutable VerificationRun persistence model and repository/migration using the existing storage conventions. Enforce one finding per run and claim, preserve all mandatory provenance/version metadata, and atomically bind each idempotency key to one canonical request digest; replay an exact match and reject a differing request with `IDEMPOTENCY_KEY_CONFLICT`.
   **Depends on:** T004, T010
-- [ ] T019 Implement run lifecycle transitions: RECEIVED, VALIDATING, VERIFYING, SUCCEEDED, and every defined terminal failure. Ensure only SUCCEEDED has authoritative findings.  
+- [x] T019 Implement run lifecycle transitions: RECEIVED, VALIDATING, VERIFYING, SUCCEEDED, and every defined terminal failure. Ensure only SUCCEEDED has authoritative findings.  
   **Depends on:** T016, T018
-- [ ] T020 Implement the verification application service in the algorithm order from plan.md: validation, immutable lookup, discovery, verifier call, response validation, span validation, normalization, coverage, atomic persistence.  
+- [x] T020 Implement the verification application service in the algorithm order from plan.md: validation, immutable lookup, discovery, verifier call, response validation, span validation, normalization, coverage, atomic persistence.  
   **Depends on:** T019
-- [ ] T021 Write integration tests proving all-or-nothing behavior: one failing claim, invalid evidence in one finding, missing/duplicate/foreign findings, persistence failure, and no approved/authoritative partial output. Prove that an invalid required span fails the whole run while a contract-valid `UNSUPPORTED` claim with no span or only valid `CONTEXT_NON_SUPPORTING` context remains a successful finding.
+- [x] T021 Write integration tests proving all-or-nothing behavior: one failing claim, invalid evidence in one finding, missing/duplicate/foreign findings, persistence failure, and no approved/authoritative partial output. Prove that an invalid required span fails the whole run while a contract-valid `UNSUPPORTED` claim with no span or only valid `CONTEXT_NON_SUPPORTING` context remains a successful finding.
   **Depends on:** T020
 
 ## Phase 4 — HTTP API and end-to-end regression suite
 
-- [ ] T022 Add synchronous POST /api/v1/verification-runs to the existing API router, its versioned OpenAPI contract, bounded timeout, terminal HTTP 200 success/failure envelope, required idempotency, and correlation conventions. Do not add HTTP 202 or polling until a separate asynchronous contract is approved. Use a local synthetic-demo access boundary and data minimization; do not add accounts, roles, permissions, authentication, or authorization.
+- [x] T022 Add synchronous POST /api/v1/verification-runs to the existing API router, its versioned OpenAPI contract, bounded timeout, terminal HTTP 200 success/failure envelope, required idempotency, and correlation conventions. Do not add HTTP 202 or polling until a separate asynchronous contract is approved. Use a local synthetic-demo access boundary and data minimization; do not add accounts, roles, permissions, authentication, or authorization.
   **Depends on:** T020
-- [ ] T023 Write API contract tests for successful response, invalid HTTP request, identifiable failed run, response-schema stability, findings/failure exclusivity, same-key/same-input idempotent replay, same-key/different-input HTTP 409 conflict, required public execution metadata (model/prompt identity, timestamps, correlation ID, and policy versions), and minimum evidence exposure at the applicable review boundary.
+- [x] T023 Write API contract tests for successful response, invalid HTTP request, identifiable failed run, response-schema stability, findings/failure exclusivity, same-key/same-input idempotent replay, same-key/different-input HTTP 409 conflict, required public execution metadata (model/prompt identity, timestamps, correlation ID, and policy versions), and minimum evidence exposure at the applicable review boundary.
   **Depends on:** T022
 - [ ] T024 Create versioned German-language fixtures and expected findings for EV-001 through EV-014. Each test asserts the `EVIDENCE_ANNOTATION-v1` policy version, claim ID, canonical primary status, required discrepancy labels, span boundaries/text where required, and run state.
   **Depends on:** T017, T023
