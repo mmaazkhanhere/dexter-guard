@@ -12,10 +12,10 @@
 
 ## Phase 1 - Source facts and deterministic integrity
 
-- [ ] T005 Write failing tests for atomic source facts and multi-clause German source fixtures: symptoms, negated symptoms, numerical measurements, mobility assistance, care actions, uncertainty, indirect speech, temporality, laterality, and approximate values. **Requirements:** FR-14.1, FR-14.2. **Depends on:** T003.
-- [ ] T006 Implement source-fact extraction port parsing/validation and immutable repository records. Require valid evidence spans and source-derived quotes; split independently evaluable clauses; route unsupported ambiguity to a source-linked unresolved item only. **Requirements:** FR-14.1, FR-14.2. **Depends on:** T005.
-- [ ] T007 Implement and test `COVERAGE_EXPECTATION-v1` as pure deterministic policy mapping to expectation and Spec 007 severity-policy key. Exclude contextual facts from denominator/findings and expose no final severity. **Requirements:** FR-14.2, FR-14.5. **Depends on:** T006.
-- [ ] T008 Implement/test Unicode source-span validation and quote derivation with umlauts, combining characters, emoji, whitespace/newlines, empty/reversed/out-of-range spans, stale source versions, and altered provider quote. **Requirements:** FR-14.1, FR-14.5. **Depends on:** T003.
+- [x] T005 Write failing tests for atomic source facts and multi-clause German source fixtures: symptoms, negated symptoms, numerical measurements, mobility assistance, care actions, uncertainty, indirect speech, temporality, laterality, and approximate values. **Requirements:** FR-14.1, FR-14.2. **Depends on:** T003. **Verified:** `tests/source_coverage/test_extraction.py` covers multi-clause German extraction and source-linked unresolved items.
+- [x] T006 Implement source-fact extraction port parsing/validation and immutable repository records. Require valid evidence spans and source-derived quotes; split independently evaluable clauses; route unsupported ambiguity to a source-linked unresolved item only. **Requirements:** FR-14.1, FR-14.2. **Depends on:** T005. **Verified:** `src/source_coverage/extraction.py`; extraction and contract tests pass.
+- [x] T007 Implement and test `COVERAGE_EXPECTATION-v1` as pure deterministic policy mapping to expectation and Spec 007 severity-policy key. Exclude contextual facts from denominator/findings and expose no final severity. **Requirements:** FR-14.2, FR-14.5. **Depends on:** T006. **Verified:** `src/source_coverage/policy.py` and `test_expectation_policy_is_deterministic_and_has_no_final_severity`.
+- [x] T008 Implement/test Unicode source-span validation and quote derivation with umlauts, combining characters, emoji, whitespace/newlines, empty/reversed/out-of-range spans, stale source versions, and altered provider quote. **Requirements:** FR-14.1, FR-14.5. **Depends on:** T003. **Verified:** exact code-point span/hash tests pass; invalid span and stale hash fail closed.
 
 ## Phase 2 - Matching, assessment, and findings
 
