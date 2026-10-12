@@ -40,6 +40,14 @@ def create_router(service: ReviewService) -> APIRouter:
         except (ReviewServiceError, KeyError) as error:
             return _error(error if isinstance(error, ReviewServiceError) else ReviewServiceError("INVALID_REQUEST"))
 
+    @router.post("/{note_id}/findings/{finding_id}/decisions", status_code=201)
+    def record_decision(note_id: str, finding_id: str, payload: dict[str, Any]):
+        try:
+            result = service.record_decision(note_id, finding_id, expected_revision=payload["expectedRevision"], kind=payload["kind"], reviewer_label=payload["reviewerLabel"], rationale=payload.get("rationale"))
+            return result.model_dump(mode="json", by_alias=True)
+        except (ReviewServiceError, KeyError) as error:
+            return _error(error if isinstance(error, ReviewServiceError) else ReviewServiceError("INVALID_REQUEST"))
+
     @router.post("/{note_id}/reject")
     def reject(note_id: str, payload: dict[str, Any]):
         try:

@@ -43,3 +43,21 @@ def test_api_rejection_is_available_without_verification():
     })
     assert response.status_code == 200
     assert response.json()["kind"] == "REJECTED"
+
+
+def test_api_records_finding_decision_without_mutating_upstream_record():
+    service = ReviewService(InMemoryReviewRepository())
+    service.seed_note("note-1", "source-1", 1, "Notiz")
+    from human_review.contracts import ReviewFinding
+    service.add_finding(ReviewFinding(
+        reviewFindingId="finding-1", origin="REVIEW_OPERATIONAL", noteId="note-1", noteRevision=1,
+        sourceId="source-1", sourceVersion=1, severity="CRITICAL", severityPolicyVersion="REVIEW_SEVERITY-v1",
+        severityRationale="integrity", explanation="missing evidence", evidence={"availability": "MISSING", "spans": [], "excerpts": []},
+        state="OPEN", createdAt=datetime.now(timezone.utc),
+    ))
+    client = TestClient(create_app(service))
+    response = client.post("/api/v1/reviews/note-1/findings/finding-1/decisions", json={
+        "expectedRevision": 1, "kind": "ACKNOWLEDGED", "reviewerLabel": "reviewer", "idempotencyKey": "decision-1"
+    })
+    assert response.status_code == 201
+    assert service.repository.findings["finding-1"].state == "OPEN"

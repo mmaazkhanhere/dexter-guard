@@ -47,7 +47,7 @@ class ReviewService:
     def save_revision(self, note_id: str, *, expected_revision: int, content: str, reviewer_label: str) -> NoteRecord:
         with self.repository._lock:
             latest = self.get_note(note_id)
-            if self.repository.dispositions:
+            if any(disposition.note_id == note_id for disposition in self.repository.dispositions):
                 raise ReviewServiceError("FINAL_DISPOSITION_IMMUTABLE")
             if latest.revision != expected_revision:
                 raise ReviewServiceError("STALE_REVISION")
@@ -58,7 +58,8 @@ class ReviewService:
             return successor
 
     def add_finding(self, finding: ReviewFinding) -> None:
-        if self.get_note(finding.note_id, finding.note_revision).source_id != finding.source_id:
+        note = self.get_note(finding.note_id, finding.note_revision)
+        if (note.source_id, note.source_version) != (finding.source_id, finding.source_version):
             raise ReviewServiceError("PROVENANCE_CONFLICT")
         self.repository.findings[finding.review_finding_id] = finding
 
