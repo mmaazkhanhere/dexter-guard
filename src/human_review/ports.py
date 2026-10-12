@@ -13,6 +13,7 @@ class UpstreamRun:
     note_id: str
     note_revision: int
     claim_set_id: str
+    unresolved_source_items: int = 0
 
 
 class ClaimExtractionPort(Protocol):

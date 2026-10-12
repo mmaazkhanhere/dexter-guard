@@ -110,6 +110,7 @@ class ReviewDecision(Contract):
     rationale: StrictStr | None = None
     successor_revision: StrictInt | None = Field(default=None, alias="successorRevision")
     suggestion_id: StrictStr | None = Field(default=None, alias="suggestionId")
+    idempotency_key: StrictStr | None = Field(default=None, alias="idempotencyKey")
     recorded_at: datetime = Field(alias="recordedAt")
 
     @model_validator(mode="after")
@@ -137,6 +138,7 @@ class FullNoteVerification(Contract):
     evidence_run_id: StrictStr = Field(alias="evidenceRunId", min_length=1)
     deterministic_validation_run_id: StrictStr = Field(alias="deterministicValidationRunId", min_length=1)
     coverage_run_id: StrictStr = Field(alias="coverageRunId", min_length=1)
+    coverage_unresolved_source_items: StrictInt = Field(default=0, alias="coverageUnresolvedSourceItems", ge=0)
     component_statuses: tuple[ComponentStatus, ...] = Field(alias="componentStatuses", min_length=4, max_length=4)
     status: Literal["VALID", "INVALID", "FAILED"]
     idempotency_key: StrictStr = Field(alias="idempotencyKey", min_length=1)
@@ -156,6 +158,8 @@ class FullNoteVerification(Contract):
             raise ValueError("valid verification requires all components to succeed")
         if self.status != "VALID" and (not self.failure_code or not self.failure_message):
             raise ValueError("failed or invalid verification requires a safe failure")
+        if self.status == "VALID" and self.coverage_unresolved_source_items:
+            raise ValueError("unresolved source items block valid approval")
         return self
 
 

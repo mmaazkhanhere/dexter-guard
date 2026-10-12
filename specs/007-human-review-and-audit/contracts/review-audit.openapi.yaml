@@ -464,6 +464,7 @@ components:
         evidenceRunId: { type: string, minLength: 1 }
         deterministicValidationRunId: { type: string, minLength: 1 }
         coverageRunId: { type: string, minLength: 1 }
+        coverageUnresolvedSourceItems: { type: integer, minimum: 0, default: 0 }
         componentStatuses: { type: array, minItems: 4, maxItems: 4, items: { $ref: '#/components/schemas/ComponentStatus' } }
         status: { enum: [VALID, INVALID, FAILED] }
         idempotencyKey: { type: string, minLength: 1 }

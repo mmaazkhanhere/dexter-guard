@@ -81,6 +81,7 @@ def test_approval_requires_latest_valid_full_verification_and_no_critical_open_f
     with pytest.raises(ReviewServiceError, match="APPROVAL_PRECONDITION_FAILED"):
         service.approve("note-1", expected_revision=1, full_verification=verification, reviewer_label="r")
     service.persist_verification(verification)
+    service.record_decision("note-1", "finding-1", expected_revision=1, kind="ADJUDICATED", reviewer_label="r", rationale="reviewed non-critical finding")
     assert service.approve("note-1", expected_revision=1, full_verification=verification, reviewer_label="r").kind == "APPROVED"
 
 
