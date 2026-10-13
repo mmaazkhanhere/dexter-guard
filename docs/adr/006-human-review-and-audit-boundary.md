@@ -2,8 +2,10 @@
 
 ## Status
 
-Proposed with Feature 007; implementation requires compatibility verification recorded in
-`specs/007-human-review-and-audit/compatibility-review.md`.
+Implementation evidence is recorded, but independent approval remains pending. Compatibility
+verification is recorded in `specs/007-human-review-and-audit/compatibility-review.md`; an
+independent reviewer must either approve this ADR or document an exception with an owner, risk,
+compensating control, and expiry before the status can become Accepted.
 
 ## Context
 
@@ -32,6 +34,15 @@ critical findings, required decisions, and terminal full-note verification.
 The design requires adapter contracts, immutable revisions, explicit stale conflicts, and
 SQLite transaction tests. It adds read-model and audit persistence complexity but keeps the
 PoC synchronous, local, synthetic-only, and fail-closed.
+
+## Implementation evidence and open decision
+
+The local boundary has regression coverage for terminal verification, stale conflicts,
+idempotency replay, bounded timeout retries, content-minimized telemetry, approval guards, and
+append-only audit history. It deliberately uses injected, reference-only ports: this does not
+constitute approval of any production Spec 001--006 transport, timeout, retry, or error
+envelope. The remaining reviewer decision is therefore a governance gate, not an inferred
+technical sign-off.
 
 ## References
 

@@ -1,172 +1,140 @@
-# Spec 007 — Convergence Procedure
+# Spec 007 — Backend Convergence Procedure
 
-## Goal
+## 1. Purpose
 
-Verify that the implemented codebase completely satisfies Feature 007's specification,
-clarifications, data model, contracts, plan, and dependency-ordered tasks. This procedure is
-read-only except that it may append narrowly scoped implementation tasks to
-[`tasks.md`](tasks.md). It must never silently mark reviewer-owned checklist items complete.
+Establish, with reproducible evidence, whether the **Human Review and Audit backend** satisfies the approved Feature 007 requirements, data contracts, invariants, acceptance criteria, and implementation tasks. Convergence is a verification decision, **not** an assertion that successful test commands alone prove completeness.
 
-## Tooling status
+This document defines a repeatable review procedure. It does not claim that any check has been executed or that the current implementation is complete.
 
-No installed `specify`, `speckit`, `/speckit-implement`, or convergence command was found in the
-available repository/tool environment. This document records the required workflow and does
-not simulate command execution. When the project toolchain is available, run the implementation
-stage only after the independent checklist gate, then repeat this convergence procedure.
+## 2. Scope and boundaries
 
-## Review sequence
+**In scope:** backend domain services, Pydantic/API contracts, review decisions, finding severity, optional suggestions, immutable note revisions, claim-level and full-note re-verification coordination, approval/rejection controls, repository persistence, append-only audit history, upstream integration boundaries, and automated backend verification.
 
-1. Confirm independent requirements-quality approval recorded with reviewer identity/date and
-   task evidence. The architecture self-review is not a substitute for that gate.
-2. Reconcile `spec.md`, `clarify.md`, `data-model.md`, `plan.md`, `research.md`, `quickstart.md`,
-   `analyze.md`, and `tasks.md` with the contract and implementation. Trace every requirement,
-   invariant, lifecycle rule, dependency, and success criterion; record a concrete gap for any
-   disagreement rather than selecting one artifact implicitly.
-3. Compare the implemented Pydantic/OpenAPI models and API behavior with
-   [`contracts/review-audit.openapi.yaml`](contracts/review-audit.openapi.yaml), including
-   terminal verification states, exact source/note/run bindings, expected-revision conflicts,
-   conditional suggestion fields, and the common error envelope.
-4. Verify the concrete Specs 001–006 ports, repositories, versions, timeout/retry rules,
-   idempotency behavior, migrations, and fixtures using
-   [`compatibility-review.md`](compatibility-review.md). Missing evidence is a dependency gap,
-   not permission to infer an interface.
-5. Trace FR-15 and FR-17–FR-25, HR-001–HR-018, and each `[US#]` task mapping to implementation
-   and passing tests. Confirm no component task bypasses the user-story outcome or ownership
-   boundary.
-6. Inspect source-span validation and highlighting for exact immutable source versions,
-   Unicode code-point semantics, missing/invalid evidence states, and candidate/source
-   separation.
-7. Verify immutable revisions, compare-and-append concurrency, stale finding/run behavior,
-   final-disposition immutability, and append-only audit history.
-8. Verify claim-level re-verification cannot authorize approval and that final full-note
-   verification contains the exact current claim set plus complete successful 004/005/006
-   component results.
-9. Exercise backend approval guards for stale, failed, malformed, incomplete,
-   source-mismatched, unresolved-critical, and unresolved-source-item cases. Confirm rejection
-   remains possible after verification failure and approval is atomic against concurrent edits.
-10. Run contract, unit, repository, API, UI, acceptance, static/compile, observability,
-    idempotency/retry, and `git diff --check` checks configured by the implementation repository.
-    Retain the exact command, exit status, timestamp, code revision, and non-sensitive result
-    summary for each check; an undated passing-test statement is not completion evidence.
-11. Verify the [Spec 008 evaluation handoff](../../docs/evaluation/spec007-handoff.md) is complete:
-    it must identify the benchmark owner and require the versioned 100+ synthetic German
-    benchmark, held-out metrics, thresholds, and model/prompt/ruleset/dataset provenance.
-    The benchmark itself remains a Spec 008 release/clinical-claim gate, not an unfulfilled
-    Spec 007 implementation task. Do not claim clinical safety or improvement from feature
-    acceptance tests alone.
-12. Confirm [ADR 006](../../docs/adr/006-human-review-and-audit-boundary.md) still matches the
-    verified upstream interfaces and transaction boundary.
+**Out of scope for this convergence review:** user-interface implementation and UI testing; speech recognition; multi-resident workflows; real patient data; diagnosis, treatment advice, or medical-truth verification; production authentication or authorization; EHR integration; distributed infrastructure; and overall benchmark/release claims owned by Spec 008. No out-of-scope work is to be added merely for completeness.
 
-## Outcome rules
+The backend must support the contractual operations required by a future client, but this review does not require or assess that client.
 
-- **Converged:** Every applicable requirement, invariant, acceptance scenario, contract,
-  dependency, and task has implementation evidence and passing tests; no unchecked
-  implementation task, unresolved compatibility gate, unchecked reviewer gate, contract drift,
-  or constitutional violation remains.
-- **Gaps found:** Append one unchecked, dependency-ordered task to `tasks.md` for each concrete
-  gap, including requirement/user-story ID, evidence, dependency, target, and acceptance proof.
-  Run the available implementation command for those tasks, then repeat this procedure.
-- A missing upstream contract, unavailable test, fabricated evidence, unsafe partial success,
-  automatic correction/approval, overwritten history, or failed approval guard is **not
-  converged**.
+## 3. Sources of truth and traceability
 
-## Historical documentation baseline — 2026-10-12
+Review the current approved versions of the following artifacts where present:
 
-**Superseded baseline — planning-only state.** At the time this baseline was written, Spec 007 application implementation had not started,
-the independent requirements-quality checklist gate remains pending, concrete Specs 001–006
-implementation compatibility is not established in the available archive, and the Spec 008
-benchmark has not been executed. These gaps are already represented by T001–T004, T021–T034,
-T035, and T036; no duplicate gap tasks are appended by this documentation-only review.
+- `spec.md` and applicable clarifications: required behavior and acceptance scenarios.
+- `data-model.md`: entities, relationships, revision and state invariants.
+- `contracts/review-audit.openapi.yaml` and related schemas: externally observable API behavior.
+- `plan.md`, `research.md`, and architecture decision records: implementation constraints and documented decisions.
+- `tasks.md`: dependency-ordered work and test obligations.
+- Applicable project constitution and Specs 001–006 interfaces, including `compatibility-review.md` when present.
 
-The documentation package is ready for independent review and subsequent implementation. After
-implementation and test evidence exist, rerun this procedure until the result can truthfully
-be reported as **Converged**.
+Record the artifact version or commit used. A missing **required** artifact, unresolved conflict between approved artifacts, or undocumented interface assumption is a gap. Do not silently choose one conflicting source. Link every applicable FR, invariant, acceptance scenario, and task to code and verification evidence.
 
-## Latest repository verification — 2026-10-12
+### Mandatory requirement coverage
 
-This section records the pre-correction implementation review. It is a historical baseline,
-despite the legacy heading above, and its gap list is superseded. It must not be read as the
-current repository state; the correction review below is the authoritative implementation update.
+| Requirement | Backend convergence proof |
+| --- | --- |
+| FR-15 | Critical/major/minor severity is assigned consistently under a documented policy. |
+| FR-17 | Findings expose correct claim locations, transcript-version-bound source spans, and explanations through contracts. Visual highlighting is excluded. |
+| FR-18 | Findings support independent, persisted decisions and appropriate state checks. |
+| FR-19 | Manual corrections produce distinct note revisions without overwriting older content. |
+| FR-20 | Suggestions are optional, evidence-grounded, explicitly accepted or rejected, and linked to resultant revisions when accepted. |
+| FR-21 | Edited claims can be reverified; results are bound to the exact revision and cannot authorize final approval alone. |
+| FR-22 | Approval requires a successful final **full-note** verification for the latest complete revision. |
+| FR-23 | Unresolved critical discrepancies block approval through backend enforcement. |
+| FR-24 | Approval, rejection, and reasoned adjudication are validated and persisted. |
+| FR-25 | Prior note versions, findings, verification results, and review actions remain auditable. |
 
-The repository now contains a partial Spec 007 implementation. Verification evidence:
+Also trace every applicable HR-001–HR-018 scenario (if defined in `spec.md`) and all relevant evidence-integrity invariants. Requirements implemented by upstream components must have verified integration contracts, not duplicate implementations here.
 
-- `pytest -q tests/human_review`: 19 passed.
-- `.venv\Scripts\python.exe -m pytest -q`: full repository suite passed.
-- `.venv\Scripts\python.exe -m compileall -q src tests`: passed.
-- `git diff --check`: passed.
+## 4. Convergence gates
 
-The result remains **Not converged — implementation gaps found**. The following concrete gaps
-were identified by comparing the implementation with the contract and task artifacts:
+### Gate A — Prerequisites and requirements integrity
 
-1. The documented `/full-verifications` endpoint is absent from `src/human_review/api.py`.
-2. Structured suggestion acceptance/rejection is not exposed through the API, and the decision
-   route does not persist `suggestionId` or enforce the accepted-successor contract.
-3. Approval checks do not yet enforce every documented predicate, including required decision
-   completeness, exact component-run/source/claim-set closure, and unresolved Spec 006 source
-   item blocking.
-4. SQLite persistence currently covers audit events, not the complete review-owned entity set.
-5. Contract, UI, end-to-end acceptance, idempotency-digest, retry, and observability coverage is
-   incomplete; the remaining unchecked tasks are not implementation evidence.
+1. Confirm the independent requirements-quality review is recorded, with reviewer, date, reviewed artifact revision, and outcome. Do not self-approve reviewer-owned checklist items.
+2. Reconcile specifications, clarifications, contracts, models, plans, decisions, and task dependencies. Record contradictions and undecided semantics explicitly.
+3. Confirm all applicable requirements and scenarios have implementation and test mappings. An unchecked task is not closed by a general statement that the test suite passes.
 
-These gaps are represented by newly appended tasks T037–T042 in `tasks.md`. No duplicate tasks
-were added for gaps already covered by earlier tasks. Convergence must be rerun after those
-tasks are implemented and tested; the feature is not ready to report as **Converged** or proceed
-to an implementation PR.
+### Gate B — Contracts and upstream compatibility
 
-## Latest implementation correction review — 2026-10-12
+1. Compare implemented routes, methods, request/response schemas, status codes, errors, and Pydantic validation with the approved OpenAPI contract.
+2. Verify exact bindings among source document **ID/version**, note **ID/revision**, finding **ID**, claim set, and verification run; validate referenced entities before persisting decisions.
+3. Verify terminal verification states, incomplete/malformed result behavior, timeouts, retries, idempotency replay/conflict rules, and expected-revision conflicts against the contracts.
+4. Confirm integration with Specs 001–006 through actual interfaces or explicitly controlled test doubles. Document outstanding dependencies; do not infer unimplemented ports, schemas, or repository behavior.
+5. Ensure the generated candidate note is never used as independent evidence for itself and source spans use the declared Unicode/offset semantics against the exact immutable transcript version.
 
-The following convergence gaps were corrected:
+### Gate C — Review lifecycle and evidence integrity
 
-- Added the `/full-verifications` API route and terminal aggregate orchestration.
-- Added explicit suggestion acceptance/rejection decision handling with successor revision
-  linkage and idempotency binding.
-- Strengthened approval checks for exact component-run references, source binding, decision
-  completeness, and unresolved coverage items.
-- Added durable SQLite persistence for notes, findings, decisions, suggestions, verification
-  aggregates, dispositions, idempotency records, and audit events.
-- Added regression coverage for full verification and accepted suggestions.
+1. Confirm independent finding-level decisions, required adjudication reasons, and severity policy are enforced server-side.
+2. Confirm suggestion acceptance is explicit; suggestion contents must be evidence-grounded, must not silently add unsupported facts, and must create or link to the appropriate successor revision.
+3. Confirm every content-changing correction creates a new immutable note revision and invalidates the prior revision's approval eligibility; historical findings remain available for audit.
+4. Confirm claim-level re-verification is informational for the affected revision and **cannot** substitute for final full-note verification.
+5. Confirm final full-note verification covers the exact current note revision and claim set, and includes successfully completed applicable evidence, deterministic, and source-coverage checks from Specs 004–006.
+6. Confirm unsupported evidence is distinguished from explicit contradiction. Missing or invalid evidence must not be converted into a supported finding.
+7. Confirm verification failure, malformed output, missing required component results, timeouts, and stale or source-mismatched results leave the note unapproved.
 
-Verification after the corrections passed the focused Spec 007 suite, the full repository
-suite, compilation, and `git diff --check`.
+### Gate D — Approval, rejection, concurrency, and audit
 
-The result is still **Not converged**. The implementation corrections above are regression
-evidence, but they do not by themselves satisfy the completion conditions in `tasks.md`.
-The task ledger currently leaves T001–T042 unchecked. In particular:
+1. Exercise the backend approval predicate for completed/valid/full-note/current verification, required review-decision completeness, unresolved critical findings, and unresolved blocking source-coverage items.
+2. Attempt approval with stale revisions, failed or incomplete verification, invalid component provenance, mismatched source versions, missing decisions, unresolved blockers, and concurrent edits; each must fail safely with a defined error.
+3. Make the final revision check and approval disposition atomic in one transaction or through an equivalent concurrency-safe mechanism. An already approved/rejected final disposition must follow the documented immutability policy.
+4. Confirm rejection remains possible when verification fails and that required reasons are stored.
+5. Confirm append-only audit records preserve original revisions, generated findings, suggestions, reviewer labels, timestamps, decisions, reasons, verification provenance, and final dispositions. Updates must not silently erase history.
+6. Verify durable persistence across process restart and idempotent requests do not create duplicate dispositions or contradictory audit histories.
 
-- T001–T002 contain documented inspection results but remain unchecked until independent
-  requirements-quality approval is recorded.
-- T003–T036 still require their fixture, contract, frontend, integration, acceptance,
-  observability, ADR, and evaluation completion evidence.
-- T037–T040 describe behavior that is present in the current partial implementation, but their
-  required task-specific tests and completion evidence have not been recorded, so they remain
-  open rather than being inferred complete from the focused suite.
-- T041–T042 remain incomplete: the repository has no React/frontend implementation or complete
-  contract, acceptance, and observability coverage for every documented route. Spec 008
-  benchmark/release evidence remains a separate release/clinical-claim gate, not a condition
-  for completing those Spec 007 tasks.
+### Gate E — Automated evidence and quality checks
 
-This reconciles the convergence result with the task ledger: passing tests demonstrate partial
-behavioral correctness, not task completion. The remaining tasks must be completed and checked,
-then this procedure rerun before reporting **Converged** or opening an implementation PR.
+Run the tests supported by the repository, including applicable:
 
-## Latest backend hardening pass — 2026-10-12
+- Schema/contract tests, domain-policy unit tests, repository and migration tests.
+- API integration tests for revision creation, finding decisions, suggestion handling, claim-level re-verification, full-note verification, approval, rejection, and audit retrieval.
+- Negative-path tests for invalid evidence, unsupported suggestions, malformed/time-out upstream responses, staleness, conflicts, and partial verification.
+- Concurrency, transaction-atomicity, idempotency/retry, restart durability, and audit-history tests.
+- End-to-end **backend** acceptance scenarios, including the full critical-discrepancy → correction → stale-run rejection → latest full-note re-verification → disposition and audit sequence.
+- Static/compile checks, relevant observability checks, and repository diff hygiene (`git diff --check`) where available.
 
-The backend implementation was hardened after the correction review. The changes add typed
-request validation and common validation errors, revision-scoped context and suggestion
-retrieval, the documented finding-scoped claim-reverification route (with the legacy local alias),
-idempotency replay/conflict handling, terminal verification timestamps and malformed-output
-classification, stricter approval decision completeness, durable restart coverage, and
-content-minimized review telemetry. The OpenAPI contract now reflects the implemented backend
-route status and terminal fields.
+For each executed check, record **command, timestamp, code revision, environment/configuration, exit status, test counts, and non-sensitive result summary**. A missing test or inaccessible dependency must be recorded as `BLOCKED` or `NOT RUN`; never recorded as passing. Use synthetic test fixtures only.
 
-Evidence recorded for this pass:
+## 5. Evidence ledger
 
-- `.venv\Scripts\python.exe -m pytest -q`: passed.
-- `.venv\Scripts\python.exe -m pytest -q tests\human_review`: passed.
-- `.venv\Scripts\python.exe -m compileall -q src tests`: passed.
-- `git diff --check`: passed.
+Maintain a separate current-run report (for example, `convergence-report.md`) with one row for each requirement, invariant, acceptance scenario, and outstanding task:
 
-This pass does not close the independent reviewer gate, create the absent React frontend, supply
-the complete synthetic HR-001–HR-018 acceptance/observability fixture package, approve ADR 006,
-or execute the externally owned Spec 008 benchmark. Those remain convergence blockers or
-external release gates as identified by T001–T042.
+| ID | Artifact reference | Implementation location | Test / evidence reference | Result | Owner / next action |
+| --- | --- | --- | --- | --- | --- |
+| FR-23 | `spec.md` approval criterion | _Populate during review_ | _Populate during review_ | NOT RUN | _Populate_ |
+
+Permitted results: `PASS`, `FAIL`, `BLOCKED`, `NOT RUN`, and `NOT APPLICABLE` (with explicit rationale). Include the reviewed git revision and date. Evidence records must not contain real patient information or unnecessary transcript text.
+
+## 6. Gap handling and iteration
+
+1. Classify each non-passing item as an implementation defect, missing test/evidence, contract mismatch, documentation ambiguity, or external dependency.
+2. For each concrete implementation or test gap, append or update a **single actionable, unchecked** task in `tasks.md`; reference requirement/scenario ID, observed evidence, dependency, files or component affected, and objective acceptance proof. Avoid duplicates.
+3. Route specification or contract conflicts through explicit review and approval before changing the implementation baseline. Do not rewrite requirements merely to match existing code.
+4. Do not silently mark independent reviews or task checkboxes complete. Re-run affected tests and the full applicable gates after remediation.
+5. Keep dated results in the separate convergence report or history, not as contradictory “latest” sections in this procedure.
+
+## 7. Decision rules
+
+**CONVERGED** may be reported only if:
+
+- All applicable requirements, integrity invariants, contracts, and backend acceptance scenarios have traceable, passing evidence on the reviewed revision.
+- Independent required reviews are approved and recorded.
+- Required tasks are completed with task-specific evidence; no unresolved blocking dependencies, undocumented contract drift, or constitutional violations remain.
+- Final full-note approval, stale-result rejection, concurrency behavior, failure-safe handling, and append-only audit history are proven by automated tests.
+- All `NOT APPLICABLE` exceptions have a documented scope justification.
+
+**NOT CONVERGED** applies if any required gate fails, is blocked, lacks evidence, or remains unreviewed. Record the exact blockers and required next actions. Passing a broad test suite does **not** override a missing requirement, unchecked task, absent required check, or incompatible upstream contract.
+
+**External project release distinction:** Completing Spec 007's backend convergence does not assert overall product readiness, clinical safety, or achievement of Spec 008's held-out benchmark thresholds. Those remain separate project-level decisions.
+
+## 8. Execution record
+
+Populate the separate convergence report with:
+
+- Review date and reviewer
+- Code commit/revision and artifact versions
+- Environment and dependency revisions
+- Requirement/test evidence ledger
+- Failures, blocked items, and deviations
+- Added or updated task IDs
+- Final decision: `CONVERGED` or `NOT CONVERGED`
+- Required follow-up actions and approver where applicable
+
+**No convergence status is asserted by this procedure alone.**
