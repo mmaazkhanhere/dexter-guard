@@ -7,8 +7,8 @@ Retain one Python FastAPI application with domain-separated modules from Specs 0
 Proposed repository shape after implementation:
 
 - frontend/: Vite React app, generated API client, UI tests.
-- src/app/: FastAPI composition root and dependencies.
-- src/{source_ingestion,nursing_notes,claim_extraction,evidence_verification,deterministic_validation,source_coverage,human_review,evaluation}/: existing domain modules retained.
+- backend/src/app/: FastAPI composition root and dependencies.
+- backend/src/{source_ingestion,nursing_notes,claim_extraction,evidence_verification,deterministic_validation,source_coverage,human_review,evaluation}/: existing domain modules retained.
 - api/: minimal Vercel Python entrypoint importing the composition root.
 
 ## Frontend structure

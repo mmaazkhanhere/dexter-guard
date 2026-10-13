@@ -1,46 +1,62 @@
-# Quickstart (Specification Target)
+# Quickstart (Spec 009 implementation)
 
-This repository currently has Python modules under src/ and no frontend directory, package.json, composed FastAPI entrypoint, PostgreSQL adapter, Vercel configuration, or frontend test suite. Commands marked **planned** depend on this feature's future implementation and are not assertions that they work today.
+## Current implementation status
 
-## Verified current backend commands
+The composed backend entrypoint is `backend/src/app/main.py`; the Vercel wrapper is
+`backend/main.py`; backend tests are under `backend/tests/`; and the browser
+application is under `frontend/`. The local
+backend commands below were verified on 2026-10-13. Frontend dependency
+installation and Vercel preview deployment remain environment-dependent gates.
+
+## Local commands
 
 From the repository root:
 
-1. Install the existing Python project: uv sync --group dev
-2. Run existing backend tests: uv run pytest
-3. Existing source-ingestion ASGI entrypoint: uv run uvicorn source_ingestion.main:app --reload
+```powershell
+uv sync --group dev
+uv run pytest
+uv run uvicorn app.main:app --env-file backend/.env --reload --port 8000
+```
 
-The current source-ingestion app exposes source and note routes and optional adapters; it is not yet the complete composed production app.
+In a second terminal:
 
-## Planned local development commands
+```powershell
+cd frontend
+npm ci
+npm run dev
+```
 
-1. Install frontend dependencies: cd frontend; npm ci
-2. Create local environment files from documented examples; never commit secrets.
-3. Set server-only DATABASE_URL, LLM credentials, provider/model configuration, timeout/retry configuration, and synthetic-only environment flag.
-4. Set VITE_API_BASE_URL=/api for the browser. Do not place LLM or database credentials in VITE_ variables.
-5. Initialize synthetic test data with the planned backend seed command or versioned evaluation fixture loader (exact command: TBD by implementation).
-6. Start composed backend: uv run uvicorn app.main:app --reload --port 8000
-7. Start frontend: cd frontend; npm run dev
-8. Open the URL printed by Vite and exercise Documentation.
+The browser-safe setting is `VITE_API_BASE_URL=/api/v1`. Database URLs and LLM
+credentials are server-only variables; never prefix them with `VITE_` or commit
+them. Use the examples in `backend/.env.example` and
+`frontend/.env.example` as the variable-name reference.
 
-## Planned validation commands
+The generation adapter uses the OpenAI-compatible chat API surface. For a Groq
+demo, set `LLM_BASE_URL=https://api.groq.com/openai/v1`, your Groq
+`LLM_API_KEY`, and a Groq-supported `LLM_MODEL`. For Gemini, keep the same
+client and change only `LLM_BASE_URL` to
+`https://generativelanguage.googleapis.com/v1beta/openai/`, then provide the
+Gemini key and model.
 
-- Frontend unit tests: cd frontend; npm run test
-- Frontend type/lint check: cd frontend; npm run check
-- Backend tests: uv run pytest
-- API contract generation/check: planned script, likely frontend npm run api:generate -- --check
-- End-to-end tests: cd frontend; npm run test:e2e
-- Production frontend build: cd frontend; npm run build
-- Local full topology validation: vercel dev -L, after Vercel Services eligibility/configuration is confirmed.
+Frontend validation, once dependencies are available:
 
-## Planned Vercel deployment
+```powershell
+cd frontend
+npm run api:generate
+npm test -- --run
+npm run lint
+npm run check
+npm run test:e2e
+```
 
-1. Confirm Vercel Services private-beta access and selected plan duration limits.
-2. Provision PostgreSQL and apply audited migrations; do not use the repository SQLite file as deployment state.
-3. Configure production and preview secrets in Vercel project settings (DATABASE_URL and LLM credentials) and non-secret configuration separately.
-4. Link the repository-root Vercel project and validate configuration: vercel link; vercel build.
-5. Deploy preview: vercel deploy. Deploy production only after preview smoke tests: vercel deploy --prod.
-6. Verify the returned one deployment URL: root page loads; /api/v1/health returns safe health; a synthetic source submission succeeds; review-context/audit requests preserve IDs; a forced timeout remains non-eligible.
+The Playwright command is a browser-only end-to-end gate. It starts the local
+Vite and FastAPI services and requires the Playwright Chromium test browser;
+Chromium is not bundled into the application or production deployment.
 
-If Services is unavailable, stop at the topology gate in research.md and prove the approved fallback before deploying. Do not create two projects to work around the one-URL requirement.
+Deployment configuration is in `vercel.json`. The supported topology is Vercel
+Services with `/api/*` routed to FastAPI and all other paths routed to Vite;
+the project must be set to the Services framework. Before production, provision
+PostgreSQL, configure server-only secrets, and run `vercel build` plus the
+preview smoke checks in `docs/deployment/spec-009-vercel-decision.md`.
+
 

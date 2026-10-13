@@ -1,0 +1,32 @@
+import type { components } from "./generated";
+
+type Schema = components["schemas"];
+export type Classification = "SUPPORTED" | "UNSUPPORTED" | "CONTRADICTED" | "UNCERTAIN";
+export type Severity = "CRITICAL" | "MAJOR" | "MINOR";
+export type SourceDocument = Schema["SourceDocument"];
+export type SavedExample = Schema["SavedExample"];
+export type NursingFact = Schema["NursingFact"];
+export type NoteResponse = Schema["NoteResponse"];
+export type SourceSpan = Schema["SourceSpan"];
+export type NoteSpan = Schema["NoteSpan"];
+export type Finding = Schema["ReviewFinding"];
+export type Suggestion = Schema["SuggestedCorrection"];
+export type ReviewContext = Schema["ReviewContext"];
+export type ReviewDecision = Schema["ReviewDecision"];
+export type AuditEvent = Schema["AuditEvent"];
+export type AuditResponse = Schema["AuditHistoryResponse"];
+export type FullVerification = Schema["FullNoteVerification"];
+export type EvaluationMetric = Schema["MetricResult"];
+export type EvaluationSummary = {
+  evaluationRunId: string;
+  origin: string;
+  runStatus: string;
+  dataset?: { datasetId?: string; datasetVersion?: string; datasetHash?: string; selectedSplit?: string };
+  metrics: EvaluationMetric[];
+  failures?: Record<string, unknown>;
+  falseNegativeCaseIds?: string[];
+  missedCriticalCases?: unknown[];
+  historicalOrLive?: string;
+};
+export type EvaluationCase = Schema["EvaluationCaseResult"];
+export type EvaluationRun = Schema["EvaluationRun"];

@@ -9,7 +9,11 @@ description = "Evidence-oriented source ingestion foundation"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.115,<1",
+  "openai>=1.0,<2",
+  "psycopg[binary]>=3.2,<4",
   "pydantic>=2.10,<3",
+  "python-dotenv>=1.0,<2",
+  "uvicorn>=0.30,<1",
 ]
 
 [dependency-groups]
@@ -21,10 +25,10 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/source_ingestion", "src/nursing_notes", "src/claim_extraction", "src/evidence_verification", "src/deterministic_validation", "src/source_coverage", "src/human_review", "src/evaluation"]
+packages = ["backend/src/app", "backend/src/source_ingestion", "backend/src/nursing_notes", "backend/src/claim_extraction", "backend/src/evidence_verification", "backend/src/deterministic_validation", "backend/src/source_coverage", "backend/src/human_review", "backend/src/evaluation"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["backend/tests"]
 addopts = "-q"
 
 [tool.uv]
