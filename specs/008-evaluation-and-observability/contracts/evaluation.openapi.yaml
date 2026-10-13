@@ -1,0 +1,108 @@
+openapi: 3.1.0
+info:
+  title: Dexter Guard Evaluation API
+  version: EVALUATION-CONTRACT-v1
+  description: Synthetic-only evaluation run control and diagnostic retrieval. This API never approves, edits, or generates a nursing note.
+paths:
+  /api/v1/evaluation-runs:
+    post:
+      summary: Start a headless evaluation using an exact dataset and split
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvaluationRunRequest'
+      responses:
+        '201':
+          description: Created immutable run
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationRun'
+        '400': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    get:
+      summary: List historical evaluation runs without source/note content
+      responses:
+        '200': { description: Run summaries }
+  /api/v1/evaluation-runs/{evaluationRunId}:
+    get:
+      summary: Retrieve an immutable evaluation run and case-level diagnostics
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: Evaluation run
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EvaluationRun' }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/v1/evaluation-runs/{evaluationRunId}/export:
+    get:
+      summary: Export machine-readable immutable results
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200': { description: JSON or CSV export }
+        '404': { $ref: '#/components/responses/Error' }
+components:
+  parameters:
+    RunId:
+      name: evaluationRunId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+  responses:
+    Error:
+      description: Typed safe error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    EvaluationRunRequest:
+      type: object
+      required: [datasetId, datasetVersion, datasetHash, selectedSplit, executionMode, idempotencyKey]
+      properties:
+        datasetId: { type: string, minLength: 1 }
+        datasetVersion: { type: string, minLength: 1 }
+        datasetHash: { type: string, minLength: 1 }
+        selectedSplit: { type: string, enum: [DEVELOPMENT, VALIDATION, HELD_OUT] }
+        executionMode: { type: string, enum: [LIVE, SAVED_FIXTURE, MOCKED_PROVIDER] }
+        idempotencyKey: { type: string, minLength: 1 }
+        referenceRunId: { type: [string, 'null'] }
+    EvaluationRun:
+      type: object
+      required: [evaluationRunId, origin, status, datasetId, datasetVersion, datasetHash, selectedSplit, configuration, caseResults, aggregateMetrics]
+      properties:
+        evaluationRunId: { type: string }
+        origin: { type: string, enum: [HISTORICAL_SAVED_RESULT, NEWLY_EXECUTED] }
+        status: { type: string, enum: [QUEUED, RUNNING, SUCCEEDED, PARTIALLY_FAILED, FAILED, INTERRUPTED, INVALID_DATASET] }
+        datasetId: { type: string }
+        datasetVersion: { type: string }
+        datasetHash: { type: string }
+        selectedSplit: { type: string, enum: [DEVELOPMENT, VALIDATION, HELD_OUT] }
+        configuration: { type: object, additionalProperties: true }
+        caseResults: { type: array, items: { type: object, additionalProperties: true } }
+        aggregateMetrics: { type: array, items: { $ref: '#/components/schemas/MetricResult' } }
+    MetricResult:
+      type: object
+      required: [metricId, state, numerator, denominator, scorableCount, unscorableCount, failedCount]
+      properties:
+        metricId: { type: string }
+        state: { type: string, enum: [SCORED, NOT_APPLICABLE, UNAVAILABLE, INCOMPLETE] }
+        numerator: { type: integer, minimum: 0 }
+        denominator: { type: integer, minimum: 0 }
+        value: { type: [number, 'null'] }
+        scorableCount: { type: integer, minimum: 0 }
+        unscorableCount: { type: integer, minimum: 0 }
+        failedCount: { type: integer, minimum: 0 }
+        reason: { type: [string, 'null'] }
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        correlationId: { type: [string, 'null'] }
+
