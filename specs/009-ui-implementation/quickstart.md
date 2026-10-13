@@ -15,7 +15,7 @@ From the repository root:
 ```powershell
 uv sync --group dev
 uv run pytest
-uv run uvicorn app.main:app --reload --port 8000
+uv run uvicorn app.main:app --env-file backend/.env --reload --port 8000
 ```
 
 In a second terminal:
@@ -30,6 +30,13 @@ The browser-safe setting is `VITE_API_BASE_URL=/api/v1`. Database URLs and LLM
 credentials are server-only variables; never prefix them with `VITE_` or commit
 them. Use the examples in `backend/.env.example` and
 `frontend/.env.example` as the variable-name reference.
+
+The generation adapter uses the OpenAI-compatible chat API surface. For a Groq
+demo, set `LLM_BASE_URL=https://api.groq.com/openai/v1`, your Groq
+`LLM_API_KEY`, and a Groq-supported `LLM_MODEL`. For Gemini, keep the same
+client and change only `LLM_BASE_URL` to
+`https://generativelanguage.googleapis.com/v1beta/openai/`, then provide the
+Gemini key and model.
 
 Frontend validation, once dependencies are available:
 
