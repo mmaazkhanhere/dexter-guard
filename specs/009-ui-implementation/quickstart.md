@@ -35,11 +35,16 @@ Frontend validation, once dependencies are available:
 
 ```powershell
 cd frontend
-npm run test
-npm run check
-npm run build
 npm run api:generate
+npm test -- --run
+npm run lint
+npm run check
+npm run test:e2e
 ```
+
+The Playwright command is a browser-only end-to-end gate. It starts the local
+Vite and FastAPI services and requires the Playwright Chromium test browser;
+Chromium is not bundled into the application or production deployment.
 
 Deployment configuration is in `vercel.json`. The supported topology is Vercel
 Services with `/api/*` routed to FastAPI and all other paths routed to Vite;
