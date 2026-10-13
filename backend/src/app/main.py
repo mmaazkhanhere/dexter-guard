@@ -26,6 +26,7 @@ from human_review.repository import InMemoryReviewRepository
 from human_review.service import ReviewService
 from nursing_notes.repository import InMemoryNoteRepository
 from nursing_notes.service import NursingNoteService
+from .postgres import PostgresPersistence, create_postgres_persistence
 from source_ingestion.app import create_app as create_source_app
 from source_ingestion.contracts import CreateSourceRequest, SourceDocument
 from source_ingestion.service import SourceIngestionService
@@ -90,11 +91,25 @@ def _saved_examples(source_service: SourceIngestionService) -> list[dict[str, ob
 
 
 def create_app() -> FastAPI:
-    source_service = SourceIngestionService()
-    review_service = ReviewService(repository=InMemoryReviewRepository())
+    database_url = os.getenv("DATABASE_URL", "").strip()
+    persistence: PostgresPersistence | None = None
+    if database_url:
+        persistence = create_postgres_persistence(database_url)
+        source_repository = persistence.source
+        note_repository = persistence.notes
+        review_repository = persistence.review
+        evaluation_repository = persistence.evaluation
+    else:
+        source_repository = None
+        note_repository = InMemoryNoteRepository()
+        review_repository = InMemoryReviewRepository()
+        evaluation_repository = SQLiteEvaluationRepository(":memory:")
+
+    source_service = SourceIngestionService(repository=source_repository) if source_repository is not None else SourceIngestionService()
+    review_service = ReviewService(repository=review_repository)
     note_service = ReviewAwareNoteService(
         source_service,
-        repository=InMemoryNoteRepository(),
+        repository=note_repository,
         generation_adapter=generation_adapter_from_environment(),
         review_service=review_service,
     )
@@ -104,10 +119,11 @@ def create_app() -> FastAPI:
     app.state.source_service = source_service
     app.state.note_service = note_service
     app.state.review_service = review_service
+    app.state.persistence = persistence
 
     @app.get("/api/v1/health", tags=["health"])
     def health() -> dict[str, str]:
-        database_ready = bool(os.getenv("DATABASE_URL"))
+        database_ready = persistence.check() if persistence is not None else False
         return {"status": "ok" if database_ready else "degraded", "database": "ready" if database_ready else "unavailable"}
 
     @app.post("/api/v1/sources", response_model=SourceDocument, status_code=status.HTTP_201_CREATED)
@@ -157,7 +173,7 @@ def create_app() -> FastAPI:
     evaluation_runner = EvaluationRunner(
         dataset=default_dataset(),
         adapter=DeterministicFixtureAdapter(),
-        repository=SQLiteEvaluationRepository(":memory:"),
+        repository=evaluation_repository,
     )
     app.state.evaluation_runner = evaluation_runner
     app.include_router(create_evaluation_router(evaluation_runner))
