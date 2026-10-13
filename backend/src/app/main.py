@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query, status
+from fastapi.responses import JSONResponse
 
 from evaluation.adapters import DeterministicFixtureAdapter
 from evaluation.api import create_router as create_evaluation_router
@@ -18,6 +19,7 @@ from evaluation.benchmark import default_dataset
 from evaluation.repository import SQLiteEvaluationRepository
 from evaluation.runner import EvaluationRunner
 from human_review.api import create_router as create_review_router
+from human_review.contracts import ClaimReverificationRequest
 from human_review.repository import InMemoryReviewRepository
 from human_review.service import ReviewService
 from nursing_notes.repository import InMemoryNoteRepository
@@ -116,14 +118,28 @@ def create_app() -> FastAPI:
     def saved_examples() -> list[dict[str, object]]:
         return _saved_examples(source_service)
 
-    @app.get("/api/v1/notes/{note_id}/revisions/{revision}")
-    def get_note_revision(note_id: str, revision: int) -> Any:
+    def _note_revision(note_id: str, revision: int) -> Any:
         try:
             return note_service.repository.get(note_id, revision).response()
         except Exception as error:
             raise HTTPException(status_code=404, detail={"code": "NOTE_NOT_FOUND", "message": "note revision not found"}) from error
 
+    @app.get("/api/v1/notes/{note_id}/revisions/{revision}")
+    def get_note_revision(note_id: str, revision: int) -> Any:
+        return _note_revision(note_id, revision)
+
+    @app.get("/api/v1/notes/{noteId}/revisions/{noteRevision}")
+    def get_note_revision_contract(noteId: str, noteRevision: int) -> Any:
+        return _note_revision(noteId, noteRevision)
+
     app.include_router(create_review_router(review_service))
+
+    @app.post("/api/v1/reviews/{note_id}/findings/{finding_id}/claim-reverification")
+    def claim_reverification_unavailable(note_id: str, finding_id: str, payload: ClaimReverificationRequest) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"code": "DEPENDENCY_UNAVAILABLE", "message": "Claim reverification is not configured."},
+        )
 
     @app.get("/api/v1/reviews/{note_id}")
     def review_context(note_id: str, revision: int | None = Query(default=None, ge=1)) -> dict[str, object]:
