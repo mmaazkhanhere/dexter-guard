@@ -2,8 +2,9 @@
 
 ## Status
 
-Proposed with Feature 007; implementation requires compatibility verification recorded in
-`specs/007-human-review-and-audit/compatibility-review.md`.
+The implementation baseline is adopted with the explicit, time-bounded exception recorded below.
+Independent requirements-quality approval remains pending and is not represented as complete by
+this ADR.
 
 ## Context
 
@@ -32,6 +33,44 @@ critical findings, required decisions, and terminal full-note verification.
 The design requires adapter contracts, immutable revisions, explicit stale conflicts, and
 SQLite transaction tests. It adds read-model and audit persistence complexity but keeps the
 PoC synchronous, local, synthetic-only, and fail-closed.
+
+## Implementation evidence and open decision
+
+The local boundary has regression coverage for terminal verification, stale conflicts,
+idempotency replay, bounded timeout retries, content-minimized telemetry, approval guards, and
+append-only audit history. It deliberately uses injected, reference-only ports: this does not
+constitute approval of any production Spec 001--006 transport, timeout, retry, or error envelope.
+
+## Explicit implementation exception (T036)
+
+**Exception ID:** ADR-006-E1
+**Owner:** Dexter Guard repository maintainers; accountable role: Spec 007 technical owner
+**Scope:** The current PoC composes Specs 003–006 through injected in-process/reference-only
+ports because the repository does not expose one shared production transport or atomic
+cross-component transaction boundary.  This is the boundary documented in
+`specs/007-human-review-and-audit/compatibility-review.md`.
+
+**Risk:** A future production adapter could drift in source/note/claim/run identity, timeout or
+retry policy, terminal-state semantics, or error-envelope details.  Treating the local doubles as
+production approval would permit stale or malformed upstream evidence to affect review decisions.
+
+**Compensating controls:**
+
+- adapters accept immutable IDs and run metadata only; they reject source-text/claim-text
+  authority and malformed results;
+- review validates exact source/version, note/revision, claim-set, and component-run provenance;
+- unavailable, malformed, failed, incomplete, or mismatched results are non-approval evidence;
+- review approval is checked atomically in the local SQLite transaction with append-only audit
+  records and idempotency constraints;
+- the compatibility review and `tests/human_review` must be rerun when a production adapter is
+  introduced.
+
+**Expiry/review trigger:** 2026-12-31, or earlier when a production Spec 003–006 transport is
+selected.  At expiry the owner must replace this exception with an independently reviewed
+adapter contract or renew it with new evidence and risk acceptance.
+
+This is an explicit implementation exception, not an independent reviewer approval or a claim of
+overall product/release readiness.
 
 ## References
 

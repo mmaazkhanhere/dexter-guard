@@ -2,6 +2,10 @@
 
 **Status:** Planned dependency; no evaluation run is claimed by Feature 007 documentation.
 
+The synthetic HR-001--HR-018 manifest is maintained at
+`tests/human_review/fixtures/review_cases.py`. It is feature-regression evidence only and has
+not been registered as a Spec 008 benchmark dataset.
+
 Spec 007 supplies synthetic German human-review fixtures for HR-001–HR-018 and their expected
 revision, finding, verification, approval, rejection, and audit outcomes. Spec 008 remains the
 owner of the versioned benchmark and release evaluation.

@@ -80,4 +80,4 @@ The fixture is designed to expose negation, numeric, and assistance discrepancie
 
 ## Test execution after implementation
 
-Run the focused unit/contract/repository/API/UI/acceptance suites added by tasks T003–T031, then execute the existing repository suite and checks above. Fixtures must be synthetic German only and include HR-001 through HR-017. Record actual commands and results in the implementation PR/evaluation record; this planning document makes no claim that those tests have run.
+Run the focused unit/contract/repository/API/UI/acceptance suites added by tasks T003–T031, then execute the existing repository suite and checks above. Fixtures must be synthetic German only and include HR-001 through HR-018, including unresolved-source-item approval blocking. Record actual commands and results in the implementation PR/evaluation record; this planning document makes no claim that those tests have run.
