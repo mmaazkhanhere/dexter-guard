@@ -5,7 +5,7 @@
 
 ## Result
 
-**Internally consistent for requirements review. No implementation is claimed.** The documents maintain upstream ownership: Specs 003–006 produce pipeline outputs, Spec 007 owns review/approval, and Spec 008 measures immutable results. The headless runner remains independent of React.
+**Internally consistent with implementation evidence, subject to independent checklist review.** The documents maintain upstream ownership: Specs 003–006 produce pipeline outputs, Spec 007 owns review/approval, and Spec 008 measures immutable results. The headless runner remains independent of React.
 
 ## Confirmed alignment
 
@@ -21,14 +21,14 @@
 
 ## Remaining implementation gates
 
-1. No approved Spec 008 benchmark annotation guide, accepted 100+ dataset, or model-pricing catalog exists in reviewed materials. T003–T005 and T008 create/validate them; no benchmark result is claimed.
-2. Existing concrete pipeline ports, app composition, timeout/retry budgets, SQLite migration convention, and React host need repository verification. T001–T002 are blockers before wiring.
-3. The report/dashboard presentation implementation is not assumed to exist. The headless JSON runner remains mandatory even if a UI is delayed.
+1. The accepted executable fixture is deterministic and synthetic-only. Provider pricing/token state is not available for saved fixtures, so cost is reported `UNAVAILABLE` rather than fabricated.
+2. Existing concrete pipeline ports are not composed by a shared application factory in this checkout. Spec 008 uses a reference-only adapter protocol and saved fixture adapter; no upstream reliability logic is duplicated.
+3. The report/dashboard implementation is a lightweight FastAPI/JSON diagnostic surface. No React host exists in the checkout, so no frontend dependency was introduced.
 4. The prior checklist approval is superseded by the amended contract/lifecycle artifacts; the amendment review criteria CQ-008-25 through CQ-008-29 require independent re-review. This does not claim that implementation, the accepted benchmark, or convergence evidence exists.
 
 The prior constitution-consistency gaps are resolved in the source artifacts. Resident-context mixing is now optional extension coverage only; the `008-evaluation.md` naming is mapped to the canonical `spec.md`; and `sourceVersion`/`noteRevision` are typed as positive integers in the data model.
 
 The API contract now uses explicit schemas for run configuration, case results, findings/matches, comparisons, and typed metric families. Live synthetic demonstrations are tracked through immutable upstream references, not a duplicate ingestion/generation workflow. The local API is explicitly synchronous and returns terminal runs; terminal results are immutable.
 
-No source ambiguity was resolved by inventing a contract. Re-run this analysis after any clarification, plan, task, or contract change and before implementation.
+No source ambiguity was resolved by inventing a contract. Implementation evidence is recorded in `converge.md`; re-run this analysis after any clarification, plan, task, or contract change and before independent review.
 

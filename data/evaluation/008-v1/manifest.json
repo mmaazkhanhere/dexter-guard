@@ -1,0 +1,13 @@
+{
+  "datasetId": "synthetic-german-nursing-008",
+  "datasetVersion": "008-v1",
+  "status": "ACCEPTED",
+  "language": "de-DE",
+  "scenarioCount": 100,
+  "contentHash": "90bac75dc5a9c950d483941bf12307c676c98dc26f822ebd85ed77b4955fdcb0",
+  "splits": {"DEVELOPMENT": 60, "VALIDATION": 20, "HELD_OUT": 20},
+  "annotationGuideVersion": "EVIDENCE_ANNOTATION-v1",
+  "evidenceStatusPolicyVersion": "EVIDENCE_STATUS-v1",
+  "matchingPolicyVersion": "EVALUATION_MATCHING-v1",
+  "syntheticOnly": true
+}
