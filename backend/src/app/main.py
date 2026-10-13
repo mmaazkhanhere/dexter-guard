@@ -8,6 +8,7 @@ the frontend.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import os
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query, status
@@ -104,7 +105,8 @@ def create_app() -> FastAPI:
 
     @app.get("/api/v1/health", tags=["health"])
     def health() -> dict[str, str]:
-        return {"status": "ok", "database": "ready"}
+        database_ready = bool(os.getenv("DATABASE_URL"))
+        return {"status": "ok" if database_ready else "degraded", "database": "ready" if database_ready else "unavailable"}
 
     @app.post("/api/v1/sources", response_model=SourceDocument, status_code=status.HTTP_201_CREATED)
     def create_v1_source(payload: CreateSourceRequest) -> SourceDocument:
