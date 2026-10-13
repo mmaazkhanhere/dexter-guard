@@ -224,6 +224,32 @@ class ReviewService:
     def audit(self, note_id: str):
         return self.repository.audit(note_id)
 
+    def record_claim_feedback(self, note_id: str, *, note_revision: int, claim_id: str, reviewer_label: str, idempotency_key: str, claim_reverifier) -> ClaimReverificationResponse:
+        note = self.get_note(note_id)
+        if note.revision != note_revision:
+            raise ReviewServiceError("STALE_REVISION")
+        digest_payload = json.dumps({"noteId": note_id, "noteRevision": note_revision, "claimId": claim_id, "reviewerLabel": reviewer_label}, sort_keys=True)
+        self._bind_idempotency("claim-reverification", idempotency_key, digest_payload)
+        replay = self.repository.get_replay("claim-reverification", idempotency_key)
+        if replay is not None:
+            return replay
+        run_id = claim_reverifier(note_id, note_revision, claim_id)
+        result = ClaimReverificationResponse(
+            reviewVerificationId=f"claim-feedback-{run_id}",
+            noteId=note_id,
+            noteRevision=note_revision,
+            claimId=claim_id,
+            source={"sourceId": note.source_id, "sourceVersion": note.source_version},
+            upstreamVerificationRunId=run_id,
+            status="SUCCEEDED",
+            approvalEligible=False,
+        )
+        self.repository.claim_feedback[result.review_verification_id] = result
+        self.repository.persist_claim_feedback(result)
+        self.repository.append_event(self._event(note_id, note_revision, reviewer_label, "CLAIM_REVERIFICATION_RECORDED", "CLAIM_REVERIFICATION", result.review_verification_id, (claim_id, run_id)))
+        self.repository.set_replay("claim-reverification", idempotency_key, result)
+        return result
+
     def context(self, note_id: str, transcript_text: str, revision: int | None = None):
         note = self.get_note(note_id, revision)
         findings = tuple(f for f in self.repository.findings.values() if f.note_id == note_id and f.note_revision == note.revision)

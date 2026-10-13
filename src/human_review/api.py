@@ -4,7 +4,7 @@ from fastapi import APIRouter, FastAPI, Query
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from .contracts import ApproveRequest, ClaimReverificationRequest, FindingDecisionRequest, FullVerificationRequest, RejectRequest, SaveRevisionRequest, ClaimReverificationResponse
+from .contracts import ApproveRequest, ClaimReverificationRequest, FindingDecisionRequest, FullVerificationRequest, RejectRequest, SaveRevisionRequest
 from .service import ReviewService
 from .approval import ReviewServiceError
 from .verification import FullNoteVerificationService
@@ -117,13 +117,7 @@ def create_app(service: ReviewService | None = None, *, source_reader=None, clai
                     raise ReviewServiceError("FINDING_NOT_FOUND")
                 if note.revision != payload.note_revision or finding.note_revision != payload.note_revision:
                     raise ReviewServiceError("STALE_REVISION")
-                service._bind_idempotency("claim-reverification", payload.idempotency_key, f"{note_id}:{payload.note_revision}:{payload.claim_id}:{payload.reviewer_label}")
-                replay = service.repository.get_replay("claim-reverification", payload.idempotency_key)
-                if replay is not None:
-                    return replay
-                run_id = claim_reverifier(note_id, note.revision, payload.claim_id)
-                result = ClaimReverificationResponse(reviewVerificationId=f"claim-feedback-{run_id}", noteId=note_id, noteRevision=note.revision, claimId=payload.claim_id, source={"sourceId": note.source_id, "sourceVersion": note.source_version}, upstreamVerificationRunId=run_id, status="SUCCEEDED", approvalEligible=False)
-                service.repository.set_replay("claim-reverification", payload.idempotency_key, result)
+                result = service.record_claim_feedback(note_id, note_revision=payload.note_revision, claim_id=payload.claim_id, reviewer_label=payload.reviewer_label, idempotency_key=payload.idempotency_key, claim_reverifier=claim_reverifier)
                 return result.model_dump(mode="json", by_alias=True)
             except (ReviewServiceError, KeyError) as error:
                 return _error(error if isinstance(error, ReviewServiceError) else ReviewServiceError("INVALID_REQUEST"))
@@ -136,13 +130,7 @@ def create_app(service: ReviewService | None = None, *, source_reader=None, clai
                 note = service.get_note(note_id)
                 if note.revision != payload.note_revision:
                     raise ReviewServiceError("STALE_REVISION")
-                service._bind_idempotency("claim-reverification", payload.idempotency_key, f"{note_id}:{payload.note_revision}:{payload.claim_id}:{payload.reviewer_label}")
-                replay = service.repository.get_replay("claim-reverification", payload.idempotency_key)
-                if replay is not None:
-                    return replay
-                run_id = claim_reverifier(note_id, note.revision, payload.claim_id)
-                result = ClaimReverificationResponse(reviewVerificationId=f"claim-feedback-{run_id}", noteId=note_id, noteRevision=note.revision, claimId=payload.claim_id, source={"sourceId": note.source_id, "sourceVersion": note.source_version}, upstreamVerificationRunId=run_id, status="SUCCEEDED", approvalEligible=False)
-                service.repository.set_replay("claim-reverification", payload.idempotency_key, result)
+                result = service.record_claim_feedback(note_id, note_revision=payload.note_revision, claim_id=payload.claim_id, reviewer_label=payload.reviewer_label, idempotency_key=payload.idempotency_key, claim_reverifier=claim_reverifier)
                 return result.model_dump(mode="json", by_alias=True)
             except ReviewServiceError as error:
                 return _error(error)

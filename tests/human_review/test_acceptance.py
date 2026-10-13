@@ -1,6 +1,8 @@
 """Synthetic API-level acceptance flows traced to the HR-001--HR-018 fixture manifest."""
 
 from fastapi.testclient import TestClient
+import yaml
+from pathlib import Path
 
 from .fixtures.review_cases import SCENARIOS, SYNTHETIC_NOTE
 from human_review.api import create_app
@@ -121,3 +123,40 @@ def test_acceptance_claim_feedback_never_becomes_approval_evidence():
 def test_acceptance_manifest_traces_every_hr_case_to_a_synthetic_expected_outcome():
     assert len(SCENARIOS) == 18
     assert all(scenario.expected_audit_event.isupper() for scenario in SCENARIOS)
+
+
+SCENARIO_TESTS = {
+    "HR-001": "test_acceptance_full_verification_approval_and_audit_are_terminal_and_ordered",
+    "HR-002": "test_acceptance_manifest_traces_every_hr_case_to_a_synthetic_expected_outcome",
+    "HR-003": "test_acceptance_full_verification_approval_and_audit_are_terminal_and_ordered",
+    "HR-004": "test_acceptance_stale_edit_blocks_old_verification_and_writes_no_disposition",
+    "HR-005": "test_acceptance_stale_edit_blocks_old_verification_and_writes_no_disposition",
+    "HR-006": "test_acceptance_claim_feedback_never_becomes_approval_evidence",
+    "HR-007": "test_acceptance_full_verification_approval_and_audit_are_terminal_and_ordered",
+    "HR-008": "test_acceptance_failed_and_unresolved_coverage_verifications_are_not_approvable_but_rejection_is",
+    "HR-009": "test_acceptance_failed_and_unresolved_coverage_verifications_are_not_approvable_but_rejection_is",
+    "HR-010": "test_acceptance_full_verification_approval_and_audit_are_terminal_and_ordered",
+    "HR-011": "test_acceptance_manifest_traces_every_hr_case_to_a_synthetic_expected_outcome",
+    "HR-012": "test_acceptance_failed_and_unresolved_coverage_verifications_are_not_approvable_but_rejection_is",
+    "HR-013": "test_acceptance_full_verification_approval_and_audit_are_terminal_and_ordered",
+    "HR-014": "test_acceptance_failed_and_unresolved_coverage_verifications_are_not_approvable_but_rejection_is",
+    "HR-015": "test_acceptance_stale_edit_blocks_old_verification_and_writes_no_disposition",
+    "HR-016": "test_acceptance_full_verification_approval_and_audit_are_terminal_and_ordered",
+    "HR-017": "test_acceptance_stale_edit_blocks_old_verification_and_writes_no_disposition",
+    "HR-018": "test_acceptance_failed_and_unresolved_coverage_verifications_are_not_approvable_but_rejection_is",
+}
+
+
+def test_every_hr_scenario_maps_to_an_executable_backend_acceptance_probe():
+    assert {scenario.scenario_id for scenario in SCENARIOS} == set(SCENARIO_TESTS)
+    assert all(callable(globals().get(test_name)) for test_name in SCENARIO_TESTS.values())
+
+
+def test_openapi_backend_paths_are_registered_in_the_fastapi_application():
+    contract_path = Path(__file__).parents[2] / "specs" / "007-human-review-and-audit" / "contracts" / "review-audit.openapi.yaml"
+    document = yaml.safe_load(contract_path.read_text(encoding="utf-8"))
+    service = _service()
+    app = create_app(service, source_reader=lambda source_id, version: "synthetic", claim_reverifier=lambda note_id, revision, claim_id: "claim-run-1", verification_ports=Ports())
+    route_paths = set(app.openapi()["paths"])
+    for path in document["paths"]:
+        assert path.replace("{noteId}", "{note_id}").replace("{findingId}", "{finding_id}") in route_paths

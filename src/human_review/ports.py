@@ -35,6 +35,49 @@ class SourceCoveragePort(Protocol):
 T = TypeVar("T")
 
 
+class ReferenceOnlyVerificationPorts:
+    """Adapt upstream terminal-run readers without accepting source or claim text.
+
+    Each callable must return an object exposing only terminal run metadata. The adapter copies
+    those immutable references into ``UpstreamRun``; it never parses, recomputes, or promotes
+    prose, transcript text, or candidate-note content.
+    """
+
+    def __init__(self, *, extract_claims, verify_evidence, validate_deterministically, read_coverage) -> None:
+        self._extract_claims = extract_claims
+        self._verify_evidence = verify_evidence
+        self._validate_deterministically = validate_deterministically
+        self._read_coverage = read_coverage
+
+    @staticmethod
+    def _metadata(run) -> UpstreamRun:
+        required = ("run_id", "status", "source_id", "source_version", "note_id", "note_revision", "claim_set_id")
+        if any(not hasattr(run, name) for name in required):
+            raise ValueError("MALFORMED_UPSTREAM_RESULT")
+        return UpstreamRun(
+            run_id=run.run_id,
+            status=run.status,
+            source_id=run.source_id,
+            source_version=run.source_version,
+            note_id=run.note_id,
+            note_revision=run.note_revision,
+            claim_set_id=run.claim_set_id,
+            unresolved_source_items=getattr(run, "unresolved_source_items", 0),
+        )
+
+    def extract(self, note_id: str, revision: int) -> UpstreamRun:
+        return self._metadata(self._extract_claims(note_id, revision))
+
+    def evidence(self, note_id: str, revision: int, claim_set_id: str) -> UpstreamRun:
+        return self._metadata(self._verify_evidence(note_id, revision, claim_set_id))
+
+    def validation(self, note_id: str, revision: int, claim_set_id: str) -> UpstreamRun:
+        return self._metadata(self._validate_deterministically(note_id, revision, claim_set_id))
+
+    def coverage(self, note_id: str, revision: int, claim_set_id: str) -> UpstreamRun:
+        return self._metadata(self._read_coverage(note_id, revision, claim_set_id))
+
+
 class RetryingVerificationPorts:
     """Bounded, deterministic retry wrapper for synchronous upstream adapters.
 
