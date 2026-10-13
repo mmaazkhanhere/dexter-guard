@@ -40,7 +40,7 @@ paths:
     get:
       operationId: listSavedExamples
       x-owning-spec: "009; data from 001/008"
-      x-integration-status: proposed-backend-dependency
+      x-integration-status: confirmed-existing
       summary: List synthetic-only saved demonstration metadata
       responses:
         "200":
@@ -90,7 +90,7 @@ paths:
     get:
       operationId: getNoteRevisionWithFacts
       x-owning-spec: "002"
-      x-integration-status: proposed-backend-dependency
+      x-integration-status: confirmed-existing
       summary: Retrieve an immutable note revision and its structured facts
       parameters:
         - $ref: "#/components/parameters/NoteId"
@@ -413,7 +413,7 @@ paths:
     get:
       operationId: getHealth
       x-owning-spec: "009"
-      x-integration-status: proposed-backend-dependency
+      x-integration-status: confirmed-existing
       summary: Safe liveness/readiness health check
       responses:
         "200":
