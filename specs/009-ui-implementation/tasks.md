@@ -35,7 +35,7 @@ Tasks are ordered by dependency and vertical slices. [P] means independently par
 
 ## Phase 5 — Evaluation
 
-- [x] T017 Implement evaluation run picker, saved/live provenance labels, metric cards/table, denominator/reason display. FR-45, FR-46. Prerequisite: T005 and evaluation endpoints. Files: frontend/src/features/evaluation, backend/src/evaluation/api.py. Completion: UI never recalculates metrics. Tests: frontend dashboard implementation; backend evaluation route smoke.
+- [ ] T017 Implement evaluation run picker, saved/live provenance labels, metric cards/table, denominator/reason display. FR-45, FR-46. Prerequisite: T005 and evaluation endpoints. Files: frontend/src/features/evaluation, backend/src/evaluation/api.py. Completion: UI never recalculates metrics. Tests: backend evaluation route smoke passes; frontend RTL/build validation is blocked by npm registry dependency installation failure.
 - [ ] T018 Implement baseline/validated comparison and case/failure inspector. FR-45. Prerequisite: T017. Files: evaluation detail components. Completion: case-level traceability is navigable. Tests: Playwright saved/live/failure workflow.
 
 ## Phase 6 — integration, deployment, and acceptance
