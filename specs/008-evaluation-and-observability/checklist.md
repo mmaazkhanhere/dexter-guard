@@ -6,13 +6,13 @@
 
 - **Reviewer:** Codex (automated requirements-quality review)
 - **Date / artifact revision:** 2026-10-13 / Spec 008 documentation baseline after constitutional gap fixes
-- **Decision:** APPROVED — requirements quality
-- **Exceptions and required remediation:** Implementation, accepted benchmark creation, compatibility discovery, and convergence evidence remain pending; this approval does not claim implementation completion.
+- **Decision:** REVIEW REQUIRED — amended contract and lifecycle artifacts
+- **Exceptions and required remediation:** The prior requirements-quality approval covered the previous baseline. The amended API schemas, typed metrics, synthetic-demo tracking, synchronous lifecycle, and optional resident-context extension require re-review; implementation, accepted benchmark creation, compatibility discovery, and convergence evidence remain pending.
 
 ## Completeness
 
 - [x] CQ-008-01 FR-26 through FR-33 each have observable behavior, acceptance scenario(s), task coverage, and an implementation verification method.
-- [x] CQ-008-02 The benchmark requires at least 100 synthetic German scenarios and explicitly covers every required error, provenance-only resident-context mixing, ambiguity, paraphrase, and multiple-error category without requiring multi-resident identification.
+- [x] CQ-008-02 The benchmark requires at least 100 synthetic German scenarios and explicitly covers every required core error, ambiguity, paraphrase, and multiple-error category; resident-context mixing is optional extension coverage only.
 - [x] CQ-008-03 Dataset, case, candidate, claim, error, source-fact, annotation-provenance, split, and configuration requirements are unambiguous.
 - [x] CQ-008-04 All required metric definitions use the supplied operational definitions and report raw numerators/denominators.
 - [x] CQ-008-05 Zero denominators, unscorable cases, invalid outputs, timeouts, interrupted runs, and partial failures have explicit visible treatment.
@@ -44,4 +44,12 @@
 - [x] CQ-008-22 The headless evaluation path does not depend on React.
 - [x] CQ-008-23 Failure and unresolved-regression outcomes cannot appear as successful benchmark/release outcomes.
 - [x] CQ-008-24 Aggregate reports can be traced to individual cases, findings, match dispositions, and underlying immutable references.
+
+## Amendment review criteria
+
+- [ ] CQ-008-25 The OpenAPI contract uses explicit reusable schemas for run configuration, case results, finding matches, comparisons, operational metrics, and failure/latency/cost entities, with no unrestricted generic run-result objects.
+- [ ] CQ-008-26 Metric responses use tagged rate, count-per-note, and duration/cost distribution types with units, aggregation methods, policy versions, raw counts/observations, and confidence intervals where meaningful.
+- [ ] CQ-008-27 Synthetic demonstration tracking accepts only immutable upstream references from Specs 001–007 and cannot create a duplicate ingestion or generation workflow.
+- [ ] CQ-008-28 The local POST API is explicitly synchronous and terminal; run identity/configuration may be created before execution, while terminal results become immutable and intermediate lifecycle states are not returned by this endpoint.
+- [ ] CQ-008-29 Resident-context mixing is optional extension coverage and cannot become a dependency of the core benchmark or release gate without an approved upstream context contract.
 

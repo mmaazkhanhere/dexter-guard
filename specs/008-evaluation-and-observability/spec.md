@@ -51,11 +51,12 @@ The feature includes a headless runner and a lightweight diagnostics report/dash
 
 1. The system shall maintain a versioned benchmark of at least 100 synthetic German-language scenarios.
 2. Each scenario shall contain an immutable source-transcript reference, reference source facts and evidence spans, one or more fixed candidate nursing notes, annotated candidate claims, expected classifications, annotated error instances, applicable expected source facts, tags, split, annotation provenance, and dataset version.
-3. The benchmark shall cover fully supported documentation; unsupported facts; explicit contradictions; numerical mismatches; unit mismatches; negation changes; uncertainty/certainty changes; attribution changes; provenance-only resident-context mixing; unsupported clinical conclusions; important omissions; multiple errors in one note; ambiguous source evidence; and valid normalisation/harmless paraphrase.
-4. Resident-context mixing cases shall use one resident per transcript and a deliberately mismatched synthetic resident context/reference in the fixture or pipeline result. They test provenance and claim-to-case binding only; they shall not require identifying or disambiguating multiple residents from transcript language.
-5. Every annotation shall identify the affected claim or source fact, category, severity, expected evidence relationship/status, and source evidence correspondence when one is applicable.
-6. A dataset validator shall reject duplicate IDs, invalid/mismatched spans, ambiguous denominator membership, missing required annotation provenance, unversioned policy references, invalid candidate/source lineage, and cases that violate the synthetic-only restriction.
-7. A scenario may include multiple candidate notes only when each has its own stable candidate, claim, error, and expected-fact references.
+3. The benchmark shall cover fully supported documentation; unsupported facts; explicit contradictions; numerical mismatches; unit mismatches; negation changes; uncertainty/certainty changes; attribution changes; unsupported clinical conclusions; important omissions; multiple errors in one note; ambiguous source evidence; and valid normalisation/harmless paraphrase.
+4. Every annotation shall identify the affected claim or source fact, category, severity, expected evidence relationship/status, and source evidence correspondence when one is applicable.
+5. A dataset validator shall reject duplicate IDs, invalid/mismatched spans, ambiguous denominator membership, missing required annotation provenance, unversioned policy references, invalid candidate/source lineage, and cases that violate the synthetic-only restriction.
+6. A scenario may include multiple candidate notes only when each has its own stable candidate, claim, error, and expected-fact references.
+
+Resident-context mixing is an optional extension, not a minimum benchmark category. It may be enabled only when an existing upstream synthetic-context provenance contract is available. Such fixtures use one resident per transcript and a deliberately mismatched context/reference; they test provenance binding only and never require identifying or disambiguating multiple residents from transcript language. Optional extension cases must not be required for the core benchmark acceptance or release gate.
 
 ### FR-27 — Protected Held-Out Dataset
 
@@ -76,7 +77,7 @@ The feature includes a headless runner and a lightweight diagnostics report/dash
 
 ### FR-29 — Reliability and Operational Metrics
 
-The system shall calculate and report numerator, denominator, value, scorable count, unscorable count, failed count, and method/policy version for every metric below. Percentages alone are insufficient.
+The system shall calculate and report a typed metric result for every metric below. Every result shall include metric kind, state, scorable count, unscorable count, failed count, aggregation method, and policy version. Rate metrics shall include numerator, denominator, value, and confidence interval where meaningful; count metrics shall include count, note count, per-note value, and unit; duration/cost distributions shall include observation count, p50, p95, mean, unit, and currency where applicable. Percentages alone are insufficient.
 
 | Metric | Required operational definition |
 | --- | --- |
@@ -95,7 +96,7 @@ Rules common to all metrics:
 - Use the versioned matching policy consistently in every run.
 - Missing evidence is not an explicit contradiction.
 - A failure, timeout, invalid model output, interrupted run, invalid fixture, or unscorable item must be counted and listed; it must never disappear from the report.
-- Metric denominators include only items whose definition makes them applicable. A zero denominator yields `NOT_APPLICABLE` with `value=null`, numerator `0`, denominator `0`, and a reason—not `0%` or `100%`.
+- Rate/count denominators and distribution observation counts include only items whose definition makes them applicable. A zero denominator or observation count yields `NOT_APPLICABLE` with null derived values, raw zero counts, and a reason—not `0%`, `100%`, or zero cost.
 - Failed execution does not create a guessed classification. It is excluded only from a classification/completeness denominator where no score is possible, while retained in failure counts and failure-rate reporting. Critical errors in a failed candidate are counted as not detected for critical-error recall unless an independent valid finding for that specific error was already persisted in the same declared evaluation attempt.
 - Invalid or ambiguous ground truth makes the item `UNSCORABLE`; it is reported separately and blocks a release-quality conclusion for an affected selected split.
 - Latency/cost summaries include successful and failed attempts separately. Percentiles are `NOT_APPLICABLE` when there are no completed observations; cost absent from a provider is `UNAVAILABLE`, not zero.
@@ -127,9 +128,10 @@ The approved target is **critical-error recall ≥95% on the held-out benchmark*
 ### FR-33 — Live and Saved Examples
 
 1. The system shall support execution against a selected synthetic benchmark candidate and inspection of saved versioned examples.
-2. A live execution shall use the normal configured reliability pipeline, generate a new `EvaluationRun`, retain its configuration/status, and be labelled `NEWLY_EXECUTED`.
-3. A saved example shall retain the original evaluation run/result identity and be labelled `HISTORICAL_SAVED_RESULT`; it shall never be represented as fresh inference.
-4. Both modes shall show synthetic-only provenance and must not accept real patient content.
+2. The system may also track a fresh synthetic demonstration input created or imported through Specs 001–007. Spec 008 shall accept immutable source, note, and upstream-run references for that demonstration; it shall not accept arbitrary transcript/note text or create a duplicate generation or ingestion workflow.
+3. A live execution shall use the normal configured reliability pipeline, generate a new `EvaluationRun`, retain its configuration/status, and be labelled `NEWLY_EXECUTED`. Benchmark executions are scored; demonstration tracking is labelled `DEMONSTRATION_ONLY` and is not used as benchmark evidence.
+4. A saved example shall retain the original evaluation run/result identity and be labelled `HISTORICAL_SAVED_RESULT`; it shall never be represented as fresh inference.
+5. Both modes shall show synthetic-only provenance and must not accept real patient content.
 
 ## Ground-truth matching and scoring
 
@@ -162,7 +164,6 @@ The matching policy is versioned as `EVALUATION_MATCHING-v1` and is defined in d
 | EVAL-013 | Given a full 100+ scenario benchmark, when it is accepted for a selected split, then required category coverage, annotations, IDs, hashes, provenance, and split-integrity checks pass. |
 | EVAL-014 | Given a changed prompt/model/rule/code version, when regression evaluation compares it to a compatible reference, then configuration differences, raw counts, deltas, uncertainty, and `PASS`/`REVIEW_REQUIRED`/`REGRESSION` disposition are persisted. |
 | EVAL-015 | Given a completed review workflow with observed human decisions, when final-note quality is reported, then it is distinct from automated detection and tied to the final complete revision. |
-| EVAL-016 | Given a single-resident transcript whose evaluation fixture carries a mismatched synthetic resident context/reference, when the runner validates provenance, then the case is classified as a resident-context error or integrity failure without attempting resident identification/disambiguation. |
 
 ## Global constraints and exclusions
 
@@ -172,7 +173,7 @@ Excluded: audio/speech processing; multi-resident identification/disambiguation;
 
 ## Success measures and dependencies
 
-- FR-26–FR-33 are traceable to acceptance scenarios and planned tests.
+- FR-26–FR-33 are traceable to acceptance scenarios and planned tests; optional extensions are not required for core acceptance.
 - The benchmark contains at least 100 accepted synthetic German scenarios and a protected held-out split.
 - Held-out critical-error recall is reported against the approved ≥95% target with raw counts and uncertainty; this reports benchmark performance, not clinical safety.
 - Every displayed aggregate is traceable to case-level match results and configuration provenance.

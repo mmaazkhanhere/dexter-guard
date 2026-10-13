@@ -17,8 +17,7 @@ ResultOrigin = HISTORICAL_SAVED_RESULT | NEWLY_EXECUTED
 EvidenceStatus = SUPPORTED | UNSUPPORTED | CONTRADICTED | UNCERTAIN
 ErrorCategory = UNSUPPORTED_FACT | EXPLICIT_CONTRADICTION | NUMERIC_MISMATCH |
                 UNIT_MISMATCH | NEGATION_CHANGE | CERTAINTY_CHANGE |
-                ATTRIBUTION_CHANGE | RESIDENT_CONTEXT_MISMATCH | CLINICAL_INFERENCE |
-                IMPORTANT_OMISSION | OTHER
+                ATTRIBUTION_CHANGE | CLINICAL_INFERENCE | IMPORTANT_OMISSION | OTHER
 Severity = CRITICAL | MAJOR | MINOR
 MatchDisposition = MATCHED | DUPLICATE | UNMATCHED_WARNING | TARGET_LINKED_MISCLASSIFICATION |
                    FALSE_NEGATIVE | UNSCORABLE | NOT_APPLICABLE
@@ -124,19 +123,22 @@ EvaluationRun {
   evaluationRunId: string
   origin: ResultOrigin
   status: RunStatus
-  datasetId, datasetVersion, datasetHash: string
-  selectedSplit: DatasetSplit
+  runPurpose: BENCHMARK_EVALUATION | SYNTHETIC_DEMO_TRACKING
+  scoringState: SCORED | DEMONSTRATION_ONLY | UNSCORABLE
+  datasetId, datasetVersion, datasetHash: string | null
+  selectedSplit: DatasetSplit | null
   selectionDigest: SHA-256
-  configuration: EvaluationConfiguration
+  configuration: RunConfiguration
+  demoReference: DemoInputReference | null
   startedAt, completedAt: timezone-aware timestamp | null
   caseResults: EvaluationCaseResult[]
   aggregateMetrics: MetricResult[]
-  comparison: PairedComparisonResult | null
+  comparison: RunComparison | null
   failureSummary: FailureSummary
   reportSchemaVersion: "EVALUATION_REPORT-v1"
 }
 
-EvaluationConfiguration {
+RunConfiguration {
   codeVersion: commit/revision identifier
   environmentId: non-secret runtime identity
   modelProvider, modelId, modelVersion: string | null
@@ -148,6 +150,15 @@ EvaluationConfiguration {
   pricingAssumptionsVersion: string | null
   matchingPolicyVersion: "EVALUATION_MATCHING-v1"
   randomSeed: integer | null
+}
+
+DemoInputReference {
+  sourceId: string
+  sourceVersion: positive integer
+  noteId: string
+  noteRevision: positive integer
+  upstreamRunIds: string[1..n]
+  syntheticDataAttestation: string
 }
 
 EvaluationCaseResult {
@@ -162,12 +173,61 @@ EvaluationCaseResult {
   status: CaseStatus
   stageRuns: StageRunReference[]
   observedFindings: ObservedFinding[]
-  matchResults: GroundTruthMatch[]
+  matchResults: FindingMatch[]
   completenessResults: SourceFactScore[]
   reviewOutcome: ReviewOutcome | null
   latency: LatencyBreakdown
   usageAndCost: UsageAndCost
   failure: EvaluationFailure | null
+}
+
+StageRunReference {
+  stage: CLAIM_EXTRACTION | EVIDENCE_VERIFICATION | DETERMINISTIC_VALIDATION | SOURCE_COVERAGE | HUMAN_REVIEW
+  upstreamRunId: string
+  status: string
+}
+
+SourceFactScore {
+  sourceFactId: string
+  status: FAITHFULLY_COVERED | OMITTED | NOT_APPLICABLE | UNCERTAIN
+  faithfullyCovered: boolean
+  matchedClaimIds: string[]
+}
+
+ReviewOutcome {
+  dataKind: OBSERVED | SIMULATED | UNAVAILABLE
+  finalRevision: positive integer | null
+  remainingErrorCount: non-negative integer
+  remainingOmissionCount: non-negative integer
+  warningCount: non-negative integer
+  humanDecisionCount: non-negative integer
+  correctionActionCount: non-negative integer
+}
+
+LatencyBreakdown {
+  endToEndMilliseconds: decimal | null
+  stageMilliseconds: map of named stage to decimal | null
+}
+
+UsageAndCost {
+  inputTokens, outputTokens: non-negative integer | null
+  retryCount: non-negative integer
+  costState: AVAILABLE | UNAVAILABLE
+  estimatedCost: decimal | null
+  currency: string | null
+  pricingAssumptionsVersion: string | null
+}
+
+EvaluationFailure {
+  code: string
+  stage: string | null
+  retryable: boolean
+  message: string
+}
+
+FailureSummary {
+  failedCases, invalidOutputCases, unscorableCases, interruptedCases: non-negative integer
+  failureCodes: string[]
 }
 
 ObservedFinding {
@@ -183,7 +243,7 @@ ObservedFinding {
   requiresCorrectionOrReview: boolean
 }
 
-GroundTruthMatch {
+FindingMatch {
   errorId: string
   findingKey: string | null
   disposition: MatchDisposition
@@ -192,24 +252,51 @@ GroundTruthMatch {
 }
 ```
 
-`EvaluationRun` is append-only after terminal state. `SUCCEEDED` means all selected cases are terminal and no case failed or was unscorable; `PARTIALLY_FAILED` means aggregation completed with one or more failed/unscorable cases; `FAILED`, `INTERRUPTED`, and `INVALID_DATASET` retain available case/failure records but cannot be presented as passing benchmark outcomes. A stored example references the original immutable `EvaluationRun`; it does not clone it as a fresh run.
+`EvaluationRun` has immutable identity/configuration at creation and an evolving execution status until terminal. The local PoC POST endpoint executes synchronously and returns only a terminal run; `QUEUED` and `RUNNING` are reserved for internal persistence or a future explicitly versioned asynchronous API. Once terminal, case results, metrics, comparison, and failure summary are immutable. `SUCCEEDED` means all selected cases are terminal and no case failed or was unscorable; `PARTIALLY_FAILED` means aggregation completed with one or more failed/unscorable cases; `FAILED`, `INTERRUPTED`, and `INVALID_DATASET` retain available case/failure records but cannot be presented as passing benchmark outcomes. A stored example references the original immutable `EvaluationRun`; it does not clone it as a fresh run.
 
 ## Metric and comparison records
 
 ```text
-MetricResult {
+MetricCommon {
   metricId: string
+  metricKind: RATE | COUNT_PER_NOTE | DURATION_DISTRIBUTION | COST_DISTRIBUTION
   state: MetricState
+  scorableCount, unscorableCount, failedCount: integer
+  aggregationMethod: string
+  policyVersion: "EVALUATION_METRICS-v1"
+  reason: string | null
+}
+
+RateMetric extends MetricCommon {
+  metricKind: RATE
   numerator: integer
   denominator: integer
   value: decimal | null
   confidenceInterval: { method, level, lower, upper } | null
-  scorableCount, unscorableCount, failedCount: integer
-  reason: string | null
-  policyVersion: "EVALUATION_METRICS-v1"
 }
 
-PairedComparisonResult {
+CountMetric extends MetricCommon {
+  metricKind: COUNT_PER_NOTE
+  count: non-negative integer
+  noteCount: non-negative integer
+  valuePerNote: decimal | null
+  unit: WARNINGS | HUMAN_DECISIONS | CORRECTION_ACTIONS | ERRORS | NOTES
+}
+
+DistributionMetric extends MetricCommon {
+  metricKind: DURATION_DISTRIBUTION | COST_DISTRIBUTION
+  observationCount: non-negative integer
+  p50: decimal | null
+  p95: decimal | null
+  mean: decimal | null
+  unit: MILLISECONDS | CURRENCY_PER_NOTE
+  currency: string | null
+  confidenceInterval: { method, level, lower, upper } | null
+}
+
+MetricResult = RateMetric | CountMetric | DistributionMetric
+
+RunComparison {
   comparisonId: string
   status: ComparisonStatus
   baselineRunId, validatedRunId: string
@@ -226,9 +313,17 @@ PairedCandidateResult {
   status: VALID | INVALID_PAIR
   invalidReason: string | null
 }
+
+MetricDelta {
+  metricId: string
+  baselineValue, validatedValue, delta: decimal | null
+  confidenceInterval: { method, level, lower, upper } | null
+}
 ```
 
-`MetricResult` uses raw counts; `value` is derived only when `denominator > 0`. Final-note quality is retained as two raw counts—remaining factual errors and remaining omissions—plus final scorable-note count; it must not become a single rate without separately approved formula.
+Rate metrics use numerator/denominator; count metrics use count/noteCount and an explicit unit; duration/cost metrics use observationCount, p50/p95/mean, unit, and optional currency. Every metric carries aggregation method, policy version, state, scorable/unscorable/failed counts, and confidence interval where meaningful. Values are null when their denominator/observation count is zero or unavailable. Final-note quality is retained as count metrics for remaining factual errors and omissions; it must not become a single rate without separately approved formula.
+
+`RESIDENT_CONTEXT_MISMATCH`, if introduced by an approved optional upstream context contract, is an extension category and never contributes to the minimum benchmark category-coverage requirement unless a future specification revision promotes it.
 
 ## Matching invariants
 

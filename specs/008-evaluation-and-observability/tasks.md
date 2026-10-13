@@ -9,12 +9,12 @@
 - [ ] T001 Inspect and record actual application wiring, repository/migration conventions, ports/routes, timeout/retry/idempotency behavior, and frontend host in compatibility-review.md. **Requirements:** all. **Done when:** assumptions in plan are confirmed or gaps are explicitly recorded; no source code changes.
 - [ ] T002 Verify upstream identity/version fields and result contracts from Specs 001–007 for source/note/claim/finding/coverage/review handoff. **Depends on:** T001. **Requirements:** FR-26, FR-29–33. **Done when:** a reference-only adapter matrix proves no duplicated reliability logic.
 - [ ] T003 [P] Write the synthetic benchmark annotation guide, schema manifest, and category/family/split authoring policy. **Depends on:** T002. **Requirements:** FR-26, FR-27. **Done when:** every required annotation and held-out rule is authorable/reviewable.
-- [ ] T004 [P] Create and independently review an initial 100+ scenario synthetic German benchmark with one or more fixed candidates where required. **Depends on:** T003. **Requirements:** FR-26, FR-27. **Done when:** scenarios cover EVAL-001–005, EVAL-010–013, and EVAL-016; no real data appears and resident-context cases do not require disambiguation.
+- [ ] T004 [P] Create and independently review an initial 100+ scenario synthetic German benchmark with one or more fixed candidates where required. **Depends on:** T003. **Requirements:** FR-26, FR-27. **Done when:** scenarios cover EVAL-001–005 and EVAL-010–013; no real data appears. Optional resident-context fixtures are excluded unless their upstream contract is verified.
 - [ ] T005 Implement dataset validators for schema, hashes, IDs, source/note spans, annotations, category coverage, duplicates, family integrity, split protection, and synthetic-only markers. **Depends on:** T003–T004. **Requirements:** FR-26, FR-27, EVAL-010, EVAL-011, EVAL-013. **Tests:** deterministic unit/fixture tests.
 
 ## Phase 1 — Contracts, domain model, persistence
 
-- [ ] T006 Implement Pydantic evaluation domain models/status unions from data-model.md and OpenAPI contract validation. **Depends on:** T001–T002. **Requirements:** FR-29, FR-30, FR-32, FR-33. **Tests:** model/contract tests.
+- [ ] T006 Implement Pydantic evaluation domain models/status unions from data-model.md and OpenAPI contract validation, including explicit case-result, configuration, finding-match, comparison, and tagged metric schemas. **Depends on:** T001–T002. **Requirements:** FR-29, FR-30, FR-32, FR-33. **Tests:** model/contract tests.
 - [ ] T007 Implement append-only SQLite evaluation repository and migration/init convention for datasets, runs, case results, findings, matches, metrics, comparisons, and exports. **Depends on:** T006. **Requirements:** FR-30, FR-32, FR-33. **Tests:** persistence, restart, immutability, idempotency tests.
 - [ ] T008 [P] Implement content-minimised evaluation telemetry/configuration capture, including code/config/model/prompt/rule/price/tokens/cost states. **Depends on:** T006. **Requirements:** FR-30. **Tests:** assert no source/note/prompt/raw-output content in logs.
 
@@ -28,9 +28,9 @@
 ## Phase 3 — Runner and pipeline integration
 
 - [ ] T013 Implement reference-only adapters to actual Spec 003–006 pipeline ports, mapping outputs to ObservedFinding without recomputation. **Depends on:** T002, T006. **Requirements:** FR-29–31. **Tests:** fake-port contracts first, then verified integration tests.
-- [ ] T014 Implement the headless evaluation runner: explicit dataset/split selection, preflight validation, fixed candidates, pipeline execution, stage capture, matching, metrics, immutable persistence, JSON result, and human summary. **Depends on:** T005, T007–T013. **Requirements:** FR-26–33. **Tests:** EVAL-001–014 without React.
+- [ ] T014 Implement the headless evaluation runner: explicit dataset/split selection, preflight validation, fixed candidates, pipeline execution, stage capture, matching, metrics, immutable persistence, JSON result, and human summary. **Depends on:** T005, T007–T013. **Requirements:** FR-26–33. **Tests:** EVAL-001–015 without React; demo tracking uses immutable upstream references only.
 - [ ] T015 Implement timeout, unavailable provider, malformed output, invalid evidence, interruption, persistence-failure, and retry/idempotency handling. **Depends on:** T014. **Requirements:** FR-29, FR-31. **Tests:** EVAL-007, EVAL-010 and failure-injection integration tests.
-- [ ] T016 [P] Add deterministic mocked-provider/saved-fixture CLI or Python entrypoint and CI invocation; add separately marked live-evaluation invocation. **Depends on:** T014–T015. **Requirements:** FR-31, FR-33. **Tests:** repeatability and no-frontend tests.
+- [ ] T016 [P] Add deterministic mocked-provider/saved-fixture CLI or Python entrypoint and CI invocation; add separately marked live benchmark and upstream-reference synthetic-demo tracking invocations. **Depends on:** T014–T015. **Requirements:** FR-31, FR-33. **Tests:** repeatability, no-frontend, demo-reference, and no-duplicate-ingestion tests.
 
 ## Phase 4 — Results, examples, and diagnostics
 
@@ -40,7 +40,7 @@
 
 ## Phase 5 — Acceptance, regression, and handoff
 
-- [ ] T020 Add deterministic acceptance suite for EVAL-001 through EVAL-016, all global evidence-integrity invariants, FR-26–33 traceability, and 100+ benchmark validation. **Depends on:** T005–T019. **Requirements:** all. **Done when:** every acceptance scenario has executable evidence.
+- [ ] T020 Add deterministic acceptance suite for EVAL-001 through EVAL-015, all global evidence-integrity invariants, FR-26–33 traceability, and 100+ benchmark validation. **Depends on:** T005–T019. **Requirements:** all. **Done when:** every core acceptance scenario has executable evidence; optional extensions are separately labelled.
 - [ ] T021 Add protected held-out reference-run/regression workflow and report fixtures; ensure only critical-error recall uses the approved >=95% gate and other changes are TBD/review-required. **Depends on:** T012, T016, T020. **Requirements:** FR-27, FR-31.
 - [ ] T022 Run formatter, static/compile, unit, contract, repository, integration, headless acceptance, and report tests; record commands/results in convergence evidence. **Depends on:** T020–T021. **Requirements:** all.
 - [ ] T023 Update analyze.md, run converge.md, append any verified gap tasks, and obtain independent checklist re-review. **Depends on:** T022. **Requirements:** all.

@@ -93,7 +93,7 @@ The report has run selection, provenance header, aggregate metric cards with num
 | Contract | Pydantic/OpenAPI validation, terminal-state exclusivity, immutable provenance, export shape, and typed error body. |
 | Repository | Append-only run persistence, historical retrieval, restart durability, idempotency, hash/split constraints. |
 | Integration | Adapters to 003–006 through fakes then verified actual ports; no frontend dependency; failure/timeout/malformed-output preservation. |
-| Acceptance | EVAL-001 through EVAL-016 and 100+ benchmark acceptance. |
+| Acceptance | EVAL-001 through EVAL-015 and 100+ benchmark acceptance; resident-context mixing is optional extension coverage only. |
 | Regression | Deterministic mocked CI benchmark; reference-run comparison; live-model variability report, never a deterministic CI assertion. |
 
 ## Constitution check
@@ -113,5 +113,6 @@ The report has run selection, provenance header, aggregate metric cards with num
 - SQLite plus immutable JSON exports gives a small reproducible PoC, at the cost of local-scale query performance.
 - Headless-first execution ensures CI/reproducibility, while the optional React report avoids blocking measurement on UI availability.
 - Deterministic fixture runs make regression tests stable; live-model runs remain necessary for real behavior but report variability rather than hiding it.
+- Fresh synthetic demo inputs originate in Specs 001–007; Spec 008 tracks them by immutable references and does not duplicate source/note ingestion or generation.
 - Manual ground truth is essential for credible scoring, even though it costs annotation/review effort; inferred labels would invalidate the benchmark.
 

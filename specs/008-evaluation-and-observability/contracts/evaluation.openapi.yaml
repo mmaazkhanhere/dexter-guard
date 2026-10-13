@@ -6,7 +6,8 @@ info:
 paths:
   /api/v1/evaluation-runs:
     post:
-      summary: Start a headless evaluation using an exact dataset and split
+      summary: Execute a synchronous benchmark evaluation or track an upstream synthetic demonstration
+      description: The local PoC executes synchronously and returns only after a terminal run state is persisted. QUEUED and RUNNING are internal persistence states and are not returned by this endpoint.
       requestBody:
         required: true
         content:
@@ -15,7 +16,7 @@ paths:
               $ref: '#/components/schemas/EvaluationRunRequest'
       responses:
         '201':
-          description: Created immutable run
+          description: Newly executed terminal run with immutable configuration and terminal results
           content:
             application/json:
               schema:
@@ -61,9 +62,20 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
   schemas:
     EvaluationRunRequest:
+      oneOf:
+        - $ref: '#/components/schemas/BenchmarkEvaluationRequest'
+        - $ref: '#/components/schemas/SyntheticDemoTrackingRequest'
+      discriminator:
+        propertyName: subjectKind
+        mapping:
+          BENCHMARK: '#/components/schemas/BenchmarkEvaluationRequest'
+          SYNTHETIC_DEMO: '#/components/schemas/SyntheticDemoTrackingRequest'
+    BenchmarkEvaluationRequest:
       type: object
-      required: [datasetId, datasetVersion, datasetHash, selectedSplit, executionMode, idempotencyKey]
+      additionalProperties: false
+      required: [subjectKind, datasetId, datasetVersion, datasetHash, selectedSplit, executionMode, idempotencyKey]
       properties:
+        subjectKind: { type: string, const: BENCHMARK }
         datasetId: { type: string, minLength: 1 }
         datasetVersion: { type: string, minLength: 1 }
         datasetHash: { type: string, minLength: 1 }
@@ -71,33 +83,353 @@ components:
         executionMode: { type: string, enum: [LIVE, SAVED_FIXTURE, MOCKED_PROVIDER] }
         idempotencyKey: { type: string, minLength: 1 }
         referenceRunId: { type: [string, 'null'] }
+    SyntheticDemoTrackingRequest:
+      type: object
+      additionalProperties: false
+      required: [subjectKind, executionMode, idempotencyKey, sourceId, sourceVersion, noteId, noteRevision, upstreamRunIds, syntheticDataAttestation]
+      properties:
+        subjectKind: { type: string, const: SYNTHETIC_DEMO }
+        executionMode: { type: string, enum: [LIVE] }
+        idempotencyKey: { type: string, minLength: 1 }
+        sourceId: { type: string, minLength: 1 }
+        sourceVersion: { type: integer, minimum: 1 }
+        noteId: { type: string, minLength: 1 }
+        noteRevision: { type: integer, minimum: 1 }
+        upstreamRunIds:
+          type: array
+          minItems: 1
+          items: { type: string, minLength: 1 }
+        syntheticDataAttestation: { type: string, minLength: 1 }
     EvaluationRun:
       type: object
-      required: [evaluationRunId, origin, status, datasetId, datasetVersion, datasetHash, selectedSplit, configuration, caseResults, aggregateMetrics]
+      additionalProperties: false
+      required: [evaluationRunId, origin, runPurpose, scoringState, status, datasetId, datasetVersion, datasetHash, selectedSplit, configuration, demoReference, startedAt, completedAt, caseResults, aggregateMetrics, comparison, failureSummary, resultsImmutable]
       properties:
         evaluationRunId: { type: string }
         origin: { type: string, enum: [HISTORICAL_SAVED_RESULT, NEWLY_EXECUTED] }
+        runPurpose: { type: string, enum: [BENCHMARK_EVALUATION, SYNTHETIC_DEMO_TRACKING] }
+        scoringState: { type: string, enum: [SCORED, DEMONSTRATION_ONLY, UNSCORABLE] }
         status: { type: string, enum: [QUEUED, RUNNING, SUCCEEDED, PARTIALLY_FAILED, FAILED, INTERRUPTED, INVALID_DATASET] }
-        datasetId: { type: string }
-        datasetVersion: { type: string }
-        datasetHash: { type: string }
-        selectedSplit: { type: string, enum: [DEVELOPMENT, VALIDATION, HELD_OUT] }
-        configuration: { type: object, additionalProperties: true }
-        caseResults: { type: array, items: { type: object, additionalProperties: true } }
+        datasetId: { type: [string, 'null'] }
+        datasetVersion: { type: [string, 'null'] }
+        datasetHash: { type: [string, 'null'] }
+        selectedSplit: { type: [string, 'null'], enum: [DEVELOPMENT, VALIDATION, HELD_OUT, null] }
+        configuration: { $ref: '#/components/schemas/RunConfiguration' }
+        demoReference:
+          anyOf:
+            - $ref: '#/components/schemas/DemoInputReference'
+            - type: 'null'
+        caseResults: { type: array, items: { $ref: '#/components/schemas/EvaluationCaseResult' } }
         aggregateMetrics: { type: array, items: { $ref: '#/components/schemas/MetricResult' } }
-    MetricResult:
+        comparison:
+          anyOf:
+            - $ref: '#/components/schemas/RunComparison'
+            - type: 'null'
+        failureSummary: { $ref: '#/components/schemas/FailureSummary' }
+        resultsImmutable: { type: boolean }
+    RunConfiguration:
       type: object
-      required: [metricId, state, numerator, denominator, scorableCount, unscorableCount, failedCount]
+      additionalProperties: false
+      required: [codeVersion, environmentId, modelProvider, modelId, modelVersion, promptVersionsAndHashes, inferenceParameters, ruleVersionsAndRulesetVersions, upstreamContractVersions, fixtureMode, pricingAssumptionsVersion, matchingPolicyVersion, randomSeed]
       properties:
-        metricId: { type: string }
+        codeVersion: { type: string, minLength: 1 }
+        environmentId: { type: string, minLength: 1 }
+        modelProvider: { type: [string, 'null'] }
+        modelId: { type: [string, 'null'] }
+        modelVersion: { type: [string, 'null'] }
+        promptVersionsAndHashes: { type: array, items: { $ref: '#/components/schemas/VersionedValue' } }
+        inferenceParameters: { $ref: '#/components/schemas/InferenceParameters' }
+        ruleVersionsAndRulesetVersions: { type: array, items: { $ref: '#/components/schemas/VersionedValue' } }
+        upstreamContractVersions: { type: array, items: { $ref: '#/components/schemas/VersionedValue' } }
+        fixtureMode: { type: string, enum: [LIVE, SAVED_FIXTURE, MOCKED_PROVIDER] }
+        pricingAssumptionsVersion: { type: [string, 'null'] }
+        matchingPolicyVersion: { type: string, const: EVALUATION_MATCHING-v1 }
+        randomSeed: { type: [integer, 'null'] }
+    VersionedValue:
+      type: object
+      additionalProperties: false
+      required: [name, version, hash]
+      properties:
+        name: { type: string, minLength: 1 }
+        version: { type: string, minLength: 1 }
+        hash: { type: [string, 'null'] }
+    InferenceParameters:
+      type: object
+      additionalProperties: false
+      required: [temperature, topP, maxTokens, timeoutSeconds, retryLimit, seed]
+      properties:
+        temperature: { type: [number, 'null'], minimum: 0 }
+        topP: { type: [number, 'null'], minimum: 0, maximum: 1 }
+        maxTokens: { type: [integer, 'null'], minimum: 1 }
+        timeoutSeconds: { type: [number, 'null'], exclusiveMinimum: 0 }
+        retryLimit: { type: [integer, 'null'], minimum: 0 }
+        seed: { type: [integer, 'null'] }
+    DemoInputReference:
+      type: object
+      additionalProperties: false
+      required: [sourceId, sourceVersion, noteId, noteRevision, upstreamRunIds, syntheticDataAttestation]
+      properties:
+        sourceId: { type: string, minLength: 1 }
+        sourceVersion: { type: integer, minimum: 1 }
+        noteId: { type: string, minLength: 1 }
+        noteRevision: { type: integer, minimum: 1 }
+        upstreamRunIds: { type: array, minItems: 1, items: { type: string, minLength: 1 } }
+        syntheticDataAttestation: { type: string, minLength: 1 }
+    EvaluationCaseResult:
+      type: object
+      additionalProperties: false
+      required: [caseExecutionId, scenarioId, candidateId, sourceId, sourceVersion, sourceTextHash, noteId, noteRevision, noteBodyHash, status, stageRuns, observedFindings, matchResults, completenessResults, reviewOutcome, latency, usageAndCost, failure]
+      properties:
+        caseExecutionId: { type: string, minLength: 1 }
+        scenarioId: { type: string, minLength: 1 }
+        candidateId: { type: string, minLength: 1 }
+        sourceId: { type: string, minLength: 1 }
+        sourceVersion: { type: integer, minimum: 1 }
+        sourceTextHash: { type: string, minLength: 1 }
+        noteId: { type: string, minLength: 1 }
+        noteRevision: { type: integer, minimum: 1 }
+        noteBodyHash: { type: string, minLength: 1 }
+        status: { type: string, enum: [PENDING, SUCCEEDED, FAILED, INVALID_OUTPUT, UNSCORABLE, SKIPPED] }
+        stageRuns: { type: array, items: { $ref: '#/components/schemas/StageRunReference' } }
+        observedFindings: { type: array, items: { $ref: '#/components/schemas/ObservedFinding' } }
+        matchResults: { type: array, items: { $ref: '#/components/schemas/FindingMatch' } }
+        completenessResults: { type: array, items: { $ref: '#/components/schemas/SourceFactScore' } }
+        reviewOutcome:
+          anyOf:
+            - $ref: '#/components/schemas/ReviewOutcome'
+            - type: 'null'
+        latency: { $ref: '#/components/schemas/LatencyBreakdown' }
+        usageAndCost: { $ref: '#/components/schemas/UsageAndCost' }
+        failure:
+          anyOf:
+            - $ref: '#/components/schemas/EvaluationFailure'
+            - type: 'null'
+    StageRunReference:
+      type: object
+      additionalProperties: false
+      required: [stage, upstreamRunId, status]
+      properties:
+        stage: { type: string, enum: [CLAIM_EXTRACTION, EVIDENCE_VERIFICATION, DETERMINISTIC_VALIDATION, SOURCE_COVERAGE, HUMAN_REVIEW] }
+        upstreamRunId: { type: string, minLength: 1 }
+        status: { type: string, minLength: 1 }
+    ObservedFinding:
+      type: object
+      additionalProperties: false
+      required: [findingKey, producer, upstreamRunId, affectedClaimId, affectedSourceFactId, primaryStatusOrOutcome, discrepancyOrRule, conflictingAttributeOrValue, sourceSpans, requiresCorrectionOrReview]
+      properties:
+        findingKey: { type: string, minLength: 1 }
+        producer: { type: string, enum: [SPEC_004, SPEC_005, SPEC_006, REVIEW_OPERATIONAL] }
+        upstreamRunId: { type: string, minLength: 1 }
+        affectedClaimId: { type: [string, 'null'] }
+        affectedSourceFactId: { type: [string, 'null'] }
+        primaryStatusOrOutcome: { type: string, minLength: 1 }
+        discrepancyOrRule: { type: [string, 'null'] }
+        conflictingAttributeOrValue: { type: [string, 'null'] }
+        sourceSpans: { type: array, items: { $ref: '#/components/schemas/SourceSpan' } }
+        requiresCorrectionOrReview: { type: boolean }
+    FindingMatch:
+      type: object
+      additionalProperties: false
+      required: [errorId, findingKey, disposition, reasonCode, specificityScore]
+      properties:
+        errorId: { type: string, minLength: 1 }
+        findingKey: { type: [string, 'null'] }
+        disposition: { type: string, enum: [MATCHED, DUPLICATE, UNMATCHED_WARNING, TARGET_LINKED_MISCLASSIFICATION, FALSE_NEGATIVE, UNSCORABLE, NOT_APPLICABLE] }
+        reasonCode: { type: string, minLength: 1 }
+        specificityScore: { type: [integer, 'null'], minimum: 0 }
+    SourceFactScore:
+      type: object
+      additionalProperties: false
+      required: [sourceFactId, status, faithfullyCovered, matchedClaimIds]
+      properties:
+        sourceFactId: { type: string, minLength: 1 }
+        status: { type: string, enum: [FAITHFULLY_COVERED, OMITTED, NOT_APPLICABLE, UNCERTAIN] }
+        faithfullyCovered: { type: boolean }
+        matchedClaimIds: { type: array, items: { type: string } }
+    ReviewOutcome:
+      type: object
+      additionalProperties: false
+      required: [dataKind, finalRevision, remainingErrorCount, remainingOmissionCount, warningCount, humanDecisionCount, correctionActionCount]
+      properties:
+        dataKind: { type: string, enum: [OBSERVED, SIMULATED, UNAVAILABLE] }
+        finalRevision: { type: [integer, 'null'], minimum: 1 }
+        remainingErrorCount: { type: integer, minimum: 0 }
+        remainingOmissionCount: { type: integer, minimum: 0 }
+        warningCount: { type: integer, minimum: 0 }
+        humanDecisionCount: { type: integer, minimum: 0 }
+        correctionActionCount: { type: integer, minimum: 0 }
+    LatencyBreakdown:
+      type: object
+      additionalProperties: false
+      required: [endToEndMilliseconds, stageMilliseconds]
+      properties:
+        endToEndMilliseconds: { type: [number, 'null'], minimum: 0 }
+        stageMilliseconds:
+          type: object
+          additionalProperties: false
+          properties:
+            claimExtraction: { type: [number, 'null'], minimum: 0 }
+            evidenceVerification: { type: [number, 'null'], minimum: 0 }
+            deterministicValidation: { type: [number, 'null'], minimum: 0 }
+            sourceCoverage: { type: [number, 'null'], minimum: 0 }
+            humanReview: { type: [number, 'null'], minimum: 0 }
+    UsageAndCost:
+      type: object
+      additionalProperties: false
+      required: [inputTokens, outputTokens, retryCount, costState, estimatedCost, currency, pricingAssumptionsVersion]
+      properties:
+        inputTokens: { type: [integer, 'null'], minimum: 0 }
+        outputTokens: { type: [integer, 'null'], minimum: 0 }
+        retryCount: { type: integer, minimum: 0 }
+        costState: { type: string, enum: [AVAILABLE, UNAVAILABLE] }
+        estimatedCost: { type: [number, 'null'], minimum: 0 }
+        currency: { type: [string, 'null'] }
+        pricingAssumptionsVersion: { type: [string, 'null'] }
+    EvaluationFailure:
+      type: object
+      additionalProperties: false
+      required: [code, stage, retryable, message]
+      properties:
+        code: { type: string, minLength: 1 }
+        stage: { type: [string, 'null'] }
+        retryable: { type: boolean }
+        message: { type: string, minLength: 1 }
+    FailureSummary:
+      type: object
+      additionalProperties: false
+      required: [failedCases, invalidOutputCases, unscorableCases, interruptedCases, failureCodes]
+      properties:
+        failedCases: { type: integer, minimum: 0 }
+        invalidOutputCases: { type: integer, minimum: 0 }
+        unscorableCases: { type: integer, minimum: 0 }
+        interruptedCases: { type: integer, minimum: 0 }
+        failureCodes: { type: array, items: { type: string } }
+    RunComparison:
+      type: object
+      additionalProperties: false
+      required: [comparisonId, status, baselineRunId, validatedRunId, pairResults, reviewDataKind, simulationPolicyVersion, aggregateDeltas]
+      properties:
+        comparisonId: { type: string, minLength: 1 }
+        status: { type: string, enum: [VALID, INVALID_PAIR, NOT_RUN, SIMULATED] }
+        baselineRunId: { type: string, minLength: 1 }
+        validatedRunId: { type: string, minLength: 1 }
+        pairResults: { type: array, items: { $ref: '#/components/schemas/PairResult' } }
+        reviewDataKind: { type: string, enum: [OBSERVED, SIMULATED, UNAVAILABLE] }
+        simulationPolicyVersion: { type: [string, 'null'] }
+        aggregateDeltas: { type: array, items: { $ref: '#/components/schemas/MetricDelta' } }
+    PairResult:
+      type: object
+      additionalProperties: false
+      required: [scenarioId, candidateId, candidateBodyHash, baselineCaseExecutionId, validatedCaseExecutionId, status, invalidReason]
+      properties:
+        scenarioId: { type: string, minLength: 1 }
+        candidateId: { type: string, minLength: 1 }
+        candidateBodyHash: { type: string, minLength: 1 }
+        baselineCaseExecutionId: { type: string, minLength: 1 }
+        validatedCaseExecutionId: { type: string, minLength: 1 }
+        status: { type: string, enum: [VALID, INVALID_PAIR] }
+        invalidReason: { type: [string, 'null'] }
+    MetricDelta:
+      type: object
+      additionalProperties: false
+      required: [metricId, baselineValue, validatedValue, delta, confidenceInterval]
+      properties:
+        metricId: { type: string, minLength: 1 }
+        baselineValue: { type: [number, 'null'] }
+        validatedValue: { type: [number, 'null'] }
+        delta: { type: [number, 'null'] }
+        confidenceInterval:
+          anyOf:
+            - $ref: '#/components/schemas/ConfidenceInterval'
+            - type: 'null'
+    MetricResult:
+      oneOf:
+        - $ref: '#/components/schemas/RateMetric'
+        - $ref: '#/components/schemas/CountMetric'
+        - $ref: '#/components/schemas/DistributionMetric'
+      discriminator:
+        propertyName: metricKind
+        mapping:
+          RATE: '#/components/schemas/RateMetric'
+          COUNT_PER_NOTE: '#/components/schemas/CountMetric'
+          DURATION_DISTRIBUTION: '#/components/schemas/DistributionMetric'
+          COST_DISTRIBUTION: '#/components/schemas/DistributionMetric'
+    MetricCommon:
+      type: object
+      required: [metricId, metricKind, state, scorableCount, unscorableCount, failedCount, aggregationMethod, policyVersion]
+      properties:
+        metricId: { type: string, minLength: 1 }
+        metricKind: { type: string }
         state: { type: string, enum: [SCORED, NOT_APPLICABLE, UNAVAILABLE, INCOMPLETE] }
-        numerator: { type: integer, minimum: 0 }
-        denominator: { type: integer, minimum: 0 }
-        value: { type: [number, 'null'] }
         scorableCount: { type: integer, minimum: 0 }
         unscorableCount: { type: integer, minimum: 0 }
         failedCount: { type: integer, minimum: 0 }
+        aggregationMethod: { type: string, minLength: 1 }
+        policyVersion: { type: string, const: EVALUATION_METRICS-v1 }
         reason: { type: [string, 'null'] }
+    RateMetric:
+      allOf:
+        - $ref: '#/components/schemas/MetricCommon'
+        - type: object
+          unevaluatedProperties: false
+          required: [metricKind, numerator, denominator, value, confidenceInterval]
+          properties:
+            metricKind: { type: string, const: RATE }
+            numerator: { type: integer, minimum: 0 }
+            denominator: { type: integer, minimum: 0 }
+            value: { type: [number, 'null'] }
+            confidenceInterval:
+              anyOf:
+                - $ref: '#/components/schemas/ConfidenceInterval'
+                - type: 'null'
+    CountMetric:
+      allOf:
+        - $ref: '#/components/schemas/MetricCommon'
+        - type: object
+          unevaluatedProperties: false
+          required: [metricKind, count, noteCount, valuePerNote, unit]
+          properties:
+            metricKind: { type: string, const: COUNT_PER_NOTE }
+            count: { type: integer, minimum: 0 }
+            noteCount: { type: integer, minimum: 0 }
+            valuePerNote: { type: [number, 'null'] }
+            unit: { type: string, enum: [WARNINGS, HUMAN_DECISIONS, CORRECTION_ACTIONS, ERRORS, NOTES] }
+    DistributionMetric:
+      allOf:
+        - $ref: '#/components/schemas/MetricCommon'
+        - type: object
+          unevaluatedProperties: false
+          required: [metricKind, observationCount, p50, p95, mean, unit, currency, confidenceInterval]
+          properties:
+            metricKind: { type: string, enum: [DURATION_DISTRIBUTION, COST_DISTRIBUTION] }
+            observationCount: { type: integer, minimum: 0 }
+            p50: { type: [number, 'null'] }
+            p95: { type: [number, 'null'] }
+            mean: { type: [number, 'null'] }
+            unit: { type: string, enum: [MILLISECONDS, CURRENCY_PER_NOTE] }
+            currency: { type: [string, 'null'] }
+            confidenceInterval:
+              anyOf:
+                - $ref: '#/components/schemas/ConfidenceInterval'
+                - type: 'null'
+    ConfidenceInterval:
+      type: object
+      additionalProperties: false
+      required: [method, level, lower, upper]
+      properties:
+        method: { type: string, minLength: 1 }
+        level: { type: number, minimum: 0, maximum: 1 }
+        lower: { type: number }
+        upper: { type: number }
+    SourceSpan:
+      type: object
+      additionalProperties: false
+      required: [sourceId, sourceVersion, start, end]
+      properties:
+        sourceId: { type: string, minLength: 1 }
+        sourceVersion: { type: integer, minimum: 1 }
+        start: { type: integer, minimum: 0 }
+        end: { type: integer, exclusiveMinimum: 0 }
     Error:
       type: object
       required: [code, message]
