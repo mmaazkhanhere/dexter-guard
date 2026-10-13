@@ -34,7 +34,7 @@ Before checking convergence, record:
 | Spec 009 `tasks.md` revision | `specs/009-ui-implementation/tasks.md` | UPDATED |
 | Spec 009 OpenAPI / frontend mapping | `contracts/openapi.yaml`, `frontend/src/api/generated.ts` | VERIFIED LOCALLY |
 | Backend Specs 001–008 revisions | `specs/001-*` through `specs/008-*` | REVIEWED FOR CONTRACTS |
-| Application Git SHA | `51cb72a923615e95e88b6646db3e1434b5409a1c` | RECORDED |
+| Application Git SHA | `c2f1d2c628bab271525148e3efbe52895d5f9837` | RECORDED |
 | Test fixture / dataset version | Synthetic repository fixtures | VERIFIED SYNTHETIC-ONLY |
 | Target Vercel project and runtime | `vercel.json`, Services + FastAPI | CONFIGURED; PREVIEW BLOCKED |
 | Database environment and migration revision | No provider, credentials, or migration revision | BLOCKED |
@@ -185,11 +185,11 @@ These checks must be performed using the **current supported Vercel project/runt
 ```text
 Deployment URL:          BLOCKED - no authenticated Vercel project
 Vercel deployment ID:    BLOCKED - no deployment attempted
-Git SHA:                 51cb72a923615e95e88b6646db3e1434b5409a1c
+Git SHA:                 c2f1d2c628bab271525148e3efbe52895d5f9837
 Database/migration:      BLOCKED - no PostgreSQL provider or migration runtime
 API smoke:               BLOCKED - no deployed URL
 Browser E2E:             BLOCKED - Chromium binary unavailable after interrupted install
-Live inference:          BLOCKED - no provider credentials
+Live inference:          PASS - one local Groq smoke passed; production Gemini not verified
 Checked at (UTC):        2026-10-13
 ```
 
@@ -234,7 +234,7 @@ For every mismatch discovered between implementation and specs:
 **Reviewer:** `Codex automated convergence review`  
 **Reviewed at (UTC):** `2026-10-13`  
 **Release Git SHA:** `51cb72a923615e95e88b6646db3e1434b5409a1c`  
-**Residual risks:** `PostgreSQL, Vercel access, Chromium browser, live provider, and production smoke remain blocked`
+**Residual risks:** `PostgreSQL, Vercel access, Chromium browser, Gemini production smoke, and production smoke remain blocked`
 
 ### Completion report to produce when checks have run
 
@@ -254,6 +254,7 @@ local PASS is not a production deployment PASS.
 | Frontend lint | `cd frontend; npm run lint` | PASS |
 | TypeScript and production build | `cd frontend; npm run check` | PASS - Vite production build completed |
 | OpenAPI client generation | `cd frontend; npm run api:generate` | PASS - generated client committed |
+| Live LLM smoke | One direct adapter request using `backend/.env` and a one-sentence synthetic transcript | PASS - Groq returned one structured fact and guardrails accepted it |
 | Diff hygiene | `git diff --check` | PASS |
 | Playwright browser E2E | `cd frontend; npm run test:e2e` | BLOCKED - Chromium was not installed; download was interrupted |
 | Vercel build | `vercel build --yes` | BLOCKED - local Vercel token is invalid; no deployment attempted |
@@ -262,7 +263,7 @@ local PASS is not a production deployment PASS.
 
 - FR-34 through FR-39, FR-42, FR-43, FR-45, FR-47, and FR-49 have local code and test evidence.
 - FR-41 and FR-44 remain partial because review/audit persistence is not durable across fresh process instances.
-- FR-46 remains partial because saved evaluation paths exist, but live provider execution has not been run against a configured endpoint.
+- FR-46 remains partial because saved evaluation paths exist and one Groq smoke passed, but Gemini production execution has not been verified.
 - The generation path is now provider-agnostic through `OpenAICompatibleGenerationAdapter`; Groq and Gemini are selected by `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL` in `backend/.env` or deployment secrets.
 - FR-48 is blocked because Vercel preview and production routing were not verified.
 - ARC-05 and SAFE-08 are blocked by the lack of PostgreSQL-backed repositories and migrations.
@@ -273,6 +274,6 @@ local PASS is not a production deployment PASS.
 1. Provision PostgreSQL, add migrations, and wire durable repositories for notes, reviews, audit events, and evaluation state.
 2. Provide Vercel Services/project access, valid credentials, server-only secrets, and run `vercel build` plus preview smoke tests.
 3. Install the Playwright Chromium test browser and execute the real browser workflow suite.
-4. Run controlled live-inference smoke, timeout, and provider-error acceptance cases against the configured endpoint.
+4. Run controlled Gemini production smoke, timeout, and provider-error acceptance cases.
 
 Until these blockers are removed, the correct convergence result is **BLOCKED / NO-GO**, not PASS. The repository is locally implemented and tested, but it is not yet a verified production deployment.
