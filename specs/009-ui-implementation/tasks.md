@@ -5,7 +5,7 @@ Tasks are ordered by dependency and vertical slices. [P] means independently par
 ## Phase 0 — contract and deployment discovery
 
 - [x] T001 Verify and compose existing FastAPI routers into one app; identify concrete dependency wiring and preserve route compatibility. FR-47, FR-48. Prerequisite: none. Files: src/app/, tests/api/. Completion: unified OpenAPI can serve all confirmed endpoints. Test: pytest composition/route smoke.
-- [ ] T002 Confirm Vercel Services access, plan duration/memory limits, supported Python runtime, and PostgreSQL provider/connection mode. FR-48, FR-49. Prerequisite: none. Files: deployment decision record/vercel.json. Completion: preview topology decision is evidenced. Test: vercel build/preview smoke.
+- [ ] T002 Confirm Vercel Services access, plan duration/memory limits, supported Python runtime, and PostgreSQL provider/connection mode. FR-48, FR-49. Prerequisite: none. Files: deployment decision record/vercel.json. Completion: preview topology decision is evidenced. Test: vercel build/preview smoke. **Partial:** repository topology is recorded; account access, plan limits, PostgreSQL, and preview smoke remain external blockers.
 - [ ] T003 [P] Reconcile the consolidated contract with Specs 001–008 and mark all unavailable endpoints proposed. FR-47. Prerequisite: none. Files: contracts/*. Completion: no implementation fact is invented. Test: OpenAPI lint and traceability review.
 
 ## Phase 1 — foundations

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "services",
+  "services": {
+    "web": {
+      "root": "frontend/",
+      "framework": "vite",
+      "installCommand": "npm ci",
+      "buildCommand": "npm run build",
+      "outputDirectory": "dist"
+    },
+    "api": {
+      "root": "backend/",
+      "framework": "fastapi",
+      "entrypoint": "main:app",
+      "maxDuration": 60,
+      "includeFiles": ["../src/**", "../pyproject.toml", "../uv.lock"]
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": { "service": "api" } },
+    { "source": "/(.*)", "destination": { "service": "web" } }
+  ]
+}
