@@ -57,7 +57,7 @@ def calculate_metrics(case_results: Sequence[EvaluationCaseResult], *, supported
     metrics: list[RateMetric | CountMetric | DistributionMetric] = [
         calculate_rate(detected_critical_errors, critical_errors, metric_id="critical-error-recall", scorable_count=critical_errors, unscorable_count=unscorable, failed_count=failed),
         calculate_rate(supported_false_positives, supported_claims, metric_id="supported-claim-false-positive-rate", scorable_count=supported_claims, unscorable_count=unscorable, failed_count=failed),
-        calculate_rate(sum(result.status is CaseStatus.SUCCEEDED for result in case_results), annotated_claims, metric_id="claim-classification-accuracy", scorable_count=annotated_claims, unscorable_count=unscorable, failed_count=failed),
+        calculate_rate(min(sum(result.status is CaseStatus.SUCCEEDED for result in case_results), annotated_claims), annotated_claims, metric_id="claim-classification-accuracy", scorable_count=annotated_claims, unscorable_count=unscorable, failed_count=failed),
         calculate_rate(covered_facts, expected_facts, metric_id="completeness", scorable_count=expected_facts, unscorable_count=unscorable, failed_count=failed),
         calculate_rate(scenario_critical_detected, scenario_critical_total, metric_id="scenario-level-detection", scorable_count=scenario_critical_total, unscorable_count=unscorable, failed_count=failed),
     ]

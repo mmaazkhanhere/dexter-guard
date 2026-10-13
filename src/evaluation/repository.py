@@ -97,6 +97,11 @@ class SQLiteEvaluationRepository:
             row = self._connection.execute("SELECT payload_json FROM evaluation_runs WHERE evaluation_run_id=?", (run_id,)).fetchone()
         return EvaluationRun.model_validate_json(row["payload_json"]) if row else None
 
+    def run_id_for_idempotency(self, idempotency_key: str) -> str | None:
+        with self._lock:
+            row = self._connection.execute("SELECT evaluation_run_id FROM evaluation_idempotency WHERE idempotency_key=?", (idempotency_key,)).fetchone()
+        return row["evaluation_run_id"] if row else None
+
     def list_runs(self) -> tuple[EvaluationRun, ...]:
         with self._lock:
             rows = self._connection.execute("SELECT payload_json FROM evaluation_runs ORDER BY created_at, evaluation_run_id").fetchall()
