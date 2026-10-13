@@ -56,7 +56,12 @@ class OpenAICompatibleGenerationAdapter:
         self.model_id = model
         self.base_url = base_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
-        self.client = client or OpenAI(api_key=api_key, base_url=self.base_url, timeout=timeout_seconds)
+        self.client = client or OpenAI(
+            api_key=api_key,
+            base_url=self.base_url,
+            timeout=timeout_seconds,
+            max_retries=0,
+        )
 
     def generate(self, source: Any, *, generation_run_id: str | None = None) -> GenerationResult:
         response = self.client.chat.completions.create(
