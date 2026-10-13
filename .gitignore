@@ -63,6 +63,8 @@ db.sqlite3
 db.sqlite3-journal
 data/*.sqlite3
 data/*.sqlite3-*
+backend/data/*.sqlite3
+backend/data/*.sqlite3-*
 
 # Flask stuff:
 instance/
@@ -224,5 +226,7 @@ __marimo__/
 # Frontend dependencies and build output
 frontend/node_modules/
 frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
 frontend/.env*
 !frontend/.env.example
