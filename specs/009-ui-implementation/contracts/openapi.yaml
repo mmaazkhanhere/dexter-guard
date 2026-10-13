@@ -1,0 +1,467 @@
+openapi: 3.1.0
+info:
+  title: Dexter Guard Frontend Integration API
+  version: UI-INTEGRATION-CONTRACT-v1-draft
+  description: >
+    Consolidated frontend-facing contract index. x-integration-status distinguishes routes
+    implemented in an existing domain API from backend work proposed by Feature 009.
+    Existing domain contracts remain authoritative for detailed schemas.
+servers:
+  - url: /
+paths:
+  /sources:
+    post:
+      operationId: createSource
+      x-owning-spec: "001"
+      x-integration-status: confirmed-existing
+      summary: Submit immutable synthetic German transcript
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../../001-source-and-note-ingestion/contracts/source-api.yaml#/components/schemas/CreateSourceRequest
+      responses:
+        "201": { description: SourceDocument }
+        "400": { $ref: "#/components/responses/ApiError" }
+  /sources/{sourceId}/versions/{sourceVersion}:
+    get:
+      operationId: getSourceVersion
+      x-owning-spec: "001"
+      x-integration-status: confirmed-existing
+      summary: Retrieve immutable source version
+      parameters:
+        - $ref: "#/components/parameters/SourceId"
+        - $ref: "#/components/parameters/SourceVersion"
+      responses:
+        "200": { description: SourceDocument }
+        "404": { $ref: "#/components/responses/ApiError" }
+  /api/v1/saved-examples:
+    get:
+      operationId: listSavedExamples
+      x-owning-spec: "009; data from 001/008"
+      x-integration-status: proposed-backend-dependency
+      summary: List synthetic-only saved demonstration metadata
+      responses:
+        "200":
+          description: Saved examples without treating historical result as live inference
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SavedExample" }
+        "503": { $ref: "#/components/responses/ApiError" }
+  /api/v1/notes/generate:
+    post:
+      operationId: generateNursingNote
+      x-owning-spec: "002"
+      x-integration-status: confirmed-existing
+      summary: Generate draft note and structured facts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../../002-nursing-note-generation/contracts/notes-api.yaml#/components/schemas/GenerateRequest
+      responses:
+        "201": { description: NoteResponse including structured facts }
+        "400": { $ref: "#/components/responses/ApiError" }
+        "409": { $ref: "#/components/responses/ApiError" }
+        "422": { $ref: "#/components/responses/ApiError" }
+        "503": { $ref: "#/components/responses/ApiError" }
+  /api/v1/notes/import:
+    post:
+      operationId: importNursingNote
+      x-owning-spec: "002"
+      x-integration-status: confirmed-existing
+      summary: Store external candidate as draft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../../002-nursing-note-generation/contracts/notes-api.yaml#/components/schemas/ImportRequest
+      responses:
+        "201": { description: Imported NoteResponse }
+        "400": { $ref: "#/components/responses/ApiError" }
+        "409": { $ref: "#/components/responses/ApiError" }
+        "422": { $ref: "#/components/responses/ApiError" }
+  /api/v1/notes/{noteId}/revisions/{noteRevision}:
+    get:
+      operationId: getNoteRevisionWithFacts
+      x-owning-spec: "002"
+      x-integration-status: proposed-backend-dependency
+      summary: Retrieve an immutable note revision and its structured facts
+      parameters:
+        - $ref: "#/components/parameters/NoteId"
+        - $ref: "#/components/parameters/NoteRevision"
+      responses:
+        "200": { description: NursingNote revision with source reference and facts }
+        "404": { $ref: "#/components/responses/ApiError" }
+  /api/v1/claims/extract:
+    post:
+      operationId: extractClaims
+      x-owning-spec: "003"
+      x-integration-status: proposed-backend-dependency
+      summary: Create/retrieve immutable extraction result for a note revision
+      responses:
+        "200": { description: Extraction run (SUCCEEDED, EMPTY, or FAILED) }
+        "404": { $ref: "#/components/responses/ApiError" }
+        "409": { $ref: "#/components/responses/ApiError" }
+        "503": { $ref: "#/components/responses/ApiError" }
+  /api/v1/verification-runs:
+    post:
+      operationId: createVerificationRun
+      x-owning-spec: "004"
+      x-integration-status: confirmed-existing-when-service-wired
+      summary: Evidence verification for immutable references
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../../004-evidence-verification/contracts/verification-runs.openapi.yaml#/components/schemas/VerificationRunRequest
+      responses:
+        "200": { description: Terminal VerificationRun, including typed non-success }
+        "400": { $ref: "#/components/responses/ApiError" }
+        "409": { $ref: "#/components/responses/ApiError" }
+        "503": { $ref: "#/components/responses/ApiError" }
+  /api/v1/verification-runs/{verificationRunId}:
+    get:
+      operationId: getVerificationRun
+      x-owning-spec: "004"
+      x-integration-status: proposed-backend-dependency
+      summary: Retrieve immutable evidence-verification result by run ID
+      parameters: [ { $ref: "#/components/parameters/VerificationRunId" } ]
+      responses:
+        "200": { description: VerificationRun }
+        "404": { $ref: "#/components/responses/ApiError" }
+  /api/v1/deterministic-validation-runs:
+    post:
+      operationId: createDeterministicValidationRun
+      x-owning-spec: "005"
+      x-integration-status: confirmed-existing-when-service-wired
+      summary: Execute deterministic validation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../../005-deterministic-validation-engine/contracts/deterministic-validation.openapi.yaml#/components/schemas/ValidationRequest
+      responses:
+        "200":
+          description: ValidationRun
+          content:
+            application/json:
+              schema:
+                $ref: ../../005-deterministic-validation-engine/contracts/deterministic-validation.openapi.yaml#/components/schemas/ValidationRun
+        "404": { $ref: "#/components/responses/ApiError" }
+        "409": { $ref: "#/components/responses/ApiError" }
+        "422": { $ref: "#/components/responses/ApiError" }
+        "503": { $ref: "#/components/responses/ApiError" }
+  /api/v1/coverage-runs:
+    post:
+      operationId: createCoverageRun
+      x-owning-spec: "006"
+      x-integration-status: confirmed-existing-when-service-wired
+      summary: Execute source-to-note coverage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../../006-source-coverage/contracts/coverage-runs.openapi.yaml#/components/schemas/CoverageRunRequest
+      responses:
+        "200":
+          description: Terminal CoverageRun
+          content:
+            application/json:
+              schema:
+                $ref: ../../006-source-coverage/contracts/coverage-runs.openapi.yaml#/components/schemas/CoverageRun
+        "404": { $ref: "#/components/responses/ApiError" }
+        "409": { $ref: "#/components/responses/ApiError" }
+        "503": { $ref: "#/components/responses/ApiError" }
+  /api/v1/reviews/{noteId}:
+    get:
+      operationId: getReviewContext
+      x-owning-spec: "007"
+      x-integration-status: confirmed-existing-in-separate-app
+      summary: Read latest or historical review context
+      parameters:
+        - $ref: "#/components/parameters/NoteId"
+        - name: revision
+          in: query
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: ReviewContext
+          content:
+            application/json:
+              schema:
+                $ref: ../../007-human-review-and-audit/contracts/review-audit.openapi.yaml#/components/schemas/ReviewContext
+        "404": { $ref: "#/components/responses/ApiError" }
+        "409": { $ref: "#/components/responses/ApiError" }
+        "503": { $ref: "#/components/responses/ApiError" }
+  /api/v1/reviews/{noteId}/revisions:
+    post:
+      operationId: saveReviewNoteRevision
+      x-owning-spec: "007"
+      x-integration-status: confirmed-existing-in-separate-app
+      summary: Create immutable manual-edit successor
+      parameters: [ { $ref: "#/components/parameters/NoteId" } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../../007-human-review-and-audit/contracts/review-audit.openapi.yaml#/components/schemas/SaveRevisionRequest
+      responses:
+        "201":
+          description: RevisionSavedResponse
+          content:
+            application/json:
+              schema:
+                $ref: ../../007-human-review-and-audit/contracts/review-audit.openapi.yaml#/components/schemas/RevisionSavedResponse
+        "409": { $ref: "#/components/responses/ApiError" }
+        "422": { $ref: "#/components/responses/ApiError" }
+  /api/v1/reviews/{noteId}/suggestions:
+    get:
+      operationId: listReviewSuggestions
+      x-owning-spec: "007"
+      x-integration-status: confirmed-existing-in-separate-app
+      summary: List usable/unusable suggestions for revision
+      parameters: [ { $ref: "#/components/parameters/NoteId" } ]
+      responses:
+        "200": { description: Suggestions }
+        "404": { $ref: "#/components/responses/ApiError" }
+  /api/v1/reviews/{noteId}/findings/{findingId}/decisions:
+    post:
+      operationId: recordFindingDecision
+      x-owning-spec: "007"
+      x-integration-status: confirmed-existing-in-separate-app
+      summary: Append finding decision/adjudication
+      parameters:
+        - $ref: "#/components/parameters/NoteId"
+        - $ref: "#/components/parameters/FindingId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../../007-human-review-and-audit/contracts/review-audit.openapi.yaml#/components/schemas/FindingDecisionRequest
+      responses:
+        "201":
+          description: ReviewDecision
+          content:
+            application/json:
+              schema:
+                $ref: ../../007-human-review-and-audit/contracts/review-audit.openapi.yaml#/components/schemas/ReviewDecision
+        "409": { $ref: "#/components/responses/ApiError" }
+        "422": { $ref: "#/components/responses/ApiError" }
+  /api/v1/reviews/{noteId}/findings/{findingId}/claim-reverification:
+    post:
+      operationId: triggerClaimReverification
+      x-owning-spec: "007"
+      x-integration-status: confirmed-existing-in-separate-app
+      summary: Reverify one claim for feedback only
+      parameters:
+        - $ref: "#/components/parameters/NoteId"
+        - $ref: "#/components/parameters/FindingId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../../007-human-review-and-audit/contracts/review-audit.openapi.yaml#/components/schemas/ClaimReverificationRequest
+      responses:
+        "200": { description: Claim feedback; never approval eligible }
+        "409": { $ref: "#/components/responses/ApiError" }
+        "503": { $ref: "#/components/responses/ApiError" }
+  /api/v1/reviews/{noteId}/full-verifications:
+    post:
+      operationId: triggerFullNoteVerification
+      x-owning-spec: "007"
+      x-integration-status: confirmed-existing-in-separate-app
+      summary: Execute full verification for current revision
+      parameters: [ { $ref: "#/components/parameters/NoteId" } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../../007-human-review-and-audit/contracts/review-audit.openapi.yaml#/components/schemas/FullVerificationRequest
+      responses:
+        "200":
+          description: FullNoteVerification including failed/invalid terminal states
+          content:
+            application/json:
+              schema:
+                $ref: ../../007-human-review-and-audit/contracts/review-audit.openapi.yaml#/components/schemas/FullNoteVerification
+        "409": { $ref: "#/components/responses/ApiError" }
+        "503": { $ref: "#/components/responses/ApiError" }
+  /api/v1/reviews/{noteId}/approve:
+    post:
+      operationId: approveReviewNote
+      x-owning-spec: "007"
+      x-integration-status: confirmed-existing-in-separate-app
+      summary: Backend-gated approval
+      parameters: [ { $ref: "#/components/parameters/NoteId" } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../../007-human-review-and-audit/contracts/review-audit.openapi.yaml#/components/schemas/ApproveRequest
+      responses:
+        "201":
+          description: Approval disposition
+          content:
+            application/json:
+              schema:
+                $ref: ../../007-human-review-and-audit/contracts/review-audit.openapi.yaml#/components/schemas/NoteDisposition
+        "409": { $ref: "#/components/responses/ApiError" }
+  /api/v1/reviews/{noteId}/reject:
+    post:
+      operationId: rejectReviewNote
+      x-owning-spec: "007"
+      x-integration-status: confirmed-existing-in-separate-app
+      summary: Backend-recorded rejection
+      parameters: [ { $ref: "#/components/parameters/NoteId" } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../../007-human-review-and-audit/contracts/review-audit.openapi.yaml#/components/schemas/RejectRequest
+      responses:
+        "201":
+          description: Rejection disposition
+          content:
+            application/json:
+              schema:
+                $ref: ../../007-human-review-and-audit/contracts/review-audit.openapi.yaml#/components/schemas/NoteDisposition
+        "409": { $ref: "#/components/responses/ApiError" }
+  /api/v1/reviews/{noteId}/audit:
+    get:
+      operationId: getReviewAuditHistory
+      x-owning-spec: "007"
+      x-integration-status: confirmed-existing-in-separate-app
+      summary: Retrieve append-only history
+      parameters: [ { $ref: "#/components/parameters/NoteId" } ]
+      responses:
+        "200":
+          description: Audit history
+          content:
+            application/json:
+              schema:
+                $ref: ../../007-human-review-and-audit/contracts/review-audit.openapi.yaml#/components/schemas/AuditHistoryResponse
+        "404": { $ref: "#/components/responses/ApiError" }
+  /api/v1/evaluation-runs:
+    get:
+      operationId: listEvaluationRuns
+      x-owning-spec: "008"
+      x-integration-status: confirmed-existing-in-separate-app
+      summary: List saved evaluation runs
+      responses:
+        "200": { description: Run summaries }
+    post:
+      operationId: createEvaluationRun
+      x-owning-spec: "008"
+      x-integration-status: confirmed-existing-in-separate-app
+      summary: Execute live benchmark/demo tracking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../../008-evaluation-and-observability/contracts/evaluation.openapi.yaml#/components/schemas/EvaluationRunRequest
+      responses:
+        "201":
+          description: EvaluationRun
+          content:
+            application/json:
+              schema:
+                $ref: ../../008-evaluation-and-observability/contracts/evaluation.openapi.yaml#/components/schemas/EvaluationRun
+        "409": { $ref: "#/components/responses/ApiError" }
+        "503": { $ref: "#/components/responses/ApiError" }
+  /api/v1/evaluation-runs/{evaluationRunId}:
+    get:
+      operationId: getEvaluationRun
+      x-owning-spec: "008"
+      x-integration-status: confirmed-existing-in-separate-app
+      summary: Retrieve metrics and case diagnostics
+      parameters: [ { $ref: "#/components/parameters/EvaluationRunId" } ]
+      responses:
+        "200":
+          description: EvaluationRun
+          content:
+            application/json:
+              schema:
+                $ref: ../../008-evaluation-and-observability/contracts/evaluation.openapi.yaml#/components/schemas/EvaluationRun
+        "404": { $ref: "#/components/responses/ApiError" }
+  /api/v1/evaluation-runs/{evaluationRunId}/export:
+    get:
+      operationId: exportEvaluationRun
+      x-owning-spec: "008"
+      x-integration-status: confirmed-existing-in-separate-app
+      summary: Export immutable result
+      parameters: [ { $ref: "#/components/parameters/EvaluationRunId" } ]
+      responses:
+        "200": { description: JSON export }
+        "404": { $ref: "#/components/responses/ApiError" }
+  /api/v1/health:
+    get:
+      operationId: getHealth
+      x-owning-spec: "009"
+      x-integration-status: proposed-backend-dependency
+      summary: Safe liveness/readiness health check
+      responses:
+        "200":
+          description: No source/note content or secrets
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+        "503": { $ref: "#/components/responses/ApiError" }
+components:
+  parameters:
+    SourceId: { name: sourceId, in: path, required: true, schema: { type: string, minLength: 1 } }
+    SourceVersion: { name: sourceVersion, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    NoteId: { name: noteId, in: path, required: true, schema: { type: string, minLength: 1 } }
+    NoteRevision: { name: noteRevision, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    FindingId: { name: findingId, in: path, required: true, schema: { type: string, minLength: 1 } }
+    VerificationRunId: { name: verificationRunId, in: path, required: true, schema: { type: string, minLength: 1 } }
+    EvaluationRunId: { name: evaluationRunId, in: path, required: true, schema: { type: string, minLength: 1 } }
+  responses:
+    ApiError:
+      description: Stable typed failure; never a successful run
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
+  schemas:
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        field: { type: [string, "null"] }
+        correlationId: { type: [string, "null"] }
+        retryable: { type: [boolean, "null"] }
+    SavedExample:
+      type: object
+      required: [exampleId, title, sourceId, sourceVersion, kind, syntheticOnly]
+      properties:
+        exampleId: { type: string }
+        title: { type: string }
+        sourceId: { type: string }
+        sourceVersion: { type: integer, minimum: 1 }
+        kind: { type: string, enum: [DOCUMENTATION, EVALUATION_HISTORICAL] }
+        evaluationRunId: { type: [string, "null"] }
+        syntheticOnly: { type: boolean, const: true }
+    Health:
+      type: object
+      required: [status, database]
+      properties:
+        status: { type: string, enum: [ok, degraded] }
+        database: { type: string, enum: [ready, unavailable] }
+
