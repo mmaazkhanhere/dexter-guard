@@ -26,6 +26,7 @@ export function ReviewWorkspace() {
 
   const context = review.data;
   const currentVerification = context?.fullVerification?.noteRevision === note.revision ? context.fullVerification : undefined;
+  const staleContext = Boolean(context && context.latestRevision > note.revision);
   const approvalEligible = Boolean(context?.approvalEligible && currentVerification?.status === "VALID" && !verify.isPending && !save.isPending);
   const firstError = save.error ?? verify.error ?? decide.error ?? approve.error ?? reject.error;
 
@@ -53,6 +54,7 @@ export function ReviewWorkspace() {
   return <>
     <WorkspaceHeader eyebrow="03 · HUMAN REVIEW" title="Resolve findings and approve safely" description="Edits create successor revisions. Approval remains controlled by the backend's latest complete-note verification." />
     {firstError && <div className="error-banner" role="alert">{safeMutationError(firstError).message}<span> ({safeMutationError(firstError).code})</span></div>}
+    {staleContext && <div className="error-banner" role="status">This review result is stale for the current note revision. Refresh before taking an approval or decision action.</div>}
     <div className="workspace-grid">
       <StateCard title={`Current persisted revision · ${note.revision}`}>
         <label>Reviewer label<input value={reviewer} onChange={(event) => setReviewer(event.target.value)} /></label>
