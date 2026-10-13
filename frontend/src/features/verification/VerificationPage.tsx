@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import { useReview } from "../../api/hooks";
 import { useWorkspace } from "../../state/workspace";
 import type { Finding } from "../../api/types";
+import { nonOverlappingSpans, validSourceSpans } from "./spans";
 
 export function VerificationPage() {
   const { note, source } = useWorkspace();
@@ -24,7 +25,7 @@ export function VerificationPage() {
 
 function EvidenceText({ text, spans, source }: { text: string; spans: Finding["evidence"]["spans"]; source?: { source_id: string; source_version: number } }) {
   if (!text) return <p className="muted">Source unavailable.</p>;
-  const valid = spans.filter((span) => span.sourceId === source?.source_id && span.sourceVersion === source?.source_version && span.start >= 0 && span.end > span.start && span.end <= Array.from(text).length).sort((a, b) => a.start - b.start);
+  const valid = source ? nonOverlappingSpans(validSourceSpans(text, source.source_id, source.source_version, spans)) : [];
   if (!valid.length) return <p className="evidence-note">{text}</p>;
   const codePoints = Array.from(text); const chunks: ReactNode[] = []; let cursor = 0;
   valid.forEach((span, index) => { if (span.start < cursor) return; if (span.start > cursor) chunks.push(<span key={`plain-${index}`}>{codePoints.slice(cursor, span.start).join("")}</span>); chunks.push(<mark key={`evidence-${index}`}>{codePoints.slice(span.start, span.end).join("")}</mark>); cursor = span.end; });
