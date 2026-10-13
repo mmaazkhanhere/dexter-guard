@@ -5,13 +5,13 @@ import { useApprove, useFindingDecision, useFullVerification, useReject, useRevi
 import { useWorkspace } from "../../state/workspace";
 
 export function ReviewPage() {
-  const { note, setNote } = useWorkspace();
+  const { note, draftContent, setDraftContent, applyNoteRevision } = useWorkspace();
   const review = useReview(note?.noteId, note?.revision);
   const save = useSaveRevision(); const verify = useFullVerification(); const decide = useFindingDecision(); const approve = useApprove(); const reject = useReject();
-  const [content, setContent] = useState(note?.content ?? ""); const [reviewer, setReviewer] = useState("synthetic-reviewer"); const [reason, setReason] = useState("");
-  useEffect(() => { setContent(review.data?.candidateNote ?? note?.content ?? ""); }, [review.data?.candidateNote, note?.content]);
+  const [content, setContent] = useState(draftContent ?? note?.content ?? ""); const [reviewer, setReviewer] = useState("synthetic-reviewer"); const [reason, setReason] = useState("");
+  useEffect(() => { const next = draftContent ?? review.data?.candidateNote ?? note?.content ?? ""; setContent(next); }, [draftContent, review.data?.candidateNote, note?.content]);
   const context = review.data;
-  async function saveRevision() { if (!note || !content.trim()) return; const result = await save.mutateAsync({ noteId: note.noteId, expectedRevision: note.revision, content, reviewerLabel: reviewer }); setNote({ ...note, revision: result.revision, content }); }
+  async function saveRevision() { if (!note || !content.trim()) return; const result = await save.mutateAsync({ noteId: note.noteId, expectedRevision: note.revision, content, reviewerLabel: reviewer }); applyNoteRevision({ ...note, revision: result.revision, content }); setDraftContent(content); await review.refetch(); }
   async function fullVerify() { if (!note) return; await verify.mutateAsync({ noteId: note.noteId, expectedRevision: note.revision, reviewerLabel: reviewer }); await review.refetch(); }
   return <>
     <WorkspaceHeader eyebrow="03 · HUMAN REVIEW" title="Resolve findings and approve safely" description="Edits create successor revisions. Approval remains controlled by the backend's latest complete-note verification." />

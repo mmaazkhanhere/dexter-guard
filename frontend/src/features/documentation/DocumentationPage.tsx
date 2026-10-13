@@ -7,7 +7,7 @@ import { useWorkspace } from "../../state/workspace";
 
 export function DocumentationPage() {
   const navigate = useNavigate();
-  const { setSource, source, note, setNote } = useWorkspace();
+  const { setSource, source, note, setNote, applyNoteRevision, setDraftContent } = useWorkspace();
   const examples = useSavedExamples();
   const createSource = useCreateSource();
   const generate = useGenerateNote();
@@ -29,14 +29,14 @@ export function DocumentationPage() {
   async function submitTranscript() {
     if (transcript.trim().length < 10) return;
     const result = await createSource.mutateAsync({ resident_test_id: residentId.trim(), language: "de-DE", transcript_text: transcript });
-    setSource(result); setNote(undefined);
+    setSource(result); setNote(undefined); setDraftContent(undefined);
   }
   async function createNote() {
     if (!source) return;
     const result = mode === "generate"
       ? await generate.mutateAsync({ sourceId: source.source_id, sourceVersion: source.source_version, requestedBy: "synthetic-reviewer" })
       : await importNote.mutateAsync({ sourceId: source.source_id, sourceVersion: source.source_version, content: candidate, externalOrigin: { system: "synthetic-external-demo", externalNoteId: `external-${Date.now()}` }, requestedBy: "synthetic-reviewer", facts: [] });
-    setNote(result); setCandidate(result.content);
+    applyNoteRevision(result); setCandidate(result.content);
   }
   return <>
     <WorkspaceHeader eyebrow="01 · DOCUMENTATION" title="Create a candidate nursing note" description="Submit a synthetic German transcript, generate or import a candidate note, and preserve the source identity through review." />
