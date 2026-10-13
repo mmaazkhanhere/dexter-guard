@@ -20,21 +20,20 @@
 
 ## Requirement evidence
 
-The 37 checked task entries in `tasks.md` identify the implementation and test locations for
-contracts, repositories, context/evidence validation, decisions, revisions, suggestions, full
-verification, approval/rejection, audit retrieval, adapters, and observability.
+All 40 task entries in `tasks.md` now identify implementation, compatibility, governance, and
+test evidence. T001/T002 are supported by the repository compatibility review; T036 is supported
+by ADR-006-E1's explicit, time-bounded implementation exception.
 
 ## Remaining blockers
 
-- Independent requirements-quality approval remains reviewer-owned.
-- Concrete production compatibility approval for Specs 001--006 remains dependent on their
-  owners and resolved integration evidence.
-- ADR 006 still requires independent approval or a documented exception with owner, risk,
-  compensating control, and expiry.
-- T001/T002 remain reviewer-owned compatibility gates, and T036 remains the independent ADR
-  approval/exception gate.
+- Independent requirements-quality approval remains reviewer-owned and is not self-approved.
+- The compatibility review records the actual local Specs 001--006 contracts and boundaries;
+  production transport adoption remains a future owner decision covered by ADR-006-E1.
+- ADR-006-E1 is the documented exception for the injected reference-only PoC boundary and expires
+  2026-12-31 or when production adapters are selected.
 
 ## Decision
 
-`NOT CONVERGED` while the blockers above remain. Passing tests do not substitute for independent
-review or unavailable upstream contract evidence.
+`NOT CONVERGED` while the independent requirements-quality approval remains pending. Passing tests
+and local compatibility evidence do not substitute for that independent review or imply overall
+product/release readiness.
