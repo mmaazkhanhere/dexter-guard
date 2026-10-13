@@ -9,8 +9,10 @@ export class ErrorBoundary extends Component<PropsWithChildren, State> {
     return { hasError: true };
   }
 
-  componentDidCatch(_error: Error, _info: ErrorInfo): void {
+  componentDidCatch(error: Error, info: ErrorInfo): void {
     // Deliberately do not send note or transcript content to telemetry.
+    void error;
+    void info;
   }
 
   render(): ReactNode {

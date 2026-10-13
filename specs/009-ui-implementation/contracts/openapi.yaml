@@ -22,7 +22,12 @@ paths:
             schema:
               $ref: ../../001-source-and-note-ingestion/contracts/source-api.yaml#/components/schemas/CreateSourceRequest
       responses:
-        "201": { description: SourceDocument }
+        "201":
+          description: SourceDocument
+          content:
+            application/json:
+              schema:
+                $ref: ../../001-source-and-note-ingestion/contracts/source-api.yaml#/components/schemas/SourceDocument
         "400": { $ref: "#/components/responses/ApiError" }
   /sources/{sourceId}/versions/{sourceVersion}:
     get:
@@ -34,7 +39,12 @@ paths:
         - $ref: "#/components/parameters/SourceId"
         - $ref: "#/components/parameters/SourceVersion"
       responses:
-        "200": { description: SourceDocument }
+        "200":
+          description: SourceDocument
+          content:
+            application/json:
+              schema:
+                $ref: ../../001-source-and-note-ingestion/contracts/source-api.yaml#/components/schemas/SourceDocument
         "404": { $ref: "#/components/responses/ApiError" }
   /api/v1/saved-examples:
     get:
@@ -64,7 +74,12 @@ paths:
             schema:
               $ref: ../../002-nursing-note-generation/contracts/notes-api.yaml#/components/schemas/GenerateRequest
       responses:
-        "201": { description: NoteResponse including structured facts }
+        "201":
+          description: NoteResponse including structured facts
+          content:
+            application/json:
+              schema:
+                $ref: ../../002-nursing-note-generation/contracts/notes-api.yaml#/components/schemas/NoteResponse
         "400": { $ref: "#/components/responses/ApiError" }
         "409": { $ref: "#/components/responses/ApiError" }
         "422": { $ref: "#/components/responses/ApiError" }
@@ -82,7 +97,12 @@ paths:
             schema:
               $ref: ../../002-nursing-note-generation/contracts/notes-api.yaml#/components/schemas/ImportRequest
       responses:
-        "201": { description: Imported NoteResponse }
+        "201":
+          description: Imported NoteResponse
+          content:
+            application/json:
+              schema:
+                $ref: ../../002-nursing-note-generation/contracts/notes-api.yaml#/components/schemas/NoteResponse
         "400": { $ref: "#/components/responses/ApiError" }
         "409": { $ref: "#/components/responses/ApiError" }
         "422": { $ref: "#/components/responses/ApiError" }
@@ -96,7 +116,12 @@ paths:
         - $ref: "#/components/parameters/NoteId"
         - $ref: "#/components/parameters/NoteRevision"
       responses:
-        "200": { description: NursingNote revision with source reference and facts }
+        "200":
+          description: NursingNote revision with source reference and facts
+          content:
+            application/json:
+              schema:
+                $ref: ../../002-nursing-note-generation/contracts/notes-api.yaml#/components/schemas/NoteResponse
         "404": { $ref: "#/components/responses/ApiError" }
   /api/v1/claims/extract:
     post:
@@ -457,6 +482,7 @@ components:
         sourceVersion: { type: integer, minimum: 1 }
         kind: { type: string, enum: [DOCUMENTATION, EVALUATION_HISTORICAL] }
         evaluationRunId: { type: [string, "null"] }
+        candidateNote: { type: string }
         syntheticOnly: { type: boolean, const: true }
     Health:
       type: object

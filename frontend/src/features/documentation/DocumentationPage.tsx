@@ -4,6 +4,7 @@ import { safeMutationError, useCreateSource, useGenerateNote, useImportNote, use
 import { WorkspaceHeader } from "../../components/shared/WorkspaceHeader";
 import { StateCard } from "../../components/shared/StateCard";
 import { useWorkspace } from "../../state/workspace";
+import { isExternalNoteValid, isTranscriptValid } from "./validation";
 
 export function DocumentationPage() {
   const navigate = useNavigate();
@@ -19,7 +20,7 @@ export function DocumentationPage() {
   const [mode, setMode] = useState<"generate" | "import">("generate");
   const example = examples.data?.find((item) => item.exampleId === selectedExample);
   const sourceQuery = useSource(example?.sourceId, example?.sourceVersion);
-  const error = createSource.error ?? generate.error ?? importNote.error;
+  const error = examples.error ?? sourceQuery.error ?? createSource.error ?? generate.error ?? importNote.error;
 
   async function loadExample() {
     if (!example) return;
@@ -27,7 +28,7 @@ export function DocumentationPage() {
     if (result.data) { setTranscript(result.data.transcript_text); setResidentId(result.data.resident_test_id); setCandidate(example.candidateNote ?? ""); }
   }
   async function submitTranscript() {
-    if (transcript.trim().length < 10) return;
+    if (!isTranscriptValid(transcript)) return;
     const result = await createSource.mutateAsync({ resident_test_id: residentId.trim(), language: "de-DE", transcript_text: transcript });
     setSource(result); setNote(undefined); setDraftContent(undefined);
   }
@@ -46,14 +47,14 @@ export function DocumentationPage() {
         <label>Saved synthetic example<select aria-label="Saved synthetic example" value={selectedExample} onChange={(event) => setSelectedExample(event.target.value)}><option value="">Choose an example …</option>{examples.data?.map((item) => <option key={item.exampleId} value={item.exampleId}>{item.title}</option>)}</select></label>
         <button className="secondary-button" onClick={loadExample} disabled={!example || sourceQuery.isFetching}>Load example</button>
         <label>Resident test ID<input value={residentId} onChange={(event) => setResidentId(event.target.value)} /></label>
-        <label>German transcript<textarea aria-label="German transcript" value={transcript} onChange={(event) => setTranscript(event.target.value)} placeholder="Deutsches synthetisches Transkript …" /></label>
-        <button onClick={submitTranscript} disabled={createSource.isPending || transcript.trim().length < 10}>{createSource.isPending ? "Submitting …" : "Submit transcript"}</button>
+        <label>German transcript<textarea aria-label="German transcript" required aria-invalid={!isTranscriptValid(transcript)} value={transcript} onChange={(event) => setTranscript(event.target.value)} placeholder="Deutsches synthetisches Transkript …" /></label>
+        <button onClick={submitTranscript} disabled={createSource.isPending || !isTranscriptValid(transcript)}>{createSource.isPending ? "Submitting …" : "Submit transcript"}</button>
         {source && <div className="identity-pill">Source {source.source_id} · v{source.source_version} · {source.language}</div>}
       </StateCard>
       <StateCard title="Candidate note">
         <div className="segmented"><button className={mode === "generate" ? "selected" : ""} onClick={() => setMode("generate")}>Generate</button><button className={mode === "import" ? "selected" : ""} onClick={() => setMode("import")}>External note</button></div>
         <label>{mode === "generate" ? "Generated note preview" : "External candidate note"}<textarea aria-label="Candidate nursing note" value={candidate} onChange={(event) => setCandidate(event.target.value)} placeholder="Kandidatennotiz …" /></label>
-        <button onClick={createNote} disabled={!source || generate.isPending || importNote.isPending || (mode === "import" && candidate.trim().length < 10)}>{generate.isPending || importNote.isPending ? "Working …" : mode === "generate" ? "Generate nursing note" : "Import note"}</button>
+        <button onClick={createNote} disabled={!source || generate.isPending || importNote.isPending || (mode === "import" && !isExternalNoteValid(candidate))}>{generate.isPending || importNote.isPending ? "Working …" : mode === "generate" ? "Generate nursing note" : "Import note"}</button>
         {note && <><div className="identity-pill">Note {note.noteId} · revision {note.revision} · {note.origin}</div><FactList facts={note.facts} /><button className="secondary-button" onClick={() => navigate("/verification")}>Open verification</button></>}
       </StateCard>
     </div>

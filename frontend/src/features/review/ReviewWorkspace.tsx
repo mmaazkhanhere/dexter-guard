@@ -5,21 +5,22 @@ import { WorkspaceHeader } from "../../components/shared/WorkspaceHeader";
 import { useWorkspace } from "../../state/workspace";
 
 export function ReviewWorkspace() {
-  const { note, draftContent, setDraftContent, applyNoteRevision } = useWorkspace();
-  const review = useReview(note?.noteId, note?.revision);
-  const audit = useAudit(note?.noteId);
+  const { note: noteMaybe, draftContent, setDraftContent, applyNoteRevision } = useWorkspace();
+  const note = noteMaybe!;
+  const review = useReview(noteMaybe?.noteId, noteMaybe?.revision);
+  const audit = useAudit(noteMaybe?.noteId);
   const save = useSaveRevision();
   const verify = useFullVerification();
   const decide = useFindingDecision();
   const approve = useApprove();
   const reject = useReject();
-  const [content, setContent] = useState(draftContent ?? note?.content ?? "");
+  const [content, setContent] = useState(draftContent ?? noteMaybe?.content ?? "");
   const [reviewer, setReviewer] = useState("synthetic-reviewer");
   const [reason, setReason] = useState("");
 
   useEffect(() => {
-    setContent(draftContent ?? review.data?.candidateNote ?? note?.content ?? "");
-  }, [draftContent, review.data?.candidateNote, note?.content]);
+    setContent(draftContent ?? review.data?.candidateNote ?? noteMaybe?.content ?? "");
+  }, [draftContent, review.data?.candidateNote, noteMaybe?.content]);
 
   if (!note) return <><WorkspaceHeader eyebrow="03 · HUMAN REVIEW" title="Resolve findings and approve safely" description="Edits create successor revisions. Approval remains controlled by the backend's latest complete-note verification." /><div className="empty-state">Create or import a note in Documentation first.</div></>;
 

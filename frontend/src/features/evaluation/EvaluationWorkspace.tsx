@@ -17,10 +17,11 @@ const metricIds = [
 
 function metricValue(metric: EvaluationMetric | undefined): string {
   if (!metric || metric.state !== "SCORED") return "UNAVAILABLE";
-  if (metric.metricKind === "RATE") return metric.value === undefined ? "UNAVAILABLE" : `${(metric.value * 100).toFixed(1)}%`;
-  if (metric.metricKind === "DURATION_DISTRIBUTION") return metric.p50 === undefined ? "UNAVAILABLE" : `p50 ${metric.p50.toFixed(0)} ms · p95 ${metric.p95?.toFixed(0) ?? "—"} ms`;
-  if (metric.metricKind === "COST_DISTRIBUTION") return metric.p50 === undefined ? "UNAVAILABLE" : `p50 ${metric.p50.toFixed(4)} ${metric.unit ?? ""}`;
-  return metric.valuePerNote === undefined ? "UNAVAILABLE" : `${metric.valuePerNote.toFixed(2)} / note`;
+  if (metric.metricKind === "RATE") return metric.value == null ? "UNAVAILABLE" : `${(metric.value * 100).toFixed(1)}%`;
+  if (metric.metricKind === "DURATION_DISTRIBUTION") return metric.p50 == null ? "UNAVAILABLE" : `p50 ${metric.p50.toFixed(0)} ms · p95 ${metric.p95?.toFixed(0) ?? "—"} ms`;
+  if (metric.metricKind === "COST_DISTRIBUTION") return metric.p50 == null ? "UNAVAILABLE" : `p50 ${metric.p50.toFixed(4)} ${metric.unit ?? ""}`;
+  if (!("valuePerNote" in metric) || metric.valuePerNote == null) return "UNAVAILABLE";
+  return `${metric.valuePerNote.toFixed(2)} / note`;
 }
 
 export function EvaluationWorkspace() {
@@ -45,7 +46,7 @@ export function EvaluationWorkspace() {
       {detail.isFetching && selected && <p className="muted">Loading immutable run detail …</p>}
     </StateCard>
     <div className="metric-grid">
-      {metricIds.map(([id, label]) => <StateCard key={id} title={label}><strong>{metricValue(metric(id))}</strong><span>{metric(id)?.reason ?? `Metric ${id}; denominator ${metric(id)?.denominator ?? metric(id)?.scorableCount ?? "unavailable"}`}</span></StateCard>)}
+      {metricIds.map(([id, label]) => { const selectedMetric = metric(id); const denominator = selectedMetric && "denominator" in selectedMetric ? selectedMetric.denominator : selectedMetric?.scorableCount; return <StateCard key={id} title={label}><strong>{metricValue(selectedMetric)}</strong><span>{selectedMetric?.reason ?? `Metric ${id}; denominator ${denominator ?? "unavailable"}`}</span></StateCard>; })}
     </div>
     {detail.data?.comparison && <StateCard title="Baseline versus validated"><p className="muted">Comparison status: {detail.data.comparison.status}. Baseline {detail.data.comparison.baselineRunId}; validated {detail.data.comparison.validatedRunId}.</p><ul>{detail.data.comparison.aggregateDeltas.map((delta, index) => <li key={index}>{String(delta.metricId ?? "metric")}: {String(delta.delta ?? "UNAVAILABLE")}</li>)}</ul></StateCard>}
     {detail.data && <StateCard title="Failing and inspected scenarios"><div className="finding-list">{detail.data.caseResults?.length ? detail.data.caseResults.map((item) => <div className="finding" key={item.caseExecutionId}><span>{item.scenarioId} · {item.candidateId}</span><strong>{item.status}</strong><p>{item.observedFindings.length} observed finding(s) · {item.matchResults.length} match result(s)</p></div>) : <p className="muted">No case results are available for this run.</p>}</div></StateCard>}
