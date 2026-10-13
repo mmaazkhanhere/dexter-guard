@@ -42,3 +42,12 @@ def test_unconfigured_verification_fails_closed() -> None:
 
     assert response.status_code == 503
     assert response.json()["code"] == "VERIFIER_UNAVAILABLE"
+
+
+def test_composed_app_exposes_evaluation_run_collection() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/api/v1/evaluation-runs")
+
+    assert response.status_code == 200
+    assert response.json() == []

@@ -13,6 +13,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Query, status
 
 from evaluation.adapters import DeterministicFixtureAdapter
+from evaluation.api import create_router as create_evaluation_router
 from evaluation.benchmark import default_dataset
 from evaluation.repository import SQLiteEvaluationRepository
 from evaluation.runner import EvaluationRunner
@@ -133,11 +134,13 @@ def create_app() -> FastAPI:
         except Exception as error:
             raise HTTPException(status_code=404, detail={"code": "NOTE_NOT_FOUND", "message": "review context not found"}) from error
 
-    app.state.evaluation_runner = EvaluationRunner(
+    evaluation_runner = EvaluationRunner(
         dataset=default_dataset(),
         adapter=DeterministicFixtureAdapter(),
         repository=SQLiteEvaluationRepository(":memory:"),
     )
+    app.state.evaluation_runner = evaluation_runner
+    app.include_router(create_evaluation_router(evaluation_runner))
     return app
 
 
