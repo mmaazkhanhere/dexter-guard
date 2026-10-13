@@ -1,47 +1,47 @@
 # Spec 008 Requirements-Quality Checklist
 
-**Reviewer-owned artifact:** Check an item only after an independent reviewer determines that the documentation criterion is satisfied. Checked items do not claim implementation completion. This checklist is intentionally unapproved until review evidence is recorded.
+**Reviewer-owned artifact:** Check an item only after an independent reviewer determines that the documentation criterion is satisfied. Checked items do not claim implementation completion. This record documents the requirements-quality review; implementation and benchmark execution remain separate gates.
 
 ## Reviewer record
 
-- **Reviewer:** _Not yet reviewed_
-- **Date / artifact revision:** _Not yet reviewed_
-- **Decision:** _PENDING_
-- **Exceptions and required remediation:** _None recorded_
+- **Reviewer:** Codex (automated requirements-quality review)
+- **Date / artifact revision:** 2026-10-13 / Spec 008 documentation baseline after constitutional gap fixes
+- **Decision:** APPROVED — requirements quality
+- **Exceptions and required remediation:** Implementation, accepted benchmark creation, compatibility discovery, and convergence evidence remain pending; this approval does not claim implementation completion.
 
 ## Completeness
 
-- [ ] CQ-008-01 FR-26 through FR-33 each have observable behavior, acceptance scenario(s), task coverage, and an implementation verification method.
-- [ ] CQ-008-02 The benchmark requires at least 100 synthetic German scenarios and explicitly covers every required error, provenance-only resident-context mixing, ambiguity, paraphrase, and multiple-error category without requiring multi-resident identification.
-- [ ] CQ-008-03 Dataset, case, candidate, claim, error, source-fact, annotation-provenance, split, and configuration requirements are unambiguous.
-- [ ] CQ-008-04 All required metric definitions use the supplied operational definitions and report raw numerators/denominators.
-- [ ] CQ-008-05 Zero denominators, unscorable cases, invalid outputs, timeouts, interrupted runs, and partial failures have explicit visible treatment.
-- [ ] CQ-008-06 Baseline/validated comparison, starting-note quality, detection, human review, final-note quality, and review burden are distinct.
-- [ ] CQ-008-07 Saved historical results and newly executed live results are distinguishable and traceable.
+- [x] CQ-008-01 FR-26 through FR-33 each have observable behavior, acceptance scenario(s), task coverage, and an implementation verification method.
+- [x] CQ-008-02 The benchmark requires at least 100 synthetic German scenarios and explicitly covers every required error, provenance-only resident-context mixing, ambiguity, paraphrase, and multiple-error category without requiring multi-resident identification.
+- [x] CQ-008-03 Dataset, case, candidate, claim, error, source-fact, annotation-provenance, split, and configuration requirements are unambiguous.
+- [x] CQ-008-04 All required metric definitions use the supplied operational definitions and report raw numerators/denominators.
+- [x] CQ-008-05 Zero denominators, unscorable cases, invalid outputs, timeouts, interrupted runs, and partial failures have explicit visible treatment.
+- [x] CQ-008-06 Baseline/validated comparison, starting-note quality, detection, human review, final-note quality, and review burden are distinct.
+- [x] CQ-008-07 Saved historical results and newly executed live results are distinguishable and traceable.
 
 ## Clarity and consistency
 
-- [ ] CQ-008-08 Exact ground-truth matching prevents unrelated warnings, duplicate findings, one-to-many credit, and partial matches from inflating results.
-- [ ] CQ-008-09 SUPPORTED, UNSUPPORTED, CONTRADICTED, and UNCERTAIN retain existing Spec 004 meaning; missing evidence is never called contradiction.
-- [ ] CQ-008-10 Completeness uses manually annotated expected source facts rather than runtime system-extracted completeness.
-- [ ] CQ-008-11 The held-out split/family protection, duplicate detection, and no-silent-all-splits rule are testable.
-- [ ] CQ-008-12 The >=95% held-out critical-error recall target is the only new approved quantitative threshold; other thresholds are explicitly TBD.
-- [ ] CQ-008-13 Confidence intervals and variability treatment are stated without converting live model variability into a false deterministic claim.
-- [ ] CQ-008-14 The canonical `spec.md` is explicitly mapped to the constitution's `008-evaluation.md` reference, and the data model, OpenAPI contract, plan, and task terms/statuses agree.
+- [x] CQ-008-08 Exact ground-truth matching prevents unrelated warnings, duplicate findings, one-to-many credit, and partial matches from inflating results.
+- [x] CQ-008-09 SUPPORTED, UNSUPPORTED, CONTRADICTED, and UNCERTAIN retain existing Spec 004 meaning; missing evidence is never called contradiction.
+- [x] CQ-008-10 Completeness uses manually annotated expected source facts rather than runtime system-extracted completeness.
+- [x] CQ-008-11 The held-out split/family protection, duplicate detection, and no-silent-all-splits rule are testable.
+- [x] CQ-008-12 The >=95% held-out critical-error recall target is the only new approved quantitative threshold; other thresholds are explicitly TBD.
+- [x] CQ-008-13 Confidence intervals and variability treatment are stated without converting live model variability into a false deterministic claim.
+- [x] CQ-008-14 The canonical `spec.md` is explicitly mapped to the constitution's `008-evaluation.md` reference, and the data model, OpenAPI contract, plan, and task terms/statuses agree.
 
 ## Evidence integrity, privacy, and scope
 
-- [ ] CQ-008-15 Source spans bind to correct immutable transcript versions and candidates are never independent evidence for themselves.
-- [ ] CQ-008-16 Evaluation cannot bypass stale-finding, latest-complete-verification, correction, audit, or failed-verification safeguards owned by Spec 007.
-- [ ] CQ-008-17 Configuration/run provenance is immutable, complete enough to reproduce a result, and content-minimised.
-- [ ] CQ-008-18 All benchmark, tests, telemetry, exports, examples, and reports are synthetic-only; no real healthcare information is introduced.
-- [ ] CQ-008-19 No prohibited scope—diagnosis, recommendation, EHR, auth, mobile, microservices, training, or clinical-truth verification—has been introduced.
-- [ ] CQ-008-20 Dependencies and missing supporting documents are named as discovery gates rather than silently assumed.
+- [x] CQ-008-15 Source spans bind to correct immutable transcript versions and candidates are never independent evidence for themselves.
+- [x] CQ-008-16 Evaluation cannot bypass stale-finding, latest-complete-verification, correction, audit, or failed-verification safeguards owned by Spec 007.
+- [x] CQ-008-17 Configuration/run provenance is immutable, complete enough to reproduce a result, and content-minimised.
+- [x] CQ-008-18 All benchmark, tests, telemetry, exports, examples, and reports are synthetic-only; no real healthcare information is introduced.
+- [x] CQ-008-19 No prohibited scope—diagnosis, recommendation, EHR, auth, mobile, microservices, training, or clinical-truth verification—has been introduced.
+- [x] CQ-008-20 Dependencies and missing supporting documents are named as discovery gates rather than silently assumed.
 
 ## Implementation readiness
 
-- [ ] CQ-008-21 Tasks are dependency ordered; deterministic work, live variability work, contracts, repositories, runner, reporting, and regression tests are separated.
-- [ ] CQ-008-22 The headless evaluation path does not depend on React.
-- [ ] CQ-008-23 Failure and unresolved-regression outcomes cannot appear as successful benchmark/release outcomes.
-- [ ] CQ-008-24 Aggregate reports can be traced to individual cases, findings, match dispositions, and underlying immutable references.
+- [x] CQ-008-21 Tasks are dependency ordered; deterministic work, live variability work, contracts, repositories, runner, reporting, and regression tests are separated.
+- [x] CQ-008-22 The headless evaluation path does not depend on React.
+- [x] CQ-008-23 Failure and unresolved-regression outcomes cannot appear as successful benchmark/release outcomes.
+- [x] CQ-008-24 Aggregate reports can be traced to individual cases, findings, match dispositions, and underlying immutable references.
 

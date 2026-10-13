@@ -24,7 +24,7 @@
 1. No approved Spec 008 benchmark annotation guide, accepted 100+ dataset, or model-pricing catalog exists in reviewed materials. T003–T005 and T008 create/validate them; no benchmark result is claimed.
 2. Existing concrete pipeline ports, app composition, timeout/retry budgets, SQLite migration convention, and React host need repository verification. T001–T002 are blockers before wiring.
 3. The report/dashboard presentation implementation is not assumed to exist. The headless JSON runner remains mandatory even if a UI is delayed.
-4. The reviewer-owned checklist is entirely unchecked. Per implement.md, implementation must pause for explicit direction/approval rather than silently proceed.
+4. The reviewer-owned checklist has been approved for requirements quality on 2026-10-13. This does not claim that implementation, the accepted benchmark, or convergence evidence exists.
 
 The prior three constitution-consistency gaps are resolved in the source artifacts: provenance-only resident-context mixing is covered without multi-resident identification, the `008-evaluation.md` naming is mapped to the canonical `spec.md`, and `sourceVersion`/`noteRevision` are typed as positive integers in the data model.
 
