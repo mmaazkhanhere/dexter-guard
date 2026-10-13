@@ -14,7 +14,7 @@
       "framework": "fastapi",
       "entrypoint": "main:app",
       "maxDuration": 60,
-      "includeFiles": ["../src/**", "../pyproject.toml", "../uv.lock"]
+      "includeFiles": ["src/**", "../pyproject.toml", "../uv.lock"]
     }
   },
   "rewrites": [

@@ -153,7 +153,7 @@ def test_every_hr_scenario_maps_to_an_executable_backend_acceptance_probe():
 
 
 def test_openapi_backend_paths_are_registered_in_the_fastapi_application():
-    contract_path = Path(__file__).parents[2] / "specs" / "007-human-review-and-audit" / "contracts" / "review-audit.openapi.yaml"
+    contract_path = Path(__file__).parents[3] / "specs" / "007-human-review-and-audit" / "contracts" / "review-audit.openapi.yaml"
     document = yaml.safe_load(contract_path.read_text(encoding="utf-8"))
     service = _service()
     app = create_app(service, source_reader=lambda source_id, version: "synthetic", claim_reverifier=lambda note_id, revision, claim_id: "claim-run-1", verification_ports=Ports())

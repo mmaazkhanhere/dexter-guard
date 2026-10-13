@@ -6,7 +6,7 @@ original `/api/v1/*` path, so the browser calls same-origin `/api/v1/*` routes.
 
 The configuration is in [`vercel.json`](../../vercel.json). The Python entrypoint
 is [`backend/main.py`](../../backend/main.py), which imports the composed app
-from `src/app` and does not expose credentials to the browser.
+from `backend/src/app` and does not expose credentials to the browser.
 
 The topology is feasible but not production-verified in this workspace. Vercel
 Services is currently Beta and requires the project framework to be set to

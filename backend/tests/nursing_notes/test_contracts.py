@@ -8,7 +8,7 @@ from nursing_notes.contracts import CandidateNursingFact
 
 
 def test_notes_openapi_contract_declares_candidate_and_persisted_fact_shapes():
-    contract_path = Path(__file__).parents[2] / "specs" / "002-nursing-note-generation" / "contracts" / "notes-api.yaml"
+    contract_path = Path(__file__).parents[3] / "specs" / "002-nursing-note-generation" / "contracts" / "notes-api.yaml"
     contract = yaml.safe_load(contract_path.read_text(encoding="utf-8"))
     schemas = contract["components"]["schemas"]
 

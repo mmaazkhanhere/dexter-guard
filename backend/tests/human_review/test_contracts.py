@@ -15,7 +15,7 @@ from human_review.contracts import (
 
 
 def test_openapi_declares_all_implemented_review_routes():
-    contract_path = Path(__file__).parents[2] / "specs" / "007-human-review-and-audit" / "contracts" / "review-audit.openapi.yaml"
+    contract_path = Path(__file__).parents[3] / "specs" / "007-human-review-and-audit" / "contracts" / "review-audit.openapi.yaml"
     document = yaml.safe_load(contract_path.read_text(encoding="utf-8"))
     paths = document["paths"]
     assert document["info"]["version"] == "REVIEW-AUDIT-CONTRACT-v1"

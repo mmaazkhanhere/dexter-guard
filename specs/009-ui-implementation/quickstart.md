@@ -2,8 +2,9 @@
 
 ## Current implementation status
 
-The composed backend entrypoint is `app.main:app`; the Vercel wrapper is
-`backend/main.py`; and the browser application is under `frontend/`. The local
+The composed backend entrypoint is `backend/src/app/main.py`; the Vercel wrapper is
+`backend/main.py`; backend tests are under `backend/tests/`; and the browser
+application is under `frontend/`. The local
 backend commands below were verified on 2026-10-13. Frontend dependency
 installation and Vercel preview deployment remain environment-dependent gates.
 

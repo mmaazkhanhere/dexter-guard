@@ -24,7 +24,7 @@ def test_downstream_consumers_can_import_and_construct_source_contracts():
 
 
 def test_openapi_contract_matches_runtime_source_document_and_span_contracts():
-    contract_path = Path(__file__).parents[2] / "specs" / "001-source-and-note-ingestion" / "contracts" / "source-api.yaml"
+    contract_path = Path(__file__).parents[3] / "specs" / "001-source-and-note-ingestion" / "contracts" / "source-api.yaml"
     contract = yaml.safe_load(contract_path.read_text(encoding="utf-8"))
     schemas = contract["components"]["schemas"]
 

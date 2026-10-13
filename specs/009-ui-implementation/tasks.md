@@ -4,7 +4,7 @@ Tasks are ordered by dependency and vertical slices. [P] means independently par
 
 ## Phase 0 — contract and deployment discovery
 
-- [x] T001 Verify and compose existing FastAPI routers into one app; identify concrete dependency wiring and preserve route compatibility. FR-47, FR-48. Prerequisite: none. Files: src/app/, tests/api/. Completion: unified OpenAPI can serve all confirmed endpoints. Test: pytest composition/route smoke.
+- [x] T001 Verify and compose existing FastAPI routers into one app; identify concrete dependency wiring and preserve route compatibility. FR-47, FR-48. Prerequisite: none. Files: backend/src/app/, backend/tests/api/. Completion: unified OpenAPI can serve all confirmed endpoints. Test: pytest composition/route smoke.
 - [ ] T002 Confirm Vercel Services access, plan duration/memory limits, supported Python runtime, and PostgreSQL provider/connection mode. FR-48, FR-49. Prerequisite: none. Files: deployment decision record/vercel.json. Completion: preview topology decision is evidenced. Test: vercel build/preview smoke. **Partial:** repository topology is recorded; account access, plan limits, PostgreSQL, and preview smoke remain external blockers.
 - [ ] T003 [P] Reconcile the consolidated contract with Specs 001–008 and mark all unavailable endpoints proposed. FR-47. Prerequisite: none. Files: contracts/*. Completion: no implementation fact is invented. Test: OpenAPI lint and traceability review.
 
@@ -18,7 +18,7 @@ Tasks are ordered by dependency and vertical slices. [P] means independently par
 
 - [ ] T007 Build transcript entry and saved-example selection; wire source submission/retrieval. FR-35. Prerequisite: T005; saved examples requires proposed contract implementation. Files: frontend/src/features/documentation. Completion: source identity/rendered errors work. Tests: RTL valid/invalid/example flow.
 - [ ] T008 Build generation/import, structured facts, and editable draft panel. FR-36, FR-37. Prerequisite: T007. Files: documentation components/hooks. Completion: origin/facts/source reference are preserved. Tests: RTL provider failure/import distinction.
-- [ ] T009 Implement missing saved-example and source-route normalization adapters only in backend composition layer if discovery confirms absence. FR-35, FR-46. Prerequisite: T001/T003. Files: src/app/api. Completion: documented contract passes without duplicating domain logic. Tests: pytest contract tests.
+- [ ] T009 Implement missing saved-example and source-route normalization adapters only in backend composition layer if discovery confirms absence. FR-35, FR-46. Prerequisite: T001/T003. Files: backend/src/app/api. Completion: documented contract passes without duplicating domain logic. Tests: pytest contract tests.
 
 ## Phase 3 — Evidence vertical slice
 
@@ -41,7 +41,7 @@ Tasks are ordered by dependency and vertical slices. [P] means independently par
 ## Phase 6 — integration, deployment, and acceptance
 
 - [ ] T019 [P] Add accessibility, responsive desktop, error-boundary, and telemetry-content tests. FR-34, FR-49. Prerequisite: T004–T18 relevant components. Completion: no color-only status; safe errors. Tests: axe/RTL/Playwright.
-- [ ] T020 Configure PostgreSQL migration/repository deployment adapters and health endpoint. FR-48, FR-49. Prerequisite: T001/T002. Files: src/app, migration/deployment config. Completion: restart-safe audit/revision storage. Tests: deployed integration persistence.
+- [ ] T020 Configure PostgreSQL migration/repository deployment adapters and health endpoint. FR-48, FR-49. Prerequisite: T001/T002. Files: backend/src/app, migration/deployment config. Completion: restart-safe audit/revision storage. Tests: deployed integration persistence.
 - [ ] T021 Configure Vercel Services, API routing, env validation, build scripts, and rollback runbook. FR-48. Prerequisite: T002/T004/T020. Files: vercel.json, api entrypoint, docs. Completion: preview has one URL for SPA/API. Tests: vercel build and smoke suite.
 - [ ] T022 Execute API contract, pytest, Vitest, Playwright, deployed smoke, and cross-document traceability review. FR-34–FR-49. Prerequisite: all above. Completion: evidence/approval/failure acceptance cases pass or documented blockers remain. Tests: full CI matrix.
 
