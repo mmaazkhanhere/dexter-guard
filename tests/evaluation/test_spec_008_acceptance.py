@@ -46,5 +46,6 @@ def test_eval_014_and_015_produce_traceable_run_and_distinct_review_boundary(tmp
     assert all(result.note_body_hash and result.source_text_hash for result in run.case_results)
     recall = next(metric for metric in run.aggregate_metrics if metric.metric_id == "critical-error-recall")
     assert recall.value is not None
+    assert next(metric for metric in run.aggregate_metrics if metric.metric_id == "final-note-remaining-errors").state.value == "UNAVAILABLE"
     assert "clinical" not in " ".join(metric.metric_id for metric in run.aggregate_metrics).lower()
 
