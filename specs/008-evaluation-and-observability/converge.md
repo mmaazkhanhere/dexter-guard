@@ -50,6 +50,22 @@ Create or update a dated convergence report with one row per requirement, invari
 | --- | --- | --- | --- | --- |
 | FR-26 | spec.md | _populate at review_ | NOT RUN | _populate_ |
 
+## Implementation evidence (2026-10-13)
+
+| ID | Evidence | Result | Limitation |
+| --- | --- | --- | --- |
+| FR-26 | `evaluation.benchmark`, `evaluation.dataset`; benchmark integrity and acceptance tests | PASS | 100 deterministic synthetic German scenarios; no clinical-safety claim |
+| FR-27 | protected split/family/hash validator and held-out runner tests | PASS | runner requires one explicit split; no tuning consumer exists in this checkout |
+| FR-28 | `evaluation.comparison` paired hash/isolation tests | PASS | task digest is optional because no shared upstream task contract exists |
+| FR-29 | matching/metrics tests; raw counts, Wilson intervals, latency and unavailable cost | PASS | observed human-review metrics remain unavailable unless supplied |
+| FR-30 | Pydantic configuration, SQLite restart/idempotency, telemetry redaction tests | PASS | saved fixture provider has no token/pricing source, so cost is `UNAVAILABLE` |
+| FR-31 | headless runner/CLI, failure/replay, regression tests | PASS | live model variability is not a deterministic CI assertion |
+| FR-32 | FastAPI query/export and JSON diagnostic report tests | PASS | no React host exists in this checkout |
+| FR-33 | immutable upstream-reference demo and historical saved-example tests | PASS | no duplicate ingestion or generation workflow |
+| EVAL-001 through EVAL-015 | deterministic acceptance and focused evaluation tests | PASS | resident-context mixing remains optional and excluded |
+| Held-out release gate | deterministic saved-fixture run: critical recall 5/5 (100%) | PASS | synthetic benchmark performance only |
+| Full suite | `python -m pytest`: 338 passed | PASS | FastAPI/Pydantic emit two non-failing dependency warnings |
+
 Permitted result values are PASS, FAIL, BLOCKED, NOT RUN, and NOT APPLICABLE with rationale. Evidence must remain synthetic-only and content-minimised.
 
 ## Gap handling and decision

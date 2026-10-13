@@ -63,6 +63,13 @@ def calculate_metrics(case_results: Sequence[EvaluationCaseResult], *, supported
     ]
     warning_count = sum(len(result.observed_findings) for result in case_results)
     metrics.append(CountMetric(metricId="review-burden-warnings", metricKind="COUNT_PER_NOTE", state=MetricState.SCORED if case_results else MetricState.NOT_APPLICABLE, scorableCount=len(case_results), unscorableCount=unscorable, failedCount=failed, aggregationMethod="sum-per-note", policyVersion="EVALUATION_METRICS-v1", count=warning_count, noteCount=len(case_results), valuePerNote=warning_count / len(case_results) if case_results else None, unit="WARNINGS", reason="zero notes" if not case_results else None))
+    for metric_id, unit, value in (
+        ("review-burden-human-decisions", "HUMAN_DECISIONS", sum(result.review_outcome.human_decision_count for result in case_results if result.review_outcome)),
+        ("review-burden-correction-actions", "CORRECTION_ACTIONS", sum(result.review_outcome.correction_action_count for result in case_results if result.review_outcome)),
+        ("final-note-remaining-errors", "ERRORS", sum(result.review_outcome.remaining_error_count for result in case_results if result.review_outcome)),
+        ("final-note-remaining-omissions", "ERRORS", sum(result.review_outcome.remaining_omission_count for result in case_results if result.review_outcome)),
+    ):
+        metrics.append(CountMetric(metricId=metric_id, metricKind="COUNT_PER_NOTE", state=MetricState.SCORED if case_results else MetricState.NOT_APPLICABLE, scorableCount=len(case_results), unscorableCount=unscorable, failedCount=failed, aggregationMethod="sum-per-note", policyVersion="EVALUATION_METRICS-v1", count=value, noteCount=len(case_results), valuePerNote=value / len(case_results) if case_results else None, unit=unit, reason="zero notes" if not case_results else None))
     metrics.append(_distribution("verification-latency", (result.latency.end_to_end_milliseconds for result in case_results if result.latency.end_to_end_milliseconds is not None), kind="DURATION_DISTRIBUTION", unit="MILLISECONDS"))
     metrics.append(_distribution("additional-inference-cost", (result.usage_and_cost.estimated_cost for result in case_results if result.usage_and_cost.cost_state == "AVAILABLE" and result.usage_and_cost.estimated_cost is not None), kind="COST_DISTRIBUTION", unit="CURRENCY_PER_NOTE", currency="EUR"))
     return tuple(metrics)

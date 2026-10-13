@@ -3,6 +3,7 @@ from __future__ import annotations
 from evaluation.benchmark import default_dataset
 from evaluation.repository import IdempotencyConflict, SQLiteEvaluationRepository
 from evaluation.runner import make_terminal_run
+from evaluation.contracts import RunStatus
 
 
 def test_sqlite_repository_restarts_and_keeps_terminal_runs_immutable(tmp_path) -> None:
@@ -32,7 +33,7 @@ def test_repository_rejects_mutating_same_run_id(tmp_path) -> None:
     dataset = default_dataset()
     run = make_terminal_run(dataset, selected_split="DEVELOPMENT")
     repo.save_run(run)
-    changed = run.model_copy(update={"status": "FAILED"})
+    changed = run.model_copy(update={"status": RunStatus.FAILED})
     try:
         repo.save_run(changed)
     except Exception as exc:

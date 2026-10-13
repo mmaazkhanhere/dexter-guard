@@ -40,7 +40,7 @@ class DeterministicFixtureAdapter(PipelineAdapter):
                 StageRunReference(stage="EVIDENCE_VERIFICATION", upstreamRunId=f"fixture-verification-{case.scenario_id}", status="SUCCEEDED"),
                 StageRunReference(stage="DETERMINISTIC_VALIDATION", upstreamRunId=f"fixture-validation-{case.scenario_id}", status="SUCCEEDED"),
                 StageRunReference(stage="SOURCE_COVERAGE", upstreamRunId=f"fixture-coverage-{case.scenario_id}", status="SUCCEEDED"),
-            ), latency_ms=(perf_counter() - started) * 1000, usage_and_cost=UsageAndCost(inputTokens=0, outputTokens=0, retryCount=0, costState="AVAILABLE", estimatedCost=0.0, currency="EUR", pricingAssumptionsVersion="SYNTHETIC_FIXTURE-v1"),
+            ), latency_ms=(perf_counter() - started) * 1000, usage_and_cost=UsageAndCost(inputTokens=None, outputTokens=None, retryCount=0, costState="UNAVAILABLE", estimatedCost=None, currency=None, pricingAssumptionsVersion="SYNTHETIC_FIXTURE-v1"),
         )
 
 
