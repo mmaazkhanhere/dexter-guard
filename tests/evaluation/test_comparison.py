@@ -19,10 +19,10 @@ def test_paired_comparison_requires_same_candidate_and_clean_baseline() -> None:
     validated = _case("1", "b" * 64)
     comparison = compare_paired_cases("baseline", "validated", (baseline,), (validated,), review_data_kind="SIMULATED", simulation_policy_version="sim-v1")
     assert comparison.status.value == "SIMULATED"
-    assert comparison.pair_results[0]["status"] == "VALID"
+    assert comparison.pair_results[0].status == "VALID"
     invalid = compare_paired_cases("baseline", "validated", (_case("1", "a" * 64, findings=()),), (_case("1", "b" * 64),))
     assert invalid.status.value == "INVALID_PAIR"
-    assert invalid.pair_results[0]["status"] == "INVALID_PAIR"
+    assert invalid.pair_results[0].status == "INVALID_PAIR"
 
 
 def test_regression_does_not_invent_unapproved_thresholds() -> None:

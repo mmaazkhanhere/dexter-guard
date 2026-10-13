@@ -433,15 +433,36 @@ class DistributionMetric(MetricCommon):
     confidence_interval: ConfidenceInterval | None = Field(default=None, alias="confidenceInterval")
 
 
+MetricResult = RateMetric | CountMetric | DistributionMetric
+
+
+class PairResult(Contract):
+    scenario_id: StrictStr = Field(alias="scenarioId", min_length=1)
+    candidate_id: StrictStr = Field(alias="candidateId", min_length=1)
+    candidate_body_hash: StrictStr = Field(alias="candidateBodyHash", min_length=1)
+    baseline_case_execution_id: StrictStr = Field(alias="baselineCaseExecutionId", min_length=1)
+    validated_case_execution_id: StrictStr = Field(alias="validatedCaseExecutionId", min_length=1)
+    status: Literal["VALID", "INVALID_PAIR"]
+    invalid_reason: StrictStr | None = Field(default=None, alias="invalidReason")
+
+
+class MetricDelta(Contract):
+    metric_id: StrictStr = Field(alias="metricId", min_length=1)
+    baseline_value: StrictFloat | None = Field(default=None, alias="baselineValue")
+    validated_value: StrictFloat | None = Field(default=None, alias="validatedValue")
+    delta: StrictFloat | None = None
+    confidence_interval: ConfidenceInterval | None = Field(default=None, alias="confidenceInterval")
+
+
 class RunComparison(Contract):
     comparison_id: StrictStr = Field(alias="comparisonId", min_length=1)
     status: ComparisonStatus
     baseline_run_id: StrictStr = Field(alias="baselineRunId", min_length=1)
     validated_run_id: StrictStr = Field(alias="validatedRunId", min_length=1)
-    pair_results: tuple[dict[str, Any], ...] = Field(alias="pairResults")
+    pair_results: tuple[PairResult, ...] = Field(alias="pairResults")
     review_data_kind: ReviewDataKind = Field(alias="reviewDataKind")
     simulation_policy_version: StrictStr | None = Field(default=None, alias="simulationPolicyVersion")
-    aggregate_deltas: tuple[dict[str, Any], ...] = Field(alias="aggregateDeltas")
+    aggregate_deltas: tuple[MetricDelta, ...] = Field(alias="aggregateDeltas")
 
 
 class EvaluationRun(Contract):
