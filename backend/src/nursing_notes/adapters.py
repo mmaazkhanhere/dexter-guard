@@ -8,6 +8,7 @@ from typing import Any, Protocol
 
 from .contracts import CandidateNursingFact, GenerationResult, SourceAnchor
 from .errors import NoteError, NoteErrorCode
+from .openai_compatible import OpenAICompatibleGenerationAdapter
 
 
 class GenerationAdapter(Protocol):
@@ -26,7 +27,6 @@ class UnavailableGenerationAdapter:
             NoteErrorCode.GENERATION_PROVIDER_UNAVAILABLE,
             "No nursing-note generation provider is configured.",
         )
-
 
 class DeterministicNursingNoteAdapter:
     """Synthetic, offline adapter for CI; it is not a live-model implementation."""

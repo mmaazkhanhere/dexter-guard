@@ -3,6 +3,7 @@
 from .adapters import (
     DeterministicNursingNoteAdapter,
     GenerationAdapter,
+    OpenAICompatibleGenerationAdapter,
     UnavailableGenerationAdapter,
 )
 from .contracts import (
@@ -32,5 +33,6 @@ __all__ = [
     "NoteResponse",
     "NursingFact",
     "NursingNoteService",
+    "OpenAICompatibleGenerationAdapter",
     "UnavailableGenerationAdapter",
 ]

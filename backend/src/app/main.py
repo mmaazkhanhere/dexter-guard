@@ -19,6 +19,7 @@ from evaluation.api import create_router as create_evaluation_router
 from evaluation.benchmark import default_dataset
 from evaluation.repository import SQLiteEvaluationRepository
 from evaluation.runner import EvaluationRunner
+from .llm_config import generation_adapter_from_environment
 from human_review.api import create_router as create_review_router
 from human_review.contracts import ClaimReverificationRequest
 from human_review.repository import InMemoryReviewRepository
@@ -94,6 +95,7 @@ def create_app() -> FastAPI:
     note_service = ReviewAwareNoteService(
         source_service,
         repository=InMemoryNoteRepository(),
+        generation_adapter=generation_adapter_from_environment(),
         review_service=review_service,
     )
     app = create_source_app(service=source_service, note_service=note_service)
