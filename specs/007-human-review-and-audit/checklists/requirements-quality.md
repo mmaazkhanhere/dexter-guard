@@ -5,8 +5,62 @@ implementation. The architecture self-review recorded below found no documentati
 but it does not substitute for reviewer sign-off or implementation evidence. Checked items
 represent requirements-quality review, not implementation completion.
 
-**Independent reviewer approval:** **PENDING.** Record the reviewer identity, date, and
-approval or exception here before any dependent implementation task is marked complete.
+**Independent reviewer approval:** **NOT APPROVED -- exceptions recorded.** The formal
+review record below replaces the prior pending state. No dependent work, release, or production
+integration may treat this checklist as approved until every listed exception is remediated and
+independently re-reviewed.
+
+## Independent review record
+
+- **Reviewer:** Codex (automated repository reviewer)
+- **Review date:** 2026-10-13
+- **Reviewed baseline:** working tree at the start of this review; implementation evidence in
+  `src/human_review`, `tests/human_review`, Specs 001--007, ADR 006, and the published OpenAPI
+  contracts.
+- **Decision:** **NOT APPROVED -- two blocking evidence-integrity/approval-safety exceptions.**
+  This is a requirements-quality and implementation-conformance review, not a clinical,
+  production-readiness, or release approval.
+
+### Confirmed items
+
+- The Spec 001--006 ownership and integration boundaries are correctly stated: Spec 007 consumes
+  immutable references and terminal metadata through reference-only ports; it does not take over
+  source ingestion, note generation, claim extraction, evidence classification, deterministic
+  validation, or coverage assessment. ADR-006-E1 remains a valid, time-bounded PoC exception
+  for the absent production aggregate transport and expires on 2026-12-31.
+- The reviewed specification, data model, contracts, task traceability, and HR-001--HR-018
+  scenarios are mutually traceable. The scope exclusions are preserved in the inspected code and
+  task inventory: no clinical decisioning, real data, auth/RBAC, EHR integration, mobile,
+  queues/microservices, or model training was added.
+- Executed evidence: `.venv\\Scripts\\python.exe -m pytest -q` (313 passed),
+  `.venv\\Scripts\\python.exe -m pytest -q tests\\human_review` (61 passed),
+  `.venv\\Scripts\\python.exe -m compileall -q src tests`, and `git diff --check` all passed.
+  The existing Starlette/httpx deprecation warning is non-blocking.
+
+### Blocking exceptions
+
+- **IR-007-01 -- Severity policy is implemented and tested contrary to the written fail-safe
+  contract.** `spec.md` defines Spec 004 `UNSUPPORTED` and `UNCERTAIN` as `MAJOR`, Spec 005
+  `NOT_EVALUABLE` as `MAJOR`, and unknown upstream finding types as `CRITICAL` until a policy
+  revision. `src/human_review/policy.py` instead returns `MINOR` for `UNSUPPORTED` and for
+  unknown inputs; `tests/human_review/test_policy.py` asserts those unsafe results. This violates
+  CQ-006, CQ-007, CQ-016, FR-15, and the approval-blocking safety model. Update the mapper and
+  tests to the documented closure, including explicit coverage for `UNCERTAIN`,
+  `NOT_EVALUABLE`, and unknown producer types, then rerun approval and acceptance tests.
+- **IR-007-02 -- The claim-feedback and structured-correction paths do not yet prove the required
+  source/provenance integrity.** `ReviewService.record_claim_feedback` accepts only an opaque
+  upstream run ID and persists no claim-set/run source or revision validation. `add_suggestion`
+  checks only source ID/version on support spans; it does not resolve the span against the
+  immutable source text or verify an exact source-derived quotation before allowing a `USABLE`
+  correction. This falls short of FR-20/FR-21, CQ-011, CQ-014, CQ-015, and the stated
+  no-invented-facts rule. Add typed reference-only metadata validation for claim feedback and a
+  Spec 001-backed span/quote validation step for usable corrections, with failing/successful
+  provenance tests.
+
+**Re-approval condition:** Close IR-007-01 and IR-007-02 with implementation, contract and
+acceptance-test evidence; update this record with the new reviewer, date, reviewed revision, and
+an explicit approval decision. Passing the current suite alone is not evidence of closure because
+it presently asserts part of IR-007-01.
 
 **Architecture self-review:** PASS for CQ-001–CQ-024 on 2026-10-12. Upstream implementation
 compatibility remains an explicit external dependency documented in
