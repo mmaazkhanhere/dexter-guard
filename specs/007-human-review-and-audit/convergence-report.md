@@ -3,7 +3,7 @@
 ## Current run
 
 - Review date: 2026-10-13
-- Reviewed revision: working tree at the checkpoint commit created for this implementation pass
+- Reviewed revision: `7b73d9a` (`docs(spec-007): close compatibility and governance tasks`)
 - Scope: Spec 007 backend contracts, services, persistence, upstream boundaries, approval,
   rejection, audit, and automated verification.
 - Data policy: synthetic fixtures only; no patient or transcript content is included in this
