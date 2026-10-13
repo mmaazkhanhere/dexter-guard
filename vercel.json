@@ -1,6 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "services",
   "services": {
     "web": {
       "root": "frontend/",
@@ -12,9 +11,7 @@
     "api": {
       "root": "backend/",
       "framework": "fastapi",
-      "entrypoint": "main:app",
-      "maxDuration": 60,
-      "includeFiles": ["src/**", "../pyproject.toml", "../uv.lock"]
+      "entrypoint": "main:app"
     }
   },
   "rewrites": [

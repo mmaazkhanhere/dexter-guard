@@ -230,3 +230,4 @@ frontend/test-results/
 frontend/playwright-report/
 frontend/.env*
 !frontend/.env.example
+.vercel

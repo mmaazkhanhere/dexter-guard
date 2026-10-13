@@ -7,12 +7,13 @@ in-memory/SQLite repositories while storing immutable records in PostgreSQL.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
-import json
+import os
 from pathlib import Path
 from threading import RLock
-from typing import Any
+from typing import Any, Iterator
 
 import psycopg
 from psycopg.errors import UniqueViolation
@@ -38,6 +39,46 @@ from source_ingestion.contracts import SourceDocument
 from source_ingestion.errors import ErrorCode, SourceError
 
 
+class _PostgresDatabase:
+    """Open a fresh transaction-scoped connection for each operation.
+
+    Vercel functions can be frozen and resumed after the database connection
+    has been closed by the provider or by a pooler. Keeping a raw connection
+    on a repository therefore creates intermittent ``connection is closed``
+    failures. A short-lived connection also works correctly with Neon-style
+    pooler URLs and keeps each transaction isolated across invocations.
+    """
+
+    def __init__(self, database_url: str) -> None:
+        self.database_url = database_url
+        self._lock = RLock()
+        raw_timeout = os.getenv("DB_CONNECT_TIMEOUT_SECONDS", "5")
+        try:
+            parsed_timeout = int(raw_timeout)
+        except ValueError:
+            parsed_timeout = 5
+        self.connect_timeout = min(max(parsed_timeout, 1), 30)
+
+    @contextmanager
+    def transaction(self) -> Iterator[psycopg.Connection[Any]]:
+        with self._lock:
+            with psycopg.connect(
+                self.database_url,
+                row_factory=dict_row,
+                connect_timeout=self.connect_timeout,
+            ) as connection:
+                with connection.transaction():
+                    yield connection
+
+    def check(self) -> bool:
+        try:
+            with self.transaction() as connection:
+                connection.execute("SELECT 1").fetchone()
+            return True
+        except psycopg.Error:
+            return False
+
+
 def run_migrations(database_url: str) -> None:
     """Apply checked-in SQL migrations exactly once per database."""
 
@@ -45,42 +86,40 @@ def run_migrations(database_url: str) -> None:
     migrations = sorted(migration_dir.glob("*.sql"))
     if not migrations:
         raise RuntimeError(f"No database migrations found in {migration_dir}")
-    with psycopg.connect(database_url, row_factory=dict_row) as connection:
-        with connection.transaction():
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS schema_migrations (
-                    version TEXT PRIMARY KEY,
-                    applied_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-                )
-                """
+    database = _PostgresDatabase(database_url)
+    with database.transaction() as connection:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                version TEXT PRIMARY KEY,
+                applied_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
+            """
+        )
         for migration in migrations:
             version = migration.name
-            with connection.transaction():
-                applied = connection.execute(
-                    "SELECT 1 FROM schema_migrations WHERE version = %s", (version,)
-                ).fetchone()
-                if applied:
-                    continue
-                connection.execute(migration.read_text(encoding="utf-8"))
-                connection.execute(
-                    "INSERT INTO schema_migrations(version) VALUES (%s)", (version,)
-                )
+            applied = connection.execute(
+                "SELECT 1 FROM schema_migrations WHERE version = %s", (version,)
+            ).fetchone()
+            if applied:
+                continue
+            connection.execute(migration.read_text(encoding="utf-8"))
+            connection.execute(
+                "INSERT INTO schema_migrations(version) VALUES (%s)", (version,)
+            )
 
 
 class PostgresSourceRepository:
     def __init__(self, database_url: str) -> None:
-        self._connection = psycopg.connect(database_url, row_factory=dict_row)
-        self._lock = RLock()
+        self._database = _PostgresDatabase(database_url)
 
     def create_initial(self, document: SourceDocument) -> SourceDocument:
-        with self._lock, self._connection.transaction():
-            existing = self._connection.execute(
+        with self._database.transaction() as connection:
+            existing = connection.execute(
                 "SELECT 1 FROM source_documents WHERE source_id = %s AND source_version = %s",
                 (document.source_id, document.source_version),
             ).fetchone()
-            has_source = self._connection.execute(
+            has_source = connection.execute(
                 "SELECT 1 FROM source_documents WHERE source_id = %s LIMIT 1",
                 (document.source_id,),
             ).fetchone()
@@ -90,7 +129,7 @@ class PostgresSourceRepository:
                     "An initial source must use a new source ID at version 1.",
                     "source_id",
                 )
-            self._connection.execute(
+            connection.execute(
                 """
                 INSERT INTO source_documents
                 (source_id, source_version, resident_test_id, language, transcript_text, created_at)
@@ -110,8 +149,8 @@ class PostgresSourceRepository:
     def create_next_version(
         self, source_id: str, expected_source_version: int, transcript_text: str, created_at: datetime
     ) -> SourceDocument:
-        with self._lock, self._connection.transaction():
-            latest = self._connection.execute(
+        with self._database.transaction() as connection:
+            latest = connection.execute(
                 "SELECT * FROM source_documents WHERE source_id = %s ORDER BY source_version DESC LIMIT 1 FOR UPDATE",
                 (source_id,),
             ).fetchone()
@@ -132,7 +171,7 @@ class PostgresSourceRepository:
                 created_at=created_at,
             )
             try:
-                self._connection.execute(
+                connection.execute(
                     """
                     INSERT INTO source_documents
                     (source_id, source_version, resident_test_id, language, transcript_text, created_at)
@@ -152,13 +191,13 @@ class PostgresSourceRepository:
         return document
 
     def get(self, source_id: str, source_version: int) -> SourceDocument:
-        with self._lock, self._connection.transaction():
-            row = self._connection.execute(
+        with self._database.transaction() as connection:
+            row = connection.execute(
                 "SELECT * FROM source_documents WHERE source_id = %s AND source_version = %s",
                 (source_id, source_version),
             ).fetchone()
             if row is None:
-                source_exists = self._connection.execute(
+                source_exists = connection.execute(
                     "SELECT 1 FROM source_documents WHERE source_id = %s LIMIT 1", (source_id,)
                 ).fetchone()
                 if source_exists is None:
@@ -170,25 +209,24 @@ class PostgresSourceRepository:
             )
 
     def source_exists(self, source_id: str) -> bool:
-        with self._lock, self._connection.transaction():
-            return self._connection.execute("SELECT 1 FROM source_documents WHERE source_id = %s LIMIT 1", (source_id,)).fetchone() is not None
+        with self._database.transaction() as connection:
+            return connection.execute("SELECT 1 FROM source_documents WHERE source_id = %s LIMIT 1", (source_id,)).fetchone() is not None
 
     def version_exists(self, source_id: str, source_version: int) -> bool:
-        with self._lock, self._connection.transaction():
-            return self._connection.execute("SELECT 1 FROM source_documents WHERE source_id = %s AND source_version = %s", (source_id, source_version)).fetchone() is not None
+        with self._database.transaction() as connection:
+            return connection.execute("SELECT 1 FROM source_documents WHERE source_id = %s AND source_version = %s", (source_id, source_version)).fetchone() is not None
 
     def close(self) -> None:
-        self._connection.close()
+        return None
 
 
 class PostgresNoteRepository:
     def __init__(self, database_url: str) -> None:
-        self._connection = psycopg.connect(database_url, row_factory=dict_row)
-        self._lock = RLock()
+        self._database = _PostgresDatabase(database_url)
 
     def create(self, revision: NoteRevisionRecord) -> NoteRevisionRecord:
-        with self._lock, self._connection.transaction():
-            latest_row = self._connection.execute(
+        with self._database.transaction() as connection:
+            latest_row = connection.execute(
                 "SELECT revision FROM note_revisions WHERE note_id = %s ORDER BY revision DESC LIMIT 1 FOR UPDATE",
                 (revision.note_id,),
             ).fetchone()
@@ -200,7 +238,7 @@ class PostgresNoteRepository:
             if not valid:
                 raise NoteError(NoteErrorCode.NOTE_VERSION_CONFLICT, "The note predecessor is stale or invalid.")
             try:
-                self._connection.execute(
+                connection.execute(
                     """
                     INSERT INTO note_revisions
                     (note_id, revision, previous_revision_id, content, status, origin, source_id, source_version,
@@ -218,7 +256,7 @@ class PostgresNoteRepository:
                     ),
                 )
                 for index, fact in enumerate(revision.facts, start=1):
-                    self._connection.execute(
+                    connection.execute(
                         "INSERT INTO nursing_facts(note_id, revision, fact_index, payload_json) VALUES (%s, %s, %s, %s)",
                         (revision.note_id, revision.revision, index, Jsonb(fact.model_dump(mode="json", by_alias=True))),
                     )
@@ -227,14 +265,14 @@ class PostgresNoteRepository:
         return revision.model_copy(deep=True)
 
     def get(self, note_id: str, revision: int | None = None) -> NoteRevisionRecord:
-        with self._lock, self._connection.transaction():
+        with self._database.transaction() as connection:
             if revision is None:
-                latest = self._connection.execute("SELECT MAX(revision) AS revision FROM note_revisions WHERE note_id = %s", (note_id,)).fetchone()
+                latest = connection.execute("SELECT MAX(revision) AS revision FROM note_revisions WHERE note_id = %s", (note_id,)).fetchone()
                 revision = latest["revision"] if latest and latest["revision"] is not None else None
-            row = self._connection.execute("SELECT * FROM note_revisions WHERE note_id = %s AND revision = %s", (note_id, revision)).fetchone() if revision is not None else None
+            row = connection.execute("SELECT * FROM note_revisions WHERE note_id = %s AND revision = %s", (note_id, revision)).fetchone() if revision is not None else None
             if row is None:
                 raise NoteError(NoteErrorCode.NOTE_NOT_FOUND, "The requested note revision does not exist.")
-            fact_rows = self._connection.execute("SELECT payload_json FROM nursing_facts WHERE note_id = %s AND revision = %s ORDER BY fact_index", (note_id, revision)).fetchall()
+            fact_rows = connection.execute("SELECT payload_json FROM nursing_facts WHERE note_id = %s AND revision = %s ORDER BY fact_index", (note_id, revision)).fetchall()
             payload = {
                 "noteId": row["note_id"], "revision": row["revision"], "previousRevisionId": row["previous_revision_id"],
                 "content": row["content"], "status": row["status"], "origin": row["origin"], "sourceId": row["source_id"],
@@ -247,59 +285,59 @@ class PostgresNoteRepository:
             return NoteRevisionRecord.model_validate(payload)
 
     def count(self) -> int:
-        with self._lock, self._connection.transaction():
-            return int(self._connection.execute("SELECT COUNT(*) AS count FROM note_revisions").fetchone()["count"])
+        with self._database.transaction() as connection:
+            return int(connection.execute("SELECT COUNT(*) AS count FROM note_revisions").fetchone()["count"])
 
     def fact_count(self) -> int:
-        with self._lock, self._connection.transaction():
-            return int(self._connection.execute("SELECT COUNT(*) AS count FROM nursing_facts").fetchone()["count"])
+        with self._database.transaction() as connection:
+            return int(connection.execute("SELECT COUNT(*) AS count FROM nursing_facts").fetchone()["count"])
 
     def close(self) -> None:
-        self._connection.close()
+        return None
 
 
 class PostgresReviewRepository(InMemoryReviewRepository):
     def __init__(self, database_url: str) -> None:
         super().__init__()
-        self._connection = psycopg.connect(database_url, row_factory=dict_row)
+        self._database = _PostgresDatabase(database_url)
         self._load()
 
     def _load(self) -> None:
-        with self._connection.transaction():
-            for row in self._connection.execute("SELECT payload_json FROM review_audit_events ORDER BY note_id, sequence"):
+        with self._database.transaction() as connection:
+            for row in connection.execute("SELECT payload_json FROM review_audit_events ORDER BY note_id, sequence"):
                 event = AuditEvent.model_validate(row["payload_json"])
                 self.events.setdefault(event.note_id, []).append(event)
-            for row in self._connection.execute("SELECT payload_json FROM review_notes"):
+            for row in connection.execute("SELECT payload_json FROM review_notes"):
                 note = NoteRecord(**row["payload_json"])
                 self.notes[(note.note_id, note.revision)] = note
                 self.latest[note.note_id] = max(note.revision, self.latest.get(note.note_id, 0))
-            for row in self._connection.execute("SELECT payload_json FROM review_findings"):
+            for row in connection.execute("SELECT payload_json FROM review_findings"):
                 finding = ReviewFinding.model_validate(row["payload_json"])
                 self.findings[finding.review_finding_id] = finding
-            for row in self._connection.execute("SELECT payload_json FROM review_decisions ORDER BY decision_id"):
+            for row in connection.execute("SELECT payload_json FROM review_decisions ORDER BY decision_id"):
                 self.decisions.append(ReviewDecision.model_validate(row["payload_json"]))
-            for row in self._connection.execute("SELECT payload_json FROM review_suggestions"):
+            for row in connection.execute("SELECT payload_json FROM review_suggestions"):
                 suggestion = SuggestedCorrection.model_validate(row["payload_json"])
                 self.suggestions[suggestion.suggestion_id] = suggestion
-            for row in self._connection.execute("SELECT payload_json FROM review_verifications"):
+            for row in connection.execute("SELECT payload_json FROM review_verifications"):
                 verification = FullNoteVerification.model_validate(row["payload_json"])
                 self.verifications[verification.full_verification_id] = verification
-            for row in self._connection.execute("SELECT payload_json FROM review_claim_feedback"):
+            for row in connection.execute("SELECT payload_json FROM review_claim_feedback"):
                 feedback = ClaimReverificationResponse.model_validate(row["payload_json"])
                 self.claim_feedback[feedback.review_verification_id] = feedback
-            for row in self._connection.execute("SELECT payload_json FROM review_dispositions ORDER BY disposition_id"):
+            for row in connection.execute("SELECT payload_json FROM review_dispositions ORDER BY disposition_id"):
                 self.dispositions.append(NoteDisposition.model_validate(row["payload_json"]))
-            for row in self._connection.execute("SELECT operation, key, digest FROM review_idempotency"):
+            for row in connection.execute("SELECT operation, key, digest FROM review_idempotency"):
                 self.idempotency[(row["operation"], row["key"])] = row["digest"]
 
     def _persist_json(self, table: str, key_column: str, key: str, payload: dict[str, Any]) -> None:
-        with self._lock, self._connection.transaction():
-            existing = self._connection.execute(f"SELECT payload_json FROM {table} WHERE {key_column} = %s", (key,)).fetchone()
+        with self._database.transaction() as connection:
+            existing = connection.execute(f"SELECT payload_json FROM {table} WHERE {key_column} = %s", (key,)).fetchone()
             if existing is not None:
                 if existing["payload_json"] != payload:
                     raise ReviewRepositoryError("IMMUTABLE_RECORD_CONFLICT")
                 return
-            self._connection.execute(f"INSERT INTO {table}({key_column}, payload_json) VALUES (%s, %s)", (key, Jsonb(payload)))
+            connection.execute(f"INSERT INTO {table}({key_column}, payload_json) VALUES (%s, %s)", (key, Jsonb(payload)))
 
     def persist_note(self, note: Any) -> None:
         super().persist_note(note)
@@ -335,8 +373,8 @@ class PostgresReviewRepository(InMemoryReviewRepository):
     def append_event(self, event: AuditEvent) -> AuditEvent:
         saved = super().append_event(event)
         try:
-            with self._lock, self._connection.transaction():
-                self._connection.execute(
+            with self._database.transaction() as connection:
+                connection.execute(
                     "INSERT INTO review_audit_events(event_id, note_id, sequence, payload_json) VALUES (%s, %s, %s, %s)",
                     (event.event_id, event.note_id, event.sequence, Jsonb(event.model_dump(mode="json", by_alias=True))),
                 )
@@ -348,77 +386,77 @@ class PostgresReviewRepository(InMemoryReviewRepository):
     def bind_idempotency(self, operation: str, key: str, digest: str) -> None:
         super().bind_idempotency(operation, key, digest)
         try:
-            with self._lock, self._connection.transaction():
-                self._connection.execute("INSERT INTO review_idempotency(operation, key, digest) VALUES (%s, %s, %s)", (operation, key, digest))
+            with self._database.transaction() as connection:
+                connection.execute("INSERT INTO review_idempotency(operation, key, digest) VALUES (%s, %s, %s)", (operation, key, digest))
         except UniqueViolation:
-            existing = self._connection.execute("SELECT digest FROM review_idempotency WHERE operation = %s AND key = %s", (operation, key)).fetchone()
-            if existing is None or existing["digest"] != digest:
-                raise ReviewRepositoryError("IDEMPOTENCY_KEY_CONFLICT")
+            with self._database.transaction() as connection:
+                existing = connection.execute("SELECT digest FROM review_idempotency WHERE operation = %s AND key = %s", (operation, key)).fetchone()
+                if existing is None or existing["digest"] != digest:
+                    raise ReviewRepositoryError("IDEMPOTENCY_KEY_CONFLICT")
 
     def close(self) -> None:
-        self._connection.close()
+        return None
 
 
 class PostgresEvaluationRepository:
     def __init__(self, database_url: str) -> None:
-        self._connection = psycopg.connect(database_url, row_factory=dict_row)
-        self._lock = RLock()
+        self._database = _PostgresDatabase(database_url)
 
     def save_dataset(self, dataset: BenchmarkDataset) -> BenchmarkDataset:
         payload = dataset.model_dump(mode="json", by_alias=True)
-        with self._lock, self._connection.transaction():
-            row = self._connection.execute("SELECT payload_json FROM evaluation_datasets WHERE dataset_id = %s AND dataset_version = %s", (dataset.dataset_id, dataset.dataset_version)).fetchone()
+        with self._database.transaction() as connection:
+            row = connection.execute("SELECT payload_json FROM evaluation_datasets WHERE dataset_id = %s AND dataset_version = %s", (dataset.dataset_id, dataset.dataset_version)).fetchone()
             if row is not None and row["payload_json"] != payload:
                 raise EvaluationRepositoryError("dataset version is immutable")
             if row is None:
-                self._connection.execute("INSERT INTO evaluation_datasets(dataset_id, dataset_version, content_hash, payload_json) VALUES (%s, %s, %s, %s)", (dataset.dataset_id, dataset.dataset_version, dataset.content_hash, Jsonb(payload)))
+                connection.execute("INSERT INTO evaluation_datasets(dataset_id, dataset_version, content_hash, payload_json) VALUES (%s, %s, %s, %s)", (dataset.dataset_id, dataset.dataset_version, dataset.content_hash, Jsonb(payload)))
         return dataset
 
     def get_dataset(self, dataset_id: str, dataset_version: str) -> BenchmarkDataset | None:
-        with self._lock, self._connection.transaction():
-            row = self._connection.execute("SELECT payload_json FROM evaluation_datasets WHERE dataset_id = %s AND dataset_version = %s", (dataset_id, dataset_version)).fetchone()
+        with self._database.transaction() as connection:
+            row = connection.execute("SELECT payload_json FROM evaluation_datasets WHERE dataset_id = %s AND dataset_version = %s", (dataset_id, dataset_version)).fetchone()
             return BenchmarkDataset.model_validate(row["payload_json"]) if row else None
 
     def reserve(self, idempotency_key: str, input_digest: str, run_id: str) -> bool:
-        with self._lock, self._connection.transaction():
-            row = self._connection.execute("SELECT input_digest FROM evaluation_idempotency WHERE idempotency_key = %s FOR UPDATE", (idempotency_key,)).fetchone()
+        with self._database.transaction() as connection:
+            row = connection.execute("SELECT input_digest FROM evaluation_idempotency WHERE idempotency_key = %s FOR UPDATE", (idempotency_key,)).fetchone()
             if row:
                 if row["input_digest"] != input_digest:
                     raise IdempotencyConflict("idempotency key is bound to a different request")
                 return False
             try:
-                self._connection.execute("INSERT INTO evaluation_idempotency(idempotency_key, input_digest, evaluation_run_id) VALUES (%s, %s, %s)", (idempotency_key, input_digest, run_id))
+                connection.execute("INSERT INTO evaluation_idempotency(idempotency_key, input_digest, evaluation_run_id) VALUES (%s, %s, %s)", (idempotency_key, input_digest, run_id))
             except UniqueViolation as error:
                 raise IdempotencyConflict("evaluation idempotency reservation conflicted") from error
             return True
 
     def save_run(self, run: EvaluationRun) -> EvaluationRun:
         payload = run.model_dump(mode="json", by_alias=True)
-        with self._lock, self._connection.transaction():
-            row = self._connection.execute("SELECT payload_json FROM evaluation_runs WHERE evaluation_run_id = %s", (run.evaluation_run_id,)).fetchone()
+        with self._database.transaction() as connection:
+            row = connection.execute("SELECT payload_json FROM evaluation_runs WHERE evaluation_run_id = %s", (run.evaluation_run_id,)).fetchone()
             if row is not None and row["payload_json"] != payload:
                 raise EvaluationRepositoryError("terminal evaluation run is immutable")
             if row is None:
-                self._connection.execute("INSERT INTO evaluation_runs(evaluation_run_id, payload_json, created_at) VALUES (%s, %s, %s)", (run.evaluation_run_id, Jsonb(payload), run.started_at))
+                connection.execute("INSERT INTO evaluation_runs(evaluation_run_id, payload_json, created_at) VALUES (%s, %s, %s)", (run.evaluation_run_id, Jsonb(payload), run.started_at))
         return run
 
     def get_run(self, run_id: str) -> EvaluationRun | None:
-        with self._lock, self._connection.transaction():
-            row = self._connection.execute("SELECT payload_json FROM evaluation_runs WHERE evaluation_run_id = %s", (run_id,)).fetchone()
+        with self._database.transaction() as connection:
+            row = connection.execute("SELECT payload_json FROM evaluation_runs WHERE evaluation_run_id = %s", (run_id,)).fetchone()
             return EvaluationRun.model_validate(row["payload_json"]) if row else None
 
     def run_id_for_idempotency(self, idempotency_key: str) -> str | None:
-        with self._lock, self._connection.transaction():
-            row = self._connection.execute("SELECT evaluation_run_id FROM evaluation_idempotency WHERE idempotency_key = %s", (idempotency_key,)).fetchone()
+        with self._database.transaction() as connection:
+            row = connection.execute("SELECT evaluation_run_id FROM evaluation_idempotency WHERE idempotency_key = %s", (idempotency_key,)).fetchone()
             return row["evaluation_run_id"] if row else None
 
     def list_runs(self) -> tuple[EvaluationRun, ...]:
-        with self._lock, self._connection.transaction():
-            rows = self._connection.execute("SELECT payload_json FROM evaluation_runs ORDER BY created_at, evaluation_run_id").fetchall()
+        with self._database.transaction() as connection:
+            rows = connection.execute("SELECT payload_json FROM evaluation_runs ORDER BY created_at, evaluation_run_id").fetchall()
             return tuple(EvaluationRun.model_validate(row["payload_json"]) for row in rows)
 
     def close(self) -> None:
-        self._connection.close()
+        return None
 
 
 @dataclass
@@ -429,12 +467,7 @@ class PostgresPersistence:
     evaluation: PostgresEvaluationRepository
 
     def check(self) -> bool:
-        try:
-            with self.source._lock, self.source._connection.transaction():
-                self.source._connection.execute("SELECT 1").fetchone()
-            return True
-        except psycopg.Error:
-            return False
+        return self.source._database.check()
 
 
 def create_postgres_persistence(database_url: str) -> PostgresPersistence:
