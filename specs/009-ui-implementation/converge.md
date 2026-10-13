@@ -34,7 +34,7 @@ Before checking convergence, record:
 | Spec 009 `tasks.md` revision | `specs/009-ui-implementation/tasks.md` | UPDATED |
 | Spec 009 OpenAPI / frontend mapping | `contracts/openapi.yaml`, `frontend/src/api/generated.ts` | VERIFIED LOCALLY |
 | Backend Specs 001–008 revisions | `specs/001-*` through `specs/008-*` | REVIEWED FOR CONTRACTS |
-| Application Git SHA | `272294382948a7567837541a2878fcf75a56187c` | RECORDED |
+| Application Git SHA | `51cb72a923615e95e88b6646db3e1434b5409a1c` | RECORDED |
 | Test fixture / dataset version | Synthetic repository fixtures | VERIFIED SYNTHETIC-ONLY |
 | Target Vercel project and runtime | `vercel.json`, Services + FastAPI | CONFIGURED; PREVIEW BLOCKED |
 | Database environment and migration revision | No provider, credentials, or migration revision | BLOCKED |
@@ -185,7 +185,7 @@ These checks must be performed using the **current supported Vercel project/runt
 ```text
 Deployment URL:          BLOCKED - no authenticated Vercel project
 Vercel deployment ID:    BLOCKED - no deployment attempted
-Git SHA:                 272294382948a7567837541a2878fcf75a56187c
+Git SHA:                 51cb72a923615e95e88b6646db3e1434b5409a1c
 Database/migration:      BLOCKED - no PostgreSQL provider or migration runtime
 API smoke:               BLOCKED - no deployed URL
 Browser E2E:             BLOCKED - Chromium binary unavailable after interrupted install
@@ -233,7 +233,7 @@ For every mismatch discovered between implementation and specs:
 **Go / No-Go:** `NO-GO until mandatory evidence passes`  
 **Reviewer:** `Codex automated convergence review`  
 **Reviewed at (UTC):** `2026-10-13`  
-**Release Git SHA:** `272294382948a7567837541a2878fcf75a56187c`  
+**Release Git SHA:** `51cb72a923615e95e88b6646db3e1434b5409a1c`  
 **Residual risks:** `PostgreSQL, Vercel access, Chromium browser, live provider, and production smoke remain blocked`
 
 ### Completion report to produce when checks have run
@@ -249,6 +249,7 @@ local PASS is not a production deployment PASS.
 |---|---|---|
 | Backend regression | `uv run pytest -q` | PASS - 341 tests passed; one existing Starlette/httpx deprecation warning |
 | API contract/composition | `uv run pytest backend/tests/api/test_composition.py backend/tests/api/test_spec_009_contract.py -q` | PASS - 6 tests passed |
+| Provider adapter | `uv run pytest -q backend/tests/nursing_notes/test_openai_compatible.py` | PASS - 6 tests passed |
 | Frontend tests | `cd frontend; npm test -- --run` | PASS - 6 files, 11 tests |
 | Frontend lint | `cd frontend; npm run lint` | PASS |
 | TypeScript and production build | `cd frontend; npm run check` | PASS - Vite production build completed |
@@ -261,7 +262,8 @@ local PASS is not a production deployment PASS.
 
 - FR-34 through FR-39, FR-42, FR-43, FR-45, FR-47, and FR-49 have local code and test evidence.
 - FR-41 and FR-44 remain partial because review/audit persistence is not durable across fresh process instances.
-- FR-46 remains partial because saved evaluation paths exist, but live provider execution is not configured.
+- FR-46 remains partial because saved evaluation paths exist, but live provider execution has not been run against a configured endpoint.
+- The generation path is now provider-agnostic through `OpenAICompatibleGenerationAdapter`; Groq and Gemini are selected by `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL` in `backend/.env` or deployment secrets.
 - FR-48 is blocked because Vercel preview and production routing were not verified.
 - ARC-05 and SAFE-08 are blocked by the lack of PostgreSQL-backed repositories and migrations.
 - SAFE-06 and SAFE-07 have local fail-closed guards, but deployed API and browser acceptance evidence is still required.
@@ -271,6 +273,6 @@ local PASS is not a production deployment PASS.
 1. Provision PostgreSQL, add migrations, and wire durable repositories for notes, reviews, audit events, and evaluation state.
 2. Provide Vercel Services/project access, valid credentials, server-only secrets, and run `vercel build` plus preview smoke tests.
 3. Install the Playwright Chromium test browser and execute the real browser workflow suite.
-4. Configure controlled live-inference credentials and run provider timeout/error acceptance cases.
+4. Run controlled live-inference smoke, timeout, and provider-error acceptance cases against the configured endpoint.
 
 Until these blockers are removed, the correct convergence result is **BLOCKED / NO-GO**, not PASS. The repository is locally implemented and tested, but it is not yet a verified production deployment.
