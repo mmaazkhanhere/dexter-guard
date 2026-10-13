@@ -13,7 +13,7 @@ Review the current constitution; spec.md; clarify.md; data-model.md; API contrac
 ### A. Requirements and reviewer gate
 
 - Confirm independent reviewer approval of every applicable checklist item.
-- Trace FR-26 through FR-33 and EVAL-001 through EVAL-015 to code, test evidence, and results.
+- Trace FR-26 through FR-33 and EVAL-001 through EVAL-016 to code, test evidence, and results.
 - Confirm every required task is complete or has a documented not-applicable rationale approved by the reviewer.
 
 ### B. Dataset and held-out integrity

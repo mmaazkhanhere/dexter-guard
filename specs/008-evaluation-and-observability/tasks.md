@@ -9,7 +9,7 @@
 - [ ] T001 Inspect and record actual application wiring, repository/migration conventions, ports/routes, timeout/retry/idempotency behavior, and frontend host in compatibility-review.md. **Requirements:** all. **Done when:** assumptions in plan are confirmed or gaps are explicitly recorded; no source code changes.
 - [ ] T002 Verify upstream identity/version fields and result contracts from Specs 001–007 for source/note/claim/finding/coverage/review handoff. **Depends on:** T001. **Requirements:** FR-26, FR-29–33. **Done when:** a reference-only adapter matrix proves no duplicated reliability logic.
 - [ ] T003 [P] Write the synthetic benchmark annotation guide, schema manifest, and category/family/split authoring policy. **Depends on:** T002. **Requirements:** FR-26, FR-27. **Done when:** every required annotation and held-out rule is authorable/reviewable.
-- [ ] T004 [P] Create and independently review an initial 100+ scenario synthetic German benchmark with one or more fixed candidates where required. **Depends on:** T003. **Requirements:** FR-26, FR-27. **Done when:** scenarios cover EVAL-001–005, EVAL-010–013; no real data appears.
+- [ ] T004 [P] Create and independently review an initial 100+ scenario synthetic German benchmark with one or more fixed candidates where required. **Depends on:** T003. **Requirements:** FR-26, FR-27. **Done when:** scenarios cover EVAL-001–005, EVAL-010–013, and EVAL-016; no real data appears and resident-context cases do not require disambiguation.
 - [ ] T005 Implement dataset validators for schema, hashes, IDs, source/note spans, annotations, category coverage, duplicates, family integrity, split protection, and synthetic-only markers. **Depends on:** T003–T004. **Requirements:** FR-26, FR-27, EVAL-010, EVAL-011, EVAL-013. **Tests:** deterministic unit/fixture tests.
 
 ## Phase 1 — Contracts, domain model, persistence
@@ -40,7 +40,7 @@
 
 ## Phase 5 — Acceptance, regression, and handoff
 
-- [ ] T020 Add deterministic acceptance suite for EVAL-001 through EVAL-015, all global evidence-integrity invariants, FR-26–33 traceability, and 100+ benchmark validation. **Depends on:** T005–T019. **Requirements:** all. **Done when:** every acceptance scenario has executable evidence.
+- [ ] T020 Add deterministic acceptance suite for EVAL-001 through EVAL-016, all global evidence-integrity invariants, FR-26–33 traceability, and 100+ benchmark validation. **Depends on:** T005–T019. **Requirements:** all. **Done when:** every acceptance scenario has executable evidence.
 - [ ] T021 Add protected held-out reference-run/regression workflow and report fixtures; ensure only critical-error recall uses the approved >=95% gate and other changes are TBD/review-required. **Depends on:** T012, T016, T020. **Requirements:** FR-27, FR-31.
 - [ ] T022 Run formatter, static/compile, unit, contract, repository, integration, headless acceptance, and report tests; record commands/results in convergence evidence. **Depends on:** T020–T021. **Requirements:** all.
 - [ ] T023 Update analyze.md, run converge.md, append any verified gap tasks, and obtain independent checklist re-review. **Depends on:** T022. **Requirements:** all.

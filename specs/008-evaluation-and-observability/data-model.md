@@ -17,7 +17,8 @@ ResultOrigin = HISTORICAL_SAVED_RESULT | NEWLY_EXECUTED
 EvidenceStatus = SUPPORTED | UNSUPPORTED | CONTRADICTED | UNCERTAIN
 ErrorCategory = UNSUPPORTED_FACT | EXPLICIT_CONTRADICTION | NUMERIC_MISMATCH |
                 UNIT_MISMATCH | NEGATION_CHANGE | CERTAINTY_CHANGE |
-                ATTRIBUTION_CHANGE | CLINICAL_INFERENCE | IMPORTANT_OMISSION | OTHER
+                ATTRIBUTION_CHANGE | RESIDENT_CONTEXT_MISMATCH | CLINICAL_INFERENCE |
+                IMPORTANT_OMISSION | OTHER
 Severity = CRITICAL | MAJOR | MINOR
 MatchDisposition = MATCHED | DUPLICATE | UNMATCHED_WARNING | TARGET_LINKED_MISCLASSIFICATION |
                    FALSE_NEGATIVE | UNSCORABLE | NOT_APPLICABLE
@@ -152,8 +153,12 @@ EvaluationConfiguration {
 EvaluationCaseResult {
   caseExecutionId: string
   scenarioId, candidateId: string
-  sourceId, sourceVersion, sourceTextHash: string
-  noteId, noteRevision, noteBodyHash: string
+  sourceId: string
+  sourceVersion: positive integer
+  sourceTextHash: SHA-256
+  noteId: string
+  noteRevision: positive integer
+  noteBodyHash: SHA-256
   status: CaseStatus
   stageRuns: StageRunReference[]
   observedFindings: ObservedFinding[]

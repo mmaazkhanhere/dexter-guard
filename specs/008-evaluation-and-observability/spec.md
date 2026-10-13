@@ -7,6 +7,8 @@
 **Upstream:** Specs 001–007  
 **Scope:** Synthetic German nursing-documentation benchmark, reproducible evaluation, experiment tracking, and diagnostic reporting.
 
+**Constitution filename mapping:** The constitution's reference to `008-evaluation.md` means this feature's canonical requirements file, `spec.md`, within the `specs/008-evaluation-and-observability` directory. No second requirements file is maintained; `specify.md` is the accompanying specify record.
+
 ## Purpose
 
 Spec 008 measures whether the existing reliability engine improves fidelity of candidate nursing notes to their supplied German source transcripts. It provides reproducible evidence about detection quality, completeness, false positives, operational cost, latency, and review burden on a defined synthetic benchmark.
@@ -49,10 +51,11 @@ The feature includes a headless runner and a lightweight diagnostics report/dash
 
 1. The system shall maintain a versioned benchmark of at least 100 synthetic German-language scenarios.
 2. Each scenario shall contain an immutable source-transcript reference, reference source facts and evidence spans, one or more fixed candidate nursing notes, annotated candidate claims, expected classifications, annotated error instances, applicable expected source facts, tags, split, annotation provenance, and dataset version.
-3. The benchmark shall cover fully supported documentation; unsupported facts; explicit contradictions; numerical mismatches; unit mismatches; negation changes; uncertainty/certainty changes; attribution changes; unsupported clinical conclusions; important omissions; multiple errors in one note; ambiguous source evidence; and valid normalisation/harmless paraphrase.
-4. Every annotation shall identify the affected claim or source fact, category, severity, expected evidence relationship/status, and source evidence correspondence when one is applicable.
-5. A dataset validator shall reject duplicate IDs, invalid/mismatched spans, ambiguous denominator membership, missing required annotation provenance, unversioned policy references, invalid candidate/source lineage, and cases that violate the synthetic-only restriction.
-6. A scenario may include multiple candidate notes only when each has its own stable candidate, claim, error, and expected-fact references.
+3. The benchmark shall cover fully supported documentation; unsupported facts; explicit contradictions; numerical mismatches; unit mismatches; negation changes; uncertainty/certainty changes; attribution changes; provenance-only resident-context mixing; unsupported clinical conclusions; important omissions; multiple errors in one note; ambiguous source evidence; and valid normalisation/harmless paraphrase.
+4. Resident-context mixing cases shall use one resident per transcript and a deliberately mismatched synthetic resident context/reference in the fixture or pipeline result. They test provenance and claim-to-case binding only; they shall not require identifying or disambiguating multiple residents from transcript language.
+5. Every annotation shall identify the affected claim or source fact, category, severity, expected evidence relationship/status, and source evidence correspondence when one is applicable.
+6. A dataset validator shall reject duplicate IDs, invalid/mismatched spans, ambiguous denominator membership, missing required annotation provenance, unversioned policy references, invalid candidate/source lineage, and cases that violate the synthetic-only restriction.
+7. A scenario may include multiple candidate notes only when each has its own stable candidate, claim, error, and expected-fact references.
 
 ### FR-27 — Protected Held-Out Dataset
 
@@ -159,6 +162,7 @@ The matching policy is versioned as `EVALUATION_MATCHING-v1` and is defined in d
 | EVAL-013 | Given a full 100+ scenario benchmark, when it is accepted for a selected split, then required category coverage, annotations, IDs, hashes, provenance, and split-integrity checks pass. |
 | EVAL-014 | Given a changed prompt/model/rule/code version, when regression evaluation compares it to a compatible reference, then configuration differences, raw counts, deltas, uncertainty, and `PASS`/`REVIEW_REQUIRED`/`REGRESSION` disposition are persisted. |
 | EVAL-015 | Given a completed review workflow with observed human decisions, when final-note quality is reported, then it is distinct from automated detection and tied to the final complete revision. |
+| EVAL-016 | Given a single-resident transcript whose evaluation fixture carries a mismatched synthetic resident context/reference, when the runner validates provenance, then the case is classified as a resident-context error or integrity failure without attempting resident identification/disambiguation. |
 
 ## Global constraints and exclusions
 

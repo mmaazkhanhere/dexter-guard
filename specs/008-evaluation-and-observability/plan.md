@@ -93,7 +93,7 @@ The report has run selection, provenance header, aggregate metric cards with num
 | Contract | Pydantic/OpenAPI validation, terminal-state exclusivity, immutable provenance, export shape, and typed error body. |
 | Repository | Append-only run persistence, historical retrieval, restart durability, idempotency, hash/split constraints. |
 | Integration | Adapters to 003–006 through fakes then verified actual ports; no frontend dependency; failure/timeout/malformed-output preservation. |
-| Acceptance | EVAL-001 through EVAL-015 and 100+ benchmark acceptance. |
+| Acceptance | EVAL-001 through EVAL-016 and 100+ benchmark acceptance. |
 | Regression | Deterministic mocked CI benchmark; reference-run comparison; live-model variability report, never a deterministic CI assertion. |
 
 ## Constitution check

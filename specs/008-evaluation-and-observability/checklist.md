@@ -12,7 +12,7 @@
 ## Completeness
 
 - [ ] CQ-008-01 FR-26 through FR-33 each have observable behavior, acceptance scenario(s), task coverage, and an implementation verification method.
-- [ ] CQ-008-02 The benchmark requires at least 100 synthetic German scenarios and explicitly covers every required error, ambiguity, paraphrase, and multiple-error category.
+- [ ] CQ-008-02 The benchmark requires at least 100 synthetic German scenarios and explicitly covers every required error, provenance-only resident-context mixing, ambiguity, paraphrase, and multiple-error category without requiring multi-resident identification.
 - [ ] CQ-008-03 Dataset, case, candidate, claim, error, source-fact, annotation-provenance, split, and configuration requirements are unambiguous.
 - [ ] CQ-008-04 All required metric definitions use the supplied operational definitions and report raw numerators/denominators.
 - [ ] CQ-008-05 Zero denominators, unscorable cases, invalid outputs, timeouts, interrupted runs, and partial failures have explicit visible treatment.
@@ -27,7 +27,7 @@
 - [ ] CQ-008-11 The held-out split/family protection, duplicate detection, and no-silent-all-splits rule are testable.
 - [ ] CQ-008-12 The >=95% held-out critical-error recall target is the only new approved quantitative threshold; other thresholds are explicitly TBD.
 - [ ] CQ-008-13 Confidence intervals and variability treatment are stated without converting live model variability into a false deterministic claim.
-- [ ] CQ-008-14 The data model, OpenAPI contract, plan, and task terms/statuses agree.
+- [ ] CQ-008-14 The canonical `spec.md` is explicitly mapped to the constitution's `008-evaluation.md` reference, and the data model, OpenAPI contract, plan, and task terms/statuses agree.
 
 ## Evidence integrity, privacy, and scope
 
