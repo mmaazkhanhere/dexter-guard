@@ -114,6 +114,7 @@ def create_app() -> FastAPI:
         generation_adapter=generation_adapter_from_environment(),
         review_service=review_service,
     )
+    review_service.attach_note_revision_writer(note_service.create_revision)
     workflow = ReliabilityWorkflow(
         source_service=source_service,
         note_service=note_service,

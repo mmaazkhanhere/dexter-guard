@@ -33,11 +33,11 @@ def _import_note(client: TestClient, transcript: str, suffix: str, *, content: s
     return source, note_response.json()
 
 
-def _verify(client: TestClient, note: dict, suffix: str):
+def _verify(client: TestClient, note: dict, suffix: str, *, revision: int = 1):
     response = client.post(
         f"/api/v1/reviews/{note['noteId']}/full-verifications",
         json={
-            "expectedRevision": 1,
+            "expectedRevision": revision,
             "reviewerLabel": "integration-test",
             "idempotencyKey": f"verify-{suffix}",
         },
@@ -167,6 +167,54 @@ def test_generated_note_flows_from_ai_generation_through_review_approval() -> No
             "reviewerLabel": "caregiver-reviewer",
             "fullVerificationId": verification["fullVerificationId"],
             "idempotencyKey": "approve-generated",
+        },
+    )
+
+    assert approval.status_code == 201
+
+
+def test_caregiver_revision_is_saved_to_main_store_and_can_be_reverified_and_approved() -> None:
+    app = create_app()
+    client = TestClient(app)
+    transcript = "Die Bewohnerin berichtet keine Schmerzen."
+    source, note = _import_note(client, transcript, "revision-sync")
+
+    edit = client.post(
+        f"/api/v1/reviews/{note['noteId']}/revisions",
+        json={
+            "expectedRevision": 1,
+            "content": f"{transcript} ",
+            "reviewerLabel": "caregiver-reviewer",
+            "idempotencyKey": "revision-sync-edit",
+        },
+    )
+
+    assert edit.status_code == 201
+    edit_body = edit.json()
+    assert edit_body["noteId"] == note["noteId"]
+    assert edit_body["revision"] == 2
+    assert edit_body["previousRevision"] == 1
+    assert edit_body["noteStatus"] == "AWAITING_FULL_VERIFICATION"
+    assert edit_body["auditEventId"]
+    assert app.state.note_service.repository.get(note["noteId"], 2).content == f"{transcript} "
+    assert app.state.review_service.get_note(note["noteId"], 2).content == f"{transcript} "
+
+    verification = _verify(client, note, "revision-sync-verify", revision=2)
+
+    assert verification["status"] == "VALID"
+    assert verification["noteRevision"] == 2
+    context = client.get(f"/api/v1/reviews/{note['noteId']}")
+    assert context.status_code == 200
+    assert context.json()["revision"] == 2
+    assert context.json()["approvalEligible"] is True
+
+    approval = client.post(
+        f"/api/v1/reviews/{note['noteId']}/approve",
+        json={
+            "expectedRevision": 2,
+            "reviewerLabel": "caregiver-reviewer",
+            "fullVerificationId": verification["fullVerificationId"],
+            "idempotencyKey": "revision-sync-approve",
         },
     )
 

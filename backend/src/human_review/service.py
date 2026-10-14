@@ -4,6 +4,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import Any, Callable
 from uuid import uuid4
 
 from .approval import ApprovalEligibilityPolicy, ReviewServiceError
@@ -21,10 +22,15 @@ class NoteRecord:
 
 
 class ReviewService:
-    def __init__(self, repository: InMemoryReviewRepository | None = None, *, clock=None, id_factory=None) -> None:
+    def __init__(self, repository: InMemoryReviewRepository | None = None, *, clock=None, id_factory=None, note_revision_writer: Callable[..., Any] | None = None) -> None:
         self.repository = repository or InMemoryReviewRepository()
         self.clock = clock or (lambda: datetime.now(timezone.utc))
         self.id_factory = id_factory or (lambda: str(uuid4()))
+        self.note_revision_writer = note_revision_writer
+
+    def attach_note_revision_writer(self, writer: Callable[..., Any]) -> None:
+        """Attach the canonical nursing-note revision writer at composition time."""
+        self.note_revision_writer = writer
 
     def _event(self, note_id: str, revision: int, actor: str, event_type: str, target_type: str, target_id: str, references=(), rationale=None) -> AuditEvent:
         payload = json.dumps({"eventType": event_type, "targetId": target_id, "references": list(references)}, sort_keys=True)
@@ -62,7 +68,33 @@ class ReviewService:
                 replay = self.repository.get_replay("save-revision", idempotency_key)
                 if replay is not None:
                     return replay
-            successor = NoteRecord(note_id, latest.revision + 1, latest.source_id, latest.source_version, content)
+            if self.note_revision_writer is not None:
+                try:
+                    canonical = self.note_revision_writer(
+                        note_id,
+                        content,
+                        expected_revision=expected_revision,
+                        requested_by=reviewer_label,
+                    )
+                except Exception as error:
+                    code = getattr(getattr(error, "code", None), "value", None)
+                    raise ReviewServiceError(code or "NOTE_REVISION_PERSISTENCE_FAILED") from error
+                if (
+                    canonical.note_id != note_id
+                    or canonical.revision != latest.revision + 1
+                    or canonical.source_id != latest.source_id
+                    or canonical.source_version != latest.source_version
+                ):
+                    raise ReviewServiceError("PROVENANCE_CONFLICT")
+                successor = NoteRecord(
+                    canonical.note_id,
+                    canonical.revision,
+                    canonical.source_id,
+                    canonical.source_version,
+                    canonical.content,
+                )
+            else:
+                successor = NoteRecord(note_id, latest.revision + 1, latest.source_id, latest.source_version, content)
             self.repository.notes[(note_id, successor.revision)] = successor
             self.repository.latest[note_id] = successor.revision
             self.repository.persist_note(successor)
