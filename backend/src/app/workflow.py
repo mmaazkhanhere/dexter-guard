@@ -41,9 +41,10 @@ from deterministic_validation.service import DeterministicValidationService
 from evidence_verification.contracts import VerificationRunRequest
 from evidence_verification.repository import InMemoryVerificationRepository
 from evidence_verification.service import VerificationService
-from human_review.contracts import EvidenceDisplay, NoteSpan, ReviewFinding
+from human_review.contracts import EvidenceDisplay, NoteSpan, ReviewFinding, SEVERITY_POLICY_VERSION
 from human_review.ports import ReferenceOnlyVerificationPorts, UpstreamRun
 from human_review.policy import severity_for
+from resident_attribution import ResidentAttributionChecker
 from app.observability import workflow_log, workflow_step
 from nursing_notes.repository import NoteRepository
 from source_coverage.contracts import CoverageRunRequest
@@ -327,6 +328,7 @@ class WorkflowVerificationPorts:
                 resident_test_id=source.resident_test_id, source_id=source.source_id,
                 source_version=source.source_version, claims=tuple(result.claims),
             )
+            self._persist_resident_attribution_findings(claim_set_id, note_id, revision, result.claims, source)
         run = UpstreamRun(
             run_id=result.extraction_run_id,
             status="SUCCEEDED" if result.status in {ExtractionStatus.SUCCEEDED, ExtractionStatus.EMPTY} else "FAILED",
@@ -335,6 +337,28 @@ class WorkflowVerificationPorts:
         )
         workflow_log("CLAIM_EXTRACTION", "CLAIM_EXTRACTION_RESULT", outcome="SUCCESS" if run.status == "SUCCEEDED" else "ERROR", noteId=note_id, noteRevision=revision, runId=run.run_id, status=run.status, claimCount=len(result.claims))
         return run
+
+    def _persist_resident_attribution_findings(self, claim_set_id, note_id, revision, claims, source) -> None:
+        for finding in ResidentAttributionChecker().check(source=source, claims=claims):
+            finding_id = f"review-resident-{claim_set_id}-{finding.claim_id}-{finding.rule_code}"
+            if finding_id in self.review_service.repository.findings:
+                continue
+            claim = next((item for item in claims if item.id == finding.claim_id), None)
+            severity, rationale = severity_for(
+                origin="SPEC_005", rule_code=finding.rule_code,
+                claim_text=claim.claim_text if claim else None,
+                resident_misassignment=finding.outcome == "MISMATCH",
+            )
+            self.review_service.add_finding(ReviewFinding(
+                reviewFindingId=finding_id, origin="SPEC_005", originRunId=f"resident-attribution-{claim_set_id}",
+                originFindingId=f"{finding.claim_id}:{finding.rule_code}", noteId=note_id, noteRevision=revision,
+                sourceId=source.source_id, sourceVersion=source.source_version, claimId=finding.claim_id,
+                claimSpan=self._claim_span(claims, finding.claim_id), upstreamStatus=finding.outcome,
+                ruleCode=finding.rule_code, severity=severity, severityPolicyVersion=SEVERITY_POLICY_VERSION,
+                severityRationale=rationale, explanation=finding.explanation,
+                evidence=self._source_evidence(source, tuple(type("Span", (), {"source_id": source.source_id, "source_version": source.source_version, "start": start, "end": end})() for start, end in finding.evidence)),
+                state="OPEN", createdAt=datetime.now(timezone.utc),
+            ))
 
     def evidence(self, note_id: str, revision: int, claim_set_id: str) -> UpstreamRun:
         workflow_log("EVIDENCE_VERIFICATION", "EVIDENCE_VERIFICATION_STARTED", noteId=note_id, noteRevision=revision, claimSetId=claim_set_id)
@@ -410,7 +434,12 @@ class WorkflowVerificationPorts:
                 )
             else:
                 evidence = EvidenceDisplay(availability="MISSING")
-            severity = "CRITICAL" if finding.status.value == "CONTRADICTED" else "MAJOR"
+            severity, rationale = severity_for(
+                origin="SPEC_004",
+                status=finding.status.value,
+                claim_text=claim.claim_text if claim is not None else None,
+                discrepancy_codes=(item.value for item in finding.discrepancies),
+            )
             self.review_service.add_finding(ReviewFinding(
                 reviewFindingId=finding_id,
                 origin="SPEC_004",
@@ -424,8 +453,8 @@ class WorkflowVerificationPorts:
                 claimSpan=claim_span,
                 upstreamStatus=finding.status.value,
                 severity=severity,
-                severityPolicyVersion="REVIEW_SEVERITY-v1",
-                severityRationale="Evidence-verification status requires human review.",
+                severityPolicyVersion=SEVERITY_POLICY_VERSION,
+                severityRationale=rationale,
                 explanation=finding.explanation,
                 evidence=evidence,
                 state="OPEN",
@@ -445,7 +474,13 @@ class WorkflowVerificationPorts:
                     source_spans = tuple(source_fact.evidence)
                 except KeyError:
                     source_spans = ()
-            severity, rationale = severity_for(origin="SPEC_005", rule_code=finding.rule_id)
+            claim_id = finding.claim_id.removeprefix("dve-") if finding.claim_id else None
+            claim = next((item for item in claims if item.id == claim_id), None)
+            severity, rationale = severity_for(
+                origin="SPEC_005",
+                rule_code=finding.rule_id,
+                claim_text=claim.claim_text if claim is not None else None,
+            )
             explanation = finding.message
             if finding.expected_value is not None or finding.observed_value is not None:
                 explanation = f"{explanation} Expected: {finding.expected_value}; observed: {finding.observed_value}."
@@ -458,12 +493,12 @@ class WorkflowVerificationPorts:
                 noteRevision=run.note_revision,
                 sourceId=run.source_id,
                 sourceVersion=run.source_version,
-                claimId=finding.claim_id.removeprefix("dve-") if finding.claim_id else None,
+                claimId=claim_id,
                 claimSpan=self._claim_span(claims, finding.claim_id),
                 upstreamStatus=getattr(finding.outcome, "value", finding.outcome),
                 ruleCode=finding.rule_id,
                 severity=severity,
-                severityPolicyVersion="REVIEW_SEVERITY-v1",
+                severityPolicyVersion=SEVERITY_POLICY_VERSION,
                 severityRationale=rationale,
                 explanation=explanation,
                 evidence=self._source_evidence(source, source_spans),
@@ -495,7 +530,7 @@ class WorkflowVerificationPorts:
                 upstreamStatus=getattr(finding.status, "value", finding.status),
                 ruleCode=f"COVERAGE-{getattr(finding.status, 'value', finding.status)}",
                 severity=severity,
-                severityPolicyVersion="REVIEW_SEVERITY-v1",
+                severityPolicyVersion=SEVERITY_POLICY_VERSION,
                 severityRationale=rationale,
                 explanation=f"{getattr(finding.status, 'value', finding.status)}: {finding.suggestion}",
                 evidence=self._source_evidence(source, finding.source_spans, finding.source_quotes),
@@ -582,7 +617,7 @@ class WorkflowVerificationPorts:
                 upstreamStatus="NOT_EVALUABLE",
                 ruleCode="NUM-006",
                 severity=severity,
-                severityPolicyVersion="REVIEW_SEVERITY-v1",
+                severityPolicyVersion=SEVERITY_POLICY_VERSION,
                 severityRationale=rationale,
                 explanation=explanation,
                 evidence=self._source_evidence(source, fact.source_spans),

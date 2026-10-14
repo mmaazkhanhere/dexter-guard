@@ -117,6 +117,29 @@ def test_complete_workflow_persists_every_component_with_shared_provenance() -> 
     assert coverage_run.runtime_counts.unresolved_source_items == 0
 
 
+def test_other_resident_alias_creates_source_linked_critical_review_finding() -> None:
+    app = create_app()
+    client = TestClient(app)
+    source_response = client.post("/api/v1/sources", json={
+        "resident_test_id": "synthetic-anna", "language": "de-DE",
+        "resident_aliases": {"synthetic-anna": ["Frau Anna Müller"], "synthetic-bruno": ["Herr Bruno Becker"]},
+        "transcript_text": "Frau Anna Müller ist ruhig. Herr Bruno Becker klagt über Schmerzen.",
+    })
+    source = source_response.json()
+    note_response = client.post("/api/v1/notes/import", json={
+        "sourceId": source["source_id"], "sourceVersion": 1,
+        "content": "Herr Bruno Becker klagt über Schmerzen.",
+        "externalOrigin": {"system": "test", "externalNoteId": "resident-attribution"}, "requestedBy": "test", "facts": [],
+    })
+    note = note_response.json()
+    _verify(client, note, "resident-attribution")
+    context = client.get(f"/api/v1/reviews/{note['noteId']}").json()
+    finding = next(item for item in context["findings"] if item.get("ruleCode") == "RESIDENT-001")
+    assert finding["severity"] == "CRITICAL"
+    assert finding["evidence"]["availability"] == "AVAILABLE"
+    assert context["approvalEligible"] is False
+
+
 def test_generated_note_flows_from_ai_generation_through_review_approval() -> None:
     app = create_app()
     client = TestClient(app)
@@ -291,6 +314,51 @@ def test_compound_vital_signs_preserve_pulse_for_numeric_validation() -> None:
         if item["origin"] == "SPEC_005" and item["ruleCode"] == "NUM-001"
     )
     assert "Expected: 83; observed: 110." in numeric["explanation"]
+    assert context.json()["approvalEligible"] is False
+
+
+def test_insulin_negation_reversal_is_persisted_as_critical() -> None:
+    class InsulinNegationVerifier:
+        model_id = "test-verifier"
+        model_version = "test-v1"
+        prompt_version = "test-prompt-v1"
+        prompt_hash = "sha256:test"
+
+        def __init__(self, source_id: str) -> None:
+            self.source_id = source_id
+
+        def verify(self, *, claims, source_text, run_id):
+            claim = claims[0]
+            start = source_text.index("Insulin")
+            return {
+                "findings": [{
+                    "claimId": claim.id,
+                    "status": "CONTRADICTED",
+                    "explanation": "Die Gabe widerspricht dem Transkript.",
+                    "sourceSpans": [{
+                        "sourceId": self.source_id,
+                        "sourceVersion": 1,
+                        "start": start,
+                        "end": start + len("Insulin wurde nicht verabreicht."),
+                    }],
+                    "discrepancies": ["NEGATION"],
+                }],
+            }
+
+    app = create_app()
+    client = TestClient(app)
+    source_text = "Insulin wurde nicht verabreicht."
+    source, note = _import_note(client, source_text, "insulin-negation", content="Insulin wurde verabreicht.")
+    app.state.workflow.evidence_service.verifier.provider = InsulinNegationVerifier(source["source_id"])
+
+    verification = _verify(client, note, "insulin-negation")
+    context = client.get(f"/api/v1/reviews/{note['noteId']}")
+
+    assert verification["status"] == "VALID"
+    finding = next(item for item in context.json()["findings"] if item["origin"] == "SPEC_004")
+    assert finding["upstreamStatus"] == "CONTRADICTED"
+    assert finding["severity"] == "CRITICAL"
+    assert "high-consequence" in finding["severityRationale"]
     assert context.json()["approvalEligible"] is False
 
 

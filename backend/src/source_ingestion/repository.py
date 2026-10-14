@@ -121,6 +121,7 @@ class InMemorySourceRepository:
                 source_id=source_id,
                 source_version=next_version,
                 resident_test_id=current.resident_test_id,
+                resident_aliases=current.resident_aliases,
                 language=current.language,
                 transcript_text=transcript_text,
                 created_at=created_at,

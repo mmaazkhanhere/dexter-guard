@@ -306,7 +306,7 @@ components:
         upstreamStatus: { type: [string, 'null'] }
         ruleCode: { type: [string, 'null'] }
         severity: { enum: [CRITICAL, MAJOR, MINOR] }
-        severityPolicyVersion: { const: REVIEW_SEVERITY-v1 }
+        severityPolicyVersion: { enum: [REVIEW_SEVERITY-v1, REVIEW_SEVERITY-v2] }
         severityRationale: { type: string, minLength: 1 }
         explanation: { type: string, minLength: 1 }
         evidence: { $ref: '#/components/schemas/EvidenceDisplay' }

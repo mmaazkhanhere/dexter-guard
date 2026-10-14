@@ -90,7 +90,7 @@ As a reviewer, I want optional proposed wording that remains visibly source-grou
 
 | ID | Requirement | Owner | Acceptance scenarios |
 | --- | --- | --- |
-| FR-15 | Assign every review finding exactly one `CRITICAL`, `MAJOR`, or `MINOR` severity using `REVIEW_SEVERITY-v1`, a deterministic policy based on imported status/rule/policy metadata rather than an LLM label. Preserve upstream results unchanged. | Review policy | HR-001, HR-013, HR-014 |
+| FR-15 | Assign every review finding exactly one `CRITICAL`, `MAJOR`, or `MINOR` severity using `REVIEW_SEVERITY-v2`. The deterministic policy prioritizes the potential impact of medication errors, negation reversals, incorrect measurements, and resident misassignment independently from evidence status or detection confidence. Preserve upstream results unchanged. | Review policy | HR-001, HR-013, HR-014 |
 | FR-17 | Display the current immutable transcript, current candidate note, claim locations, valid evidence references, severity, human-readable explanations, suggestions, decisions, and note status. Selecting a finding reveals its affected claim and evidence where available. | Review context/read model | HR-001, HR-002 |
 | FR-18 | Record independent finding-level decisions: accepted suggestion, manual correction reference, acknowledgement, dispute with rationale, and adjudication. Acknowledgement alone never resolves a critical discrepancy. | Finding decision service | HR-003, HR-013 |
 | FR-19 | Permit a reviewer-labelled manual note correction only by creating a new immutable revision; retain all earlier revisions and decision history. | Revision service | HR-004, HR-005, HR-017 |
@@ -109,17 +109,17 @@ As a reviewer, I want optional proposed wording that remains visibly source-grou
 - A **finding status** is `OPEN`, `RESOLVED`, `ADJUDICATED`, or `STALE`. It is tied to an immutable finding and the revision it assessed.
 - An upstream **verification-run status** stays owned by Specs 004–006 (`SUCCEEDED`/their documented terminal failure values). A failed run is not an evidence status and cannot be represented as `UNSUPPORTED` or `UNCERTAIN`.
 
-### Severity policy (`REVIEW_SEVERITY-v1`)
+### Severity policy (`REVIEW_SEVERITY-v2`)
 
-Severity is a documentation-fidelity priority, not a medical risk judgement. The policy maps each incoming finding deterministically in this order:
+Severity is a documentation-fidelity priority, not a medical risk judgement or detection-confidence score. The policy maps each incoming finding deterministically in this order:
 
 1. Evidence-integrity/provenance failures (`EVD-001`–`EVD-003`, source-version/hash/quotation mismatch, invalid claim or span) and any terminal full-note component failure are **CRITICAL** operational findings.
-2. Spec 004 `CONTRADICTED` is **CRITICAL**. `UNSUPPORTED` and `UNCERTAIN` are **MAJOR**.
-3. Spec 005 `FAIL` outcomes other than the evidence-integrity rules and `NOT_EVALUABLE` outcomes are **MAJOR**; explicitly non-blocking informational rule warnings, if introduced by a versioned upstream contract, are **MINOR**.
+2. A finding is **CRITICAL** when its resolved claim/rule metadata identifies a medication documentation error, a `NEGATION` discrepancy, an incorrect measurement (`NUM-001`, `NUM-003`, or `NUM-005`), or resident misassignment. This priority does not depend on whether Spec 004 reported `CONTRADICTED`, `UNSUPPORTED`, or `UNCERTAIN`; those upstream labels remain unchanged.
+3. Other Spec 004 `CONTRADICTED`, `UNSUPPORTED`, and `UNCERTAIN` findings are **MAJOR**. Other Spec 005 `FAIL` and `NOT_EVALUABLE` outcomes are **MAJOR**. Explicitly versioned informational findings are **MINOR**.
 4. Spec 006 findings retain their producer policy keys and Spec 007 maps the current `COVERAGE_EXPECTATION-v1` keys deterministically: `MEASUREMENT_OMISSION` → **CRITICAL**; `SYMPTOM_OMISSION`, `MOBILITY_ASSISTANCE_OMISSION`, `CARE_ACTION_OMISSION`, and `UNCERTAINTY_OMISSION` → **MAJOR**. An unrecognised or absent key is **MAJOR** for `MISSING`, `DISTORTED`, or `UNCERTAIN`, and **MINOR** only for a future explicitly informational coverage finding. Spec 007 severity labels are never sent back as Spec 006 policy keys.
-5. Any new/unknown upstream finding type is **CRITICAL** until `REVIEW_SEVERITY-v1` is revised and approved. This is a fail-safe compatibility rule, not an interpretation of the finding.
+5. Any new/unknown upstream finding type is **CRITICAL** until `REVIEW_SEVERITY-v2` is revised and approved. This is a fail-safe compatibility rule, not an interpretation of the finding.
 
-The current Spec 006 contract permits a free-form optional `severityPolicyKey`; the current omission keys and their mapping above are the reviewed v1 vocabulary. Ambiguous clinical importance is not inferred by a model. An unknown producer key follows the conservative fallback and requires a policy update before it can receive a lower severity.
+The policy does not consume a model confidence value and does not infer clinical importance. It reads only structured discrepancy/rule metadata and documented claim text indicators. An unknown producer key follows the conservative fallback and requires a policy update before it can receive a lower severity.
 
 ### Finding decisions
 
@@ -180,6 +180,7 @@ All scenarios use synthetic German nursing documentation and synthetic resident 
 | HR-016 | **Given** a fully corrected synthetic German note and valid successful components for its latest revision/source, **when** all policy-required decisions are complete and approval is requested, **then** it is approved and audit history contains the disposition. |
 | HR-017 | **Given** a full-note verification succeeds, **when** the note is edited afterward, **then** its status returns to `AWAITING_FULL_VERIFICATION` and a new full-note verification is required before approval. |
 | HR-018 | **Given** a successful Spec 006 run contains an unresolved source item, **when** approval is attempted, **then** the backend blocks approval regardless of runtime completeness or finding acknowledgement/adjudication. |
+| HR-019 | **Given** source evidence states that insulin was not administered and the note states that it was administered, **when** Spec 004 reports a negation discrepancy, **then** Spec 007 preserves that upstream result and assigns `CRITICAL` under `REVIEW_SEVERITY-v2`, regardless of evidence status or detection confidence. |
 
 ## Edge cases and failure behaviour
 

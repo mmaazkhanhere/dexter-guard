@@ -43,6 +43,7 @@ class SourceIngestionService:
             source_id=str(self._id_factory()),
             source_version=1,
             resident_test_id=request.resident_test_id,
+            resident_aliases=request.resident_aliases,
             language=request.language,
             transcript_text=request.transcript_text,
             created_at=self._clock(),

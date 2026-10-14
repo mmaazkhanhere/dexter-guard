@@ -316,3 +316,16 @@ Tests must use deterministic fixtures and fakes or in-memory persistence where a
 ## Implementation boundary
 
 This specification is intentionally narrow enough to implement independently. Future specifications may build note, fact, claim, evidence, review, and evaluation behavior on these contracts, but they must preserve the source ID, version, transcript immutability, and span validation rules established here.
+
+## Resident attribution mapping
+
+**FR-RA-001:** A source may carry an explicit synthetic `resident_aliases` map
+from resident test IDs to German transcript aliases. The map is immutable with
+the source version and is the sole authority for name-to-resident attribution.
+Names, pronouns, sentence order, and model output must never create a mapping.
+
+**FR-RA-002:** In a transcript with aliases for multiple mapped residents, a
+claim naming another mapped resident creates a source-linked critical
+`RESIDENT-001` finding. A pronoun-only or unaliased claim creates an uncertain
+`RESIDENT-002` finding requiring human clarification. Existing approval policy
+blocks unresolved critical mismatches.

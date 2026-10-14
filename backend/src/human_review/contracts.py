@@ -6,7 +6,8 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr, model_validator
 
 CONTRACT_VERSION = "REVIEW-AUDIT-CONTRACT-v1"
-SEVERITY_POLICY_VERSION = "REVIEW_SEVERITY-v1"
+SEVERITY_POLICY_VERSION = "REVIEW_SEVERITY-v2"
+LEGACY_SEVERITY_POLICY_VERSION = "REVIEW_SEVERITY-v1"
 APPROVAL_POLICY_VERSION = "REVIEW_APPROVAL-v1"
 
 
@@ -72,7 +73,7 @@ class ReviewFinding(Contract):
     upstream_status: StrictStr | None = Field(default=None, alias="upstreamStatus")
     rule_code: StrictStr | None = Field(default=None, alias="ruleCode")
     severity: Literal["CRITICAL", "MAJOR", "MINOR"]
-    severity_policy_version: Literal[SEVERITY_POLICY_VERSION] = Field(alias="severityPolicyVersion")
+    severity_policy_version: Literal[LEGACY_SEVERITY_POLICY_VERSION, SEVERITY_POLICY_VERSION] = Field(alias="severityPolicyVersion")
     severity_rationale: StrictStr = Field(alias="severityRationale", min_length=1)
     explanation: StrictStr = Field(min_length=1)
     evidence: EvidenceDisplay

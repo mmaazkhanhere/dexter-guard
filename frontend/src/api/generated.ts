@@ -828,8 +828,8 @@ export interface components {
             ruleCode?: string | null;
             /** @enum {unknown} */
             severity: "CRITICAL" | "MAJOR" | "MINOR";
-            /** @constant */
-            severityPolicyVersion: "REVIEW_SEVERITY-v1";
+            /** @enum {unknown} */
+            severityPolicyVersion: "REVIEW_SEVERITY-v1" | "REVIEW_SEVERITY-v2";
             severityRationale: string;
             explanation: string;
             evidence: components["schemas"]["EvidenceDisplay"];

@@ -19,6 +19,7 @@ class SourceDocument(_StrictContract):
     source_id: StrictStr = Field(min_length=1)
     source_version: StrictInt = Field(ge=1)
     resident_test_id: StrictStr = Field(min_length=1, pattern=_RESIDENT_ID_PATTERN)
+    resident_aliases: dict[StrictStr, tuple[StrictStr, ...]] = Field(default_factory=dict)
     language: Literal["de-DE"]
     transcript_text: StrictStr = Field(min_length=1)
     created_at: datetime
@@ -57,6 +58,7 @@ class CreateSourceRequest(_StrictContract):
     """Request for a new source identity at version one."""
 
     resident_test_id: StrictStr = Field(min_length=1, pattern=_RESIDENT_ID_PATTERN)
+    resident_aliases: dict[StrictStr, tuple[StrictStr, ...]] = Field(default_factory=dict)
     language: Literal["de-DE"]
     transcript_text: StrictStr = Field(min_length=1)
 

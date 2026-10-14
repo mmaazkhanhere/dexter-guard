@@ -165,6 +165,8 @@ components:
       properties:
         resident_test_id:
           $ref: '#/components/schemas/ResidentTestId'
+        resident_aliases:
+          $ref: '#/components/schemas/ResidentAliases'
         language:
           $ref: '#/components/schemas/Language'
         transcript_text:
@@ -207,6 +209,8 @@ components:
           description: Immutable version number within source_id.
         resident_test_id:
           $ref: '#/components/schemas/ResidentTestId'
+        resident_aliases:
+          $ref: '#/components/schemas/ResidentAliases'
         language:
           $ref: '#/components/schemas/Language'
         transcript_text:
@@ -267,6 +271,20 @@ components:
       minLength: 1
       pattern: '^[A-Za-z0-9][A-Za-z0-9._-]*$'
       description: Exactly one synthetic resident test identifier.
+
+    ResidentAliases:
+      type: object
+      additionalProperties:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+      default: {}
+      description: >-
+        Explicit synthetic-only mapping from resident test IDs to transcript
+        aliases. It is authoritative only for attribution checks and is never
+        inferred from names, pronouns, or transcript order.
 
     Language:
       type: string

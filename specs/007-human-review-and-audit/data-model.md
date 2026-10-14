@@ -1,7 +1,7 @@
 # Spec 007 Data Model
 
 **Contract version:** `REVIEW-AUDIT-CONTRACT-v1`  
-**Severity policy:** `REVIEW_SEVERITY-v1`  
+**Severity policy:** `REVIEW_SEVERITY-v2` (legacy `REVIEW_SEVERITY-v1` findings remain readable)
 **Persistence rule:** All review-owned records are immutable/append-only. Upstream source, note, claim, and verification records retain their existing ownership.
 
 ## Reused immutable references
@@ -30,7 +30,7 @@ Normalized read/persistence record representing an upstream finding or a review-
 | `sourceId`, `sourceVersion` | Yes | Must equal the note revision's evidence source. |
 | `claimId` | No | Required where upstream finding is claim-level; absent for source-only coverage/operational finding. |
 | `upstreamStatus`, `ruleCode` | As applicable | Preserved, never reclassified. |
-| `severity` | Yes | `CRITICAL`, `MAJOR`, `MINOR`; assigned once by `REVIEW_SEVERITY-v1`. |
+| `severity` | Yes | `CRITICAL`, `MAJOR`, `MINOR`; assigned once by the finding's versioned severity policy. |
 | `severityPolicyVersion`, `severityRationale` | Yes | Version and deterministic mapping explanation. |
 | `explanation` | Yes | Reviewer-facing, origin-provided/derived safe text. |
 | `evidenceAvailability` | Yes | `AVAILABLE`, `MISSING`, `INVALID`; only `AVAILABLE` exposes valid display spans. |

@@ -21,6 +21,13 @@ verification, deterministic validation, and source coverage. Approval is written
 one repository transaction that re-checks the latest revision, exact source/run bindings,
 critical findings, required decisions, and terminal full-note verification.
 
+`REVIEW_SEVERITY-v2` classifies review priority from deterministic consequence
+signals rather than treating an evidence status as severity. Medication
+documentation, negation reversal, numeric mismatch, and resident-identity
+signals are critical; source-verification status and any model confidence remain
+independently preserved upstream metadata. Legacy v1 findings remain readable so
+append-only audit history is not rewritten.
+
 ## Alternatives considered
 
 - Let Spec 007 re-run or reimplement upstream algorithms: rejected because it creates

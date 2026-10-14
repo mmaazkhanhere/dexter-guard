@@ -13,7 +13,7 @@ No installed `specify`/`speckit` command or template directory was found under `
 
 | Requirement | Spec behaviour | Contract operation | Task coverage |
 | --- | --- | --- | --- |
-| FR-15 | `REVIEW_SEVERITY-v1` mappings | `ReviewFinding` | T009–T011 |
+| FR-15 | `REVIEW_SEVERITY-v2` consequence-aware mappings | `ReviewFinding` | T009–T011, HR-019 |
 | FR-17 | Context, claims/evidence/highlights | `GET /reviews/{noteId}` | T009–T012 |
 | FR-18 | Independent decisions | `POST .../decisions` | T013–T015 |
 | FR-19 | Immutable revisions/conflict | `POST .../revisions` | T016–T017, T020 |
