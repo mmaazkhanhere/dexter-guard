@@ -19,7 +19,7 @@ from evaluation.api import create_router as create_evaluation_router
 from evaluation.benchmark import default_dataset
 from evaluation.repository import SQLiteEvaluationRepository
 from evaluation.runner import EvaluationRunner
-from .llm_config import generation_adapter_from_environment
+from .llm_config import evidence_verifier_from_environment, generation_adapter_from_environment
 from human_review.api import create_router as create_review_router
 from human_review.contracts import ClaimReverificationRequest
 from human_review.repository import InMemoryReviewRepository
@@ -108,6 +108,7 @@ def create_app() -> FastAPI:
 
     source_service = SourceIngestionService(repository=source_repository) if source_repository is not None else SourceIngestionService()
     review_service = ReviewService(repository=review_repository)
+    evidence_verifier = evidence_verifier_from_environment()
     note_service = ReviewAwareNoteService(
         source_service,
         repository=note_repository,
@@ -119,6 +120,7 @@ def create_app() -> FastAPI:
         source_service=source_service,
         note_service=note_service,
         review_service=review_service,
+        evidence_verifier=evidence_verifier,
     )
     app = create_source_app(
         service=source_service,
@@ -201,7 +203,7 @@ def create_app() -> FastAPI:
 
     evaluation_runner = EvaluationRunner(
         dataset=default_dataset(),
-        adapter=ReliabilityEngineEvaluationAdapter(),
+        adapter=ReliabilityEngineEvaluationAdapter(evidence_verifier=evidence_verifier),
         repository=evaluation_repository,
     )
     app.state.evaluation_runner = evaluation_runner

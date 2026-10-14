@@ -57,6 +57,15 @@ def test_real_adapter_runs_the_actual_four_stage_pipeline_without_fixture_predic
     ]
     assert all(run.status == "SUCCEEDED" for run in outcome.stage_runs)
     assert outcome.usage_and_cost.cost_state == "UNAVAILABLE"
+    assert {
+        "ADAPTER_SETUP",
+        "CLAIM_EXTRACTION",
+        "EVIDENCE_VERIFICATION",
+        "DETERMINISTIC_VALIDATION",
+        "SOURCE_COVERAGE",
+        "RESULT_COLLECTION",
+    } <= outcome.stage_latency_ms.keys()
+    assert all(value is not None and value >= 0 for value in outcome.stage_latency_ms.values())
     assert all(finding.upstream_run_id != f"fixture-{case.scenario_id}" for finding in outcome.findings)
     assert all(not finding.finding_key.startswith("fixture-finding-") for finding in outcome.findings)
 

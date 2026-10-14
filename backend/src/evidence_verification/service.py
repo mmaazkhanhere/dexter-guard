@@ -358,7 +358,14 @@ class VerificationService:
         )
         timed_out = False
         try:
-            return future.result(timeout=self.provider_timeout_seconds)
+            response = future.result(timeout=self.provider_timeout_seconds)
+            self.metrics.increment_by("provider_attempts", getattr(self.verifier, "last_retry_count", 0))
+            self.metrics.record_provider_usage(
+                input_tokens=getattr(self.verifier, "last_input_tokens", None),
+                output_tokens=getattr(self.verifier, "last_output_tokens", None),
+                inference_cost=getattr(self.verifier, "last_inference_cost", None),
+            )
+            return response
         except FutureTimeoutError:
             timed_out = True
             future.cancel()

@@ -9,6 +9,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from nursing_notes.adapters import GenerationAdapter, OpenAICompatibleGenerationAdapter, UnavailableGenerationAdapter
+from evidence_verification.openai_compatible import OpenAICompatibleEvidenceVerifier
 
 
 def load_local_environment() -> None:
@@ -42,4 +43,39 @@ def generation_adapter_from_environment(
         model=model,
         timeout_seconds=timeout_seconds,
     )
+
+
+def evidence_verifier_from_environment(values: Mapping[str, str] | None = None) -> object | None:
+    """Build the optional live evidence verifier from server-side settings.
+
+    Verification-specific variables take precedence.  The existing ``LLM_*``
+    variables remain a convenient fallback for deployments using one model for
+    both note generation and evidence verification.
+    """
+    environment = values if values is not None else os.environ
+    api_key = environment.get("VERIFICATION_LLM_API_KEY", environment.get("LLM_API_KEY", "")).strip()
+    model = environment.get("VERIFICATION_LLM_MODEL", environment.get("LLM_MODEL", "")).strip()
+    base_url = environment.get("VERIFICATION_LLM_BASE_URL", environment.get("LLM_BASE_URL", "https://api.openai.com/v1")).strip()
+    if not api_key or not model or not base_url:
+        return None
+    try:
+        timeout_seconds = float(environment.get("VERIFICATION_LLM_TIMEOUT_SECONDS", environment.get("LLM_TIMEOUT_SECONDS", "30")))
+        input_cost = _optional_float(environment.get("VERIFICATION_LLM_INPUT_COST_PER_1K"))
+        output_cost = _optional_float(environment.get("VERIFICATION_LLM_OUTPUT_COST_PER_1K"))
+    except ValueError as error:
+        raise ValueError("verification LLM timeout and pricing values must be numeric") from error
+    return OpenAICompatibleEvidenceVerifier(
+        api_key=api_key,
+        base_url=base_url,
+        model=model,
+        timeout_seconds=timeout_seconds,
+        input_cost_per_1k=input_cost,
+        output_cost_per_1k=output_cost,
+    )
+
+
+def _optional_float(value: str | None) -> float | None:
+    if value is None or not value.strip():
+        return None
+    return float(value)
 

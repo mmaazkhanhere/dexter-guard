@@ -104,6 +104,10 @@ class StructuredVerifierAdapter:
             raise ValueError("max_attempts must be positive")
         self.provider = provider
         self.max_attempts = max_attempts
+        self.last_retry_count = 0
+        self.last_input_tokens: int | None = None
+        self.last_output_tokens: int | None = None
+        self.last_inference_cost: float | None = None
 
     def verify(
         self,
@@ -125,7 +129,11 @@ class StructuredVerifierAdapter:
             raise ProviderUnavailableError("No evidence-verifier provider is configured.")
 
         last_error: Exception | None = None
-        for _ in range(self.max_attempts):
+        self.last_retry_count = 0
+        self.last_input_tokens = None
+        self.last_output_tokens = None
+        self.last_inference_cost = None
+        for attempt in range(self.max_attempts):
             try:
                 raw = self._call(
                     method,
@@ -135,6 +143,7 @@ class StructuredVerifierAdapter:
                     source_id=source_id,
                     source_version=source_version,
                 )
+                self._capture_usage(raw)
                 response = parse_verifier_output(raw)
                 if response.policy_version != ANNOTATION_POLICY_VERSION:
                     raise MalformedVerifierOutputError("Verifier output used an unsupported annotation policy version.")
@@ -147,9 +156,31 @@ class StructuredVerifierAdapter:
                 last_error = MalformedVerifierOutputError("Verifier output failed the response schema.")
             except Exception as error:  # provider exceptions are intentionally redacted
                 last_error = ProviderUnavailableError("The evidence-verifier provider failed.")
+            if attempt < self.max_attempts - 1:
+                self.last_retry_count += 1
         if isinstance(last_error, VerifierError):
             raise last_error
         raise ProviderUnavailableError("The evidence-verifier provider failed.") from last_error
+
+    def _capture_usage(self, raw: object) -> None:
+        usage = raw.get("usage") if isinstance(raw, Mapping) else getattr(raw, "usage", None)
+        provider = self.provider
+
+        def number(*names: str) -> int | None:
+            for name in names:
+                value = usage.get(name) if isinstance(usage, Mapping) else getattr(usage, name, None)
+                if value is not None:
+                    try:
+                        return max(0, int(value))
+                    except (TypeError, ValueError):
+                        return None
+            return None
+
+        input_tokens = number("prompt_tokens", "input_tokens")
+        output_tokens = number("completion_tokens", "output_tokens")
+        self.last_input_tokens = input_tokens if input_tokens is not None else getattr(provider, "last_input_tokens", None)
+        self.last_output_tokens = output_tokens if output_tokens is not None else getattr(provider, "last_output_tokens", None)
+        self.last_inference_cost = getattr(provider, "last_inference_cost", None)
 
     @staticmethod
     def _call(

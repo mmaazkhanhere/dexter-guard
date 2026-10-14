@@ -485,14 +485,14 @@ class WorkflowVerificationPorts:
 class ReliabilityWorkflow:
     """Own all cross-component repositories and expose review verification ports."""
 
-    def __init__(self, *, source_service, note_service, review_service):
+    def __init__(self, *, source_service, note_service, review_service, claim_provider=None, evidence_verifier=None, coverage_matcher=None):
         self.source_service = source_service
         self.note_repository = note_service.repository
         self.claim_repository = InMemoryClaimRepository()
         self.claim_results: dict[str, object] = {}
         self.claim_service = ClaimExtractionService(
             NursingNoteRevisionReader(self.note_repository, source_service),
-            HeuristicClaimProvider(),
+            claim_provider or HeuristicClaimProvider(),
             repository=self.claim_repository,
         )
         self.extraction_repository = InMemorySourceFactExtractionRepository()
@@ -504,13 +504,14 @@ class ReliabilityWorkflow:
             self.claim_sets,
             run_repository=self.coverage_runs,
             note_repository=self.note_repository,
+            matcher=coverage_matcher,
         )
         self.evidence_runs = InMemoryVerificationRepository()
         self.evidence_service = VerificationService(
             source_service=source_service,
             note_repository=self.note_repository,
             claim_resolver=lambda claim_set_id: self.claim_repository.get_current_result_by_extraction_run_id(claim_set_id) if hasattr(self.claim_repository, "get_current_result_by_extraction_run_id") else self._claim_result(claim_set_id),
-            verifier=HeuristicEvidenceProvider(),
+            verifier=evidence_verifier or HeuristicEvidenceProvider(),
             repository=self.evidence_runs,
         )
         self.validation_runs = InMemoryValidationRunRepository()

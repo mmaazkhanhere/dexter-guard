@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from time import perf_counter
 from typing import Callable
 
@@ -22,6 +22,7 @@ class PipelineOutcome:
     latency_ms: float
     usage_and_cost: UsageAndCost
     failure: EvaluationFailure | None = None
+    stage_latency_ms: dict[str, float | None] = field(default_factory=dict)
     # These aliases are pipeline metadata, not annotations.  The runner uses them
     # to translate implementation IDs into the immutable dataset's target IDs
     # after the engine has finished.  No expected error or expected status is
@@ -85,7 +86,14 @@ class ReliabilityEngineEvaluationAdapter(PipelineAdapter):
     def __init__(
         self,
         engine: Callable[[ReliabilityEngineInputs], PipelineOutcome] | None = None,
+        *,
+        evidence_verifier: object | None = None,
+        claim_provider: object | None = None,
+        coverage_matcher: object | None = None,
     ) -> None:
+        self._evidence_verifier = evidence_verifier
+        self._claim_provider = claim_provider
+        self._coverage_matcher = coverage_matcher
         self._engine = engine or self._run_isolated_pipeline
 
     def evaluate(self, case: EvaluationCase, candidate: EvaluationCandidate) -> PipelineOutcome:
@@ -102,8 +110,7 @@ class ReliabilityEngineEvaluationAdapter(PipelineAdapter):
         )
         return self._engine(inputs)
 
-    @staticmethod
-    def _run_isolated_pipeline(inputs: ReliabilityEngineInputs) -> PipelineOutcome:
+    def _run_isolated_pipeline(self, inputs: ReliabilityEngineInputs) -> PipelineOutcome:
         """Materialize only the two textual inputs and execute production ports."""
         from human_review.repository import InMemoryReviewRepository
         from human_review.service import ReviewService
@@ -114,6 +121,7 @@ class ReliabilityEngineEvaluationAdapter(PipelineAdapter):
         from app.workflow import ReliabilityWorkflow
 
         started = perf_counter()
+        stage_latency: dict[str, float | None] = {}
         if inputs.note_revision != 1:
             return PipelineOutcome(
                 findings=(),
@@ -126,6 +134,7 @@ class ReliabilityEngineEvaluationAdapter(PipelineAdapter):
                     retryable=False,
                     message="The isolated benchmark adapter currently accepts revision 1 inputs only.",
                 ),
+                stage_latency_ms=stage_latency,
             )
 
         source_service = SourceIngestionService(
@@ -156,24 +165,37 @@ class ReliabilityEngineEvaluationAdapter(PipelineAdapter):
             source_service=source_service,
             note_service=note_service,
             review_service=review_service,
+            claim_provider=self._claim_provider,
+            evidence_verifier=self._evidence_verifier,
+            coverage_matcher=self._coverage_matcher,
         )
+        stage_latency["ADAPTER_SETUP"] = (perf_counter() - started) * 1000
 
         stage_runs: list[StageRunReference] = []
+        stage_started = perf_counter()
         extraction = workflow.ports.extract(note.note_id, note.revision)
+        stage_latency["CLAIM_EXTRACTION"] = (perf_counter() - stage_started) * 1000
         stage_runs.append(StageRunReference(stage="CLAIM_EXTRACTION", upstreamRunId=extraction.run_id, status=extraction.status))
         if extraction.status != "SUCCEEDED":
             return ReliabilityEngineEvaluationAdapter._failed_outcome(
-                started, stage_runs, "CLAIM_EXTRACTION", "CLAIM_EXTRACTION_FAILED",
+                started, stage_runs, "CLAIM_EXTRACTION", "CLAIM_EXTRACTION_FAILED", stage_latency,
             )
 
+        stage_started = perf_counter()
         evidence = workflow.ports.evidence(note.note_id, note.revision, extraction.claim_set_id)
+        stage_latency["EVIDENCE_VERIFICATION"] = (perf_counter() - stage_started) * 1000
         stage_runs.append(StageRunReference(stage="EVIDENCE_VERIFICATION", upstreamRunId=evidence.run_id, status=evidence.status))
+        stage_started = perf_counter()
         validation = workflow.ports.validation(note.note_id, note.revision, extraction.claim_set_id)
+        stage_latency["DETERMINISTIC_VALIDATION"] = (perf_counter() - stage_started) * 1000
         stage_runs.append(StageRunReference(stage="DETERMINISTIC_VALIDATION", upstreamRunId=validation.run_id, status=validation.status))
+        stage_started = perf_counter()
         coverage = workflow.ports.coverage(note.note_id, note.revision, extraction.claim_set_id)
+        stage_latency["SOURCE_COVERAGE"] = (perf_counter() - stage_started) * 1000
         stage_runs.append(StageRunReference(stage="SOURCE_COVERAGE", upstreamRunId=coverage.run_id, status=coverage.status))
 
         findings: list[ObservedFinding] = []
+        collection_started = perf_counter()
         claim_id_ordinals: list[tuple[str, int]] = []
         source_fact_spans: list[tuple[str, tuple[SourceSpan, ...]]] = []
 
@@ -238,23 +260,26 @@ class ReliabilityEngineEvaluationAdapter(PipelineAdapter):
                 ))
 
         usage_and_cost = _pipeline_usage_and_cost(workflow, coverage_run)
+        stage_latency["RESULT_COLLECTION"] = (perf_counter() - collection_started) * 1000
 
         return PipelineOutcome(
             findings=tuple(findings),
             stage_runs=tuple(stage_runs),
             latency_ms=(perf_counter() - started) * 1000,
             usage_and_cost=usage_and_cost,
+            stage_latency_ms=stage_latency,
             claim_id_ordinals=tuple(claim_id_ordinals),
             source_fact_spans=tuple(source_fact_spans),
         )
 
     @staticmethod
-    def _failed_outcome(started: float, stage_runs: list[StageRunReference], stage: str, code: str) -> PipelineOutcome:
+    def _failed_outcome(started: float, stage_runs: list[StageRunReference], stage: str, code: str, stage_latency: dict[str, float | None]) -> PipelineOutcome:
         return PipelineOutcome(
             findings=(),
             stage_runs=tuple(stage_runs),
             latency_ms=(perf_counter() - started) * 1000,
             usage_and_cost=UsageAndCost(retryCount=0, costState="UNAVAILABLE"),
+            stage_latency_ms=stage_latency,
             failure=EvaluationFailure(code=code, stage=stage, retryable=False, message=f"{stage} did not complete successfully."),
         )
 
@@ -266,15 +291,17 @@ def _pipeline_usage_and_cost(workflow, coverage_run) -> UsageAndCost:
     input_tokens = getattr(execution, "input_tokens", None)
     output_tokens = getattr(execution, "output_tokens", None)
     estimated_cost = getattr(execution, "inference_cost", None)
-    if input_tokens is None and evidence_snapshot.token_usage:
-        input_tokens = evidence_snapshot.token_usage
-    if estimated_cost is None and evidence_snapshot.inference_cost:
+    if input_tokens is None and getattr(evidence_snapshot, "input_tokens", 0):
+        input_tokens = evidence_snapshot.input_tokens
+    if output_tokens is None and getattr(evidence_snapshot, "output_tokens", 0):
+        output_tokens = evidence_snapshot.output_tokens
+    if estimated_cost is None and getattr(evidence_snapshot, "cost_known", False):
         estimated_cost = evidence_snapshot.inference_cost
-    cost_available = estimated_cost is not None
+    cost_available = bool(getattr(evidence_snapshot, "cost_known", False)) or estimated_cost is not None
     return UsageAndCost(
         inputTokens=input_tokens,
         outputTokens=output_tokens,
-        retryCount=max(0, evidence_snapshot.provider_attempts - evidence_snapshot.successful_runs),
+        retryCount=max(0, evidence_snapshot.provider_attempts - evidence_snapshot.successful_runs) + (getattr(execution, "retry_count", 0) or 0),
         costState="AVAILABLE" if cost_available else "UNAVAILABLE",
         estimatedCost=estimated_cost,
         currency="EUR" if cost_available else None,

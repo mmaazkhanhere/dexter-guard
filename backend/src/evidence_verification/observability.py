@@ -25,6 +25,9 @@ class VerificationMetricsSnapshot:
     rejection_reasons: tuple[tuple[str, int], ...] = ()
     token_usage: int = 0
     inference_cost: float = 0.0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cost_known: bool = False
 
 
 class VerificationMetrics:
@@ -46,13 +49,39 @@ class VerificationMetrics:
         self._policy_versions: set[str] = set()
         self._rejection_reasons: dict[str, int] = {}
         self._token_usage = 0
+        self._input_tokens = 0
+        self._output_tokens = 0
         self._inference_cost = 0.0
+        self._cost_known = False
         self._lock = Lock()
 
     def increment(self, name: str) -> None:
         with self._lock:
             if name in self._values:
                 self._values[name] += 1
+
+    def increment_by(self, name: str, amount: int) -> None:
+        with self._lock:
+            if name in self._values:
+                self._values[name] += max(0, amount)
+
+    def record_provider_usage(
+        self,
+        *,
+        input_tokens: int | None = None,
+        output_tokens: int | None = None,
+        inference_cost: float | None = None,
+    ) -> None:
+        with self._lock:
+            if input_tokens is not None:
+                self._input_tokens += max(0, input_tokens)
+                self._token_usage += max(0, input_tokens)
+            if output_tokens is not None:
+                self._output_tokens += max(0, output_tokens)
+                self._token_usage += max(0, output_tokens)
+            if inference_cost is not None:
+                self._inference_cost += max(0.0, float(inference_cost))
+                self._cost_known = True
 
     def record_terminal(
         self,
@@ -86,6 +115,7 @@ class VerificationMetrics:
                 self._token_usage += max(0, token_usage)
             if inference_cost is not None:
                 self._inference_cost += max(0.0, float(inference_cost))
+                self._cost_known = True
 
     def snapshot(self) -> VerificationMetricsSnapshot:
         with self._lock:
@@ -98,6 +128,9 @@ class VerificationMetrics:
                 rejection_reasons=tuple(sorted(self._rejection_reasons.items())),
                 token_usage=self._token_usage,
                 inference_cost=self._inference_cost,
+                input_tokens=self._input_tokens,
+                output_tokens=self._output_tokens,
+                cost_known=self._cost_known,
             )
 
 

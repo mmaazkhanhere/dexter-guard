@@ -10,7 +10,7 @@ from .benchmark import default_dataset
 from .comparison import compare_paired_cases
 from .contracts import (
     BenchmarkDataset, CaseStatus, DatasetSplit, EvaluationCaseResult, EvaluationRun, EvaluationRunRequest, FailureSummary,
-    FindingMatch, InferenceParameters, LatencyBreakdown, ObservedFinding, RunConfiguration, RunStatus, SourceFactScore, UsageAndCost,
+    FindingMatch, InferenceParameters, LatencyBreakdown, ObservedFinding, RunConfiguration, RunStatus, SourceFactScore, UsageAndCost, VersionedValue,
 )
 from .dataset import DatasetValidationError, validate_dataset
 from .matching import match_findings
@@ -108,14 +108,23 @@ class EvaluationRunner:
             findings = _canonicalize_findings(outcome, case, candidate)
             matches = match_findings(findings, candidate.error_instances) if not failure else tuple(FindingMatch(errorId=error.error_id, findingKey=None, disposition="FALSE_NEGATIVE", reasonCode="CASE_FAILED", specificityScore=None) for error in candidate.error_instances)
             scores = _completeness_scores(outcome, findings, case, candidate)
-            return EvaluationCaseResult(caseExecutionId=f"case-{uuid4().hex}", scenarioId=case.scenario_id, candidateId=candidate.candidate_id, sourceId=case.source.source_id, sourceVersion=case.source.source_version, sourceTextHash=case.source.source_text_hash, noteId=candidate.note_id, noteRevision=candidate.note_revision, noteBodyHash=candidate.note_body_hash, status=status, stageRuns=outcome.stage_runs, observedFindings=findings, matchResults=matches, completenessResults=scores, reviewOutcome=None, latency=LatencyBreakdown(endToEndMilliseconds=outcome.latency_ms or (perf_counter() - started) * 1000), usageAndCost=outcome.usage_and_cost, failure=failure)
+            return EvaluationCaseResult(caseExecutionId=f"case-{uuid4().hex}", scenarioId=case.scenario_id, candidateId=candidate.candidate_id, sourceId=case.source.source_id, sourceVersion=case.source.source_version, sourceTextHash=case.source.source_text_hash, noteId=candidate.note_id, noteRevision=candidate.note_revision, noteBodyHash=candidate.note_body_hash, status=status, stageRuns=outcome.stage_runs, observedFindings=findings, matchResults=matches, completenessResults=scores, reviewOutcome=None, latency=LatencyBreakdown(endToEndMilliseconds=outcome.latency_ms or (perf_counter() - started) * 1000, stageMilliseconds=outcome.stage_latency_ms or {}), usageAndCost=outcome.usage_and_cost, failure=failure)
         except Exception as error:
             from .contracts import EvaluationFailure
             return EvaluationCaseResult(caseExecutionId=f"case-{uuid4().hex}", scenarioId=case.scenario_id, candidateId=candidate.candidate_id, sourceId=case.source.source_id, sourceVersion=case.source.source_version, sourceTextHash=case.source.source_text_hash, noteId=candidate.note_id, noteRevision=candidate.note_revision, noteBodyHash=candidate.note_body_hash, status=CaseStatus.FAILED, stageRuns=(), observedFindings=(), matchResults=(), completenessResults=(), reviewOutcome=None, latency=LatencyBreakdown(endToEndMilliseconds=(perf_counter() - started) * 1000), usageAndCost=UsageAndCost(retryCount=0, costState="UNAVAILABLE"), failure=EvaluationFailure(code="EVALUATION_ADAPTER_FAILURE", stage=None, retryable=False, message=str(error)))
 
     def _configuration(self, request) -> RunConfiguration:
         is_live = request.execution_mode == "LIVE"
-        return RunConfiguration(codeVersion=self.code_version, environmentId="local-synthetic", modelProvider=None, modelId=None, modelVersion=None, promptVersionsAndHashes=(), inferenceParameters=InferenceParameters(), ruleVersionsAndRulesetVersions=(), upstreamContractVersions=(
+        verifier = getattr(self.adapter, "_evidence_verifier", None)
+        model_provider = "OPENAI_COMPATIBLE" if verifier is not None else None
+        model_id = getattr(verifier, "model_id", None)
+        model_version = getattr(verifier, "model_version", None)
+        prompts = (VersionedValue(
+            name="evidence-verifier-prompt",
+            version=str(getattr(verifier, "prompt_version", "unknown")),
+            hash=str(getattr(verifier, "prompt_hash", "")) or None,
+        ),) if verifier is not None else ()
+        return RunConfiguration(codeVersion=self.code_version, environmentId="local-synthetic", modelProvider=model_provider, modelId=model_id, modelVersion=model_version, promptVersionsAndHashes=prompts, inferenceParameters=InferenceParameters(), ruleVersionsAndRulesetVersions=(), upstreamContractVersions=(
             {"name": "SPEC_004", "version": "EVIDENCE_STATUS-v1"}, {"name": "SPEC_006", "version": "SOURCE_COVERAGE-v1"},
         ), fixtureMode=request.execution_mode, pricingAssumptionsVersion=None if is_live else "SYNTHETIC_FIXTURE-v1", matchingPolicyVersion="EVALUATION_MATCHING-v1", randomSeed=0)
 

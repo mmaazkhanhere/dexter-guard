@@ -21,6 +21,7 @@ from .provider import (
     VerifierCandidateFinding,
     VerifierResponse,
 )
+from .openai_compatible import OpenAICompatibleEvidenceVerifier
 from .repository import (
     IdempotencyReservation,
     InMemoryVerificationRepository,
@@ -66,6 +67,7 @@ __all__ = [
     "StructuredVerifierAdapter",
     "VerifierCandidateFinding",
     "VerifierResponse",
+    "OpenAICompatibleEvidenceVerifier",
     "IdempotencyReservation",
     "InMemoryVerificationRepository",
     "SQLiteVerificationRepository",
