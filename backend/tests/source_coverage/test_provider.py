@@ -30,10 +30,19 @@ def test_malformed_provider_output_fails_closed():
 
 
 def test_provider_timeout_is_not_uncertain_coverage():
+    started = time.monotonic()
+    calls = []
+
     def slow(facts, claims, run_id):
-        time.sleep(0.05)
+        calls.append(run_id)
+        time.sleep(0.2)
         return ()
 
     adapter = BoundedSemanticMatcher(slow, timeout_seconds=0.001)
     with pytest.raises(ProviderTimeoutError):
         adapter.match([fact()], [], run_id="run-1")
+    elapsed = time.monotonic() - started
+
+    assert elapsed < 0.1
+    assert calls == ["run-1"]
+    assert adapter.last_retry_count == 0
