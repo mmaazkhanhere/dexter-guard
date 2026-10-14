@@ -132,7 +132,13 @@ class VerificationService:
 
         try:
             candidate_evidence = discover_candidate_evidence(claims, source.transcript_text)
-            response = self._invoke_verifier(candidate_evidence, source.transcript_text, run_id)
+            response = self._invoke_verifier(
+                candidate_evidence,
+                source.transcript_text,
+                run_id,
+                source_id=request.source_id,
+                source_version=request.source_version,
+            )
         except (ProviderTimeoutError, FutureTimeoutError, TimeoutError):
             self.metrics.increment("provider_failures")
             return self._persist_failure(
@@ -331,10 +337,25 @@ class VerificationService:
             resolved.append(claim)
         return tuple(resolved)
 
-    def _invoke_verifier(self, claims: Sequence[object], source_text: str, run_id: str) -> VerifierResponse:
+    def _invoke_verifier(
+        self,
+        claims: Sequence[object],
+        source_text: str,
+        run_id: str,
+        *,
+        source_id: str | None = None,
+        source_version: int | None = None,
+    ) -> VerifierResponse:
         self.metrics.increment("provider_attempts")
         executor = ThreadPoolExecutor(max_workers=1)
-        future = executor.submit(self.verifier.verify, claims=claims, source_text=source_text, run_id=run_id)
+        future = executor.submit(
+            self.verifier.verify,
+            claims=claims,
+            source_text=source_text,
+            run_id=run_id,
+            source_id=source_id,
+            source_version=source_version,
+        )
         timed_out = False
         try:
             return future.result(timeout=self.provider_timeout_seconds)

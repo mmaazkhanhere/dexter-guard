@@ -30,6 +30,7 @@ from .postgres import PostgresPersistence, create_postgres_persistence
 from source_ingestion.app import create_app as create_source_app
 from source_ingestion.contracts import CreateSourceRequest, SourceDocument
 from source_ingestion.service import SourceIngestionService
+from .workflow import ReliabilityWorkflow
 
 
 class ReviewAwareNoteService(NursingNoteService):
@@ -113,12 +114,28 @@ def create_app() -> FastAPI:
         generation_adapter=generation_adapter_from_environment(),
         review_service=review_service,
     )
-    app = create_source_app(service=source_service, note_service=note_service)
+    workflow = ReliabilityWorkflow(
+        source_service=source_service,
+        note_service=note_service,
+        review_service=review_service,
+    )
+    app = create_source_app(
+        service=source_service,
+        note_service=note_service,
+        verification_service=workflow.evidence_service,
+        deterministic_validation_service=workflow.validation_service,
+        coverage_service=workflow.coverage_service,
+    )
     app.title = "Dexter Guard Reliability Engine"
     app.version = "UI-INTEGRATION-CONTRACT-v1"
     app.state.source_service = source_service
     app.state.note_service = note_service
     app.state.review_service = review_service
+    app.state.workflow = workflow
+    app.state.claim_extraction_service = workflow.claim_service
+    app.state.evidence_verification_service = workflow.evidence_service
+    app.state.deterministic_validation_service = workflow.validation_service
+    app.state.source_coverage_service = workflow.coverage_service
     app.state.persistence = persistence
 
     @app.get("/api/v1/health", tags=["health"])
@@ -152,7 +169,18 @@ def create_app() -> FastAPI:
     def get_note_revision_contract(noteId: str, noteRevision: int) -> Any:
         return _note_revision(noteId, noteRevision)
 
-    app.include_router(create_review_router(review_service))
+    @app.post("/api/v1/claims/extract")
+    def extract_claims(payload: dict[str, object]) -> Any:
+        note_revision_id = payload.get("noteRevisionId")
+        if not isinstance(note_revision_id, str) or not note_revision_id.strip():
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"code": "INVALID_REQUEST", "message": "noteRevisionId is required."},
+            )
+        result = workflow.claim_service.extract_claims(note_revision_id)
+        return result.model_dump(mode="json", by_alias=True, exclude_none=True)
+
+    app.include_router(create_review_router(review_service, verification_ports=workflow.ports))
 
     @app.post("/api/v1/reviews/{note_id}/findings/{finding_id}/claim-reverification")
     def claim_reverification_unavailable(note_id: str, finding_id: str, payload: ClaimReverificationRequest) -> JSONResponse:

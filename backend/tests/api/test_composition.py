@@ -35,13 +35,50 @@ def test_composed_app_preserves_source_and_note_routes() -> None:
     assert retrieved.json()["transcript_text"] == body["transcript_text"]
 
 
-def test_unconfigured_verification_fails_closed() -> None:
+def test_verification_rejects_malformed_request_after_workflow_wiring() -> None:
     client = TestClient(create_app())
 
     response = client.post("/api/v1/verification-runs", json={})
 
-    assert response.status_code == 503
-    assert response.json()["code"] == "VERIFIER_UNAVAILABLE"
+    assert response.status_code == 400
+
+
+def test_composed_app_runs_the_complete_review_workflow() -> None:
+    client = TestClient(create_app())
+    source = client.post(
+        "/api/v1/sources",
+        json={
+            "resident_test_id": "synthetic-resident-workflow",
+            "language": "de-DE",
+            "transcript_text": "Die Bewohnerin berichtet keine Schmerzen. Temperatur 37,2 °C.",
+        },
+    ).json()
+    note = client.post(
+        "/api/v1/notes/import",
+        json={
+            "sourceId": source["source_id"],
+            "sourceVersion": source["source_version"],
+            "content": source["transcript_text"],
+            "externalOrigin": {"system": "synthetic-test", "externalNoteId": "workflow-1"},
+            "requestedBy": "synthetic-reviewer",
+            "facts": [],
+        },
+    ).json()
+
+    verification = client.post(
+        f"/api/v1/reviews/{note['noteId']}/full-verifications",
+        json={"expectedRevision": 1, "reviewerLabel": "synthetic-reviewer", "idempotencyKey": "workflow-1"},
+    )
+
+    assert verification.status_code == 200
+    body = verification.json()
+    assert body["status"] == "VALID"
+    assert {item["component"] for item in body["componentStatuses"]} == {
+        "CLAIM_EXTRACTION",
+        "EVIDENCE_VERIFICATION",
+        "DETERMINISTIC_VALIDATION",
+        "SOURCE_COVERAGE",
+    }
 
 
 def test_composed_app_exposes_evaluation_run_collection() -> None:

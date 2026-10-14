@@ -105,7 +105,15 @@ class StructuredVerifierAdapter:
         self.provider = provider
         self.max_attempts = max_attempts
 
-    def verify(self, *, claims: Sequence[object], source_text: str, run_id: str) -> VerifierResponse:
+    def verify(
+        self,
+        *,
+        claims: Sequence[object],
+        source_text: str,
+        run_id: str,
+        source_id: str | None = None,
+        source_version: int | None = None,
+    ) -> VerifierResponse:
         method = (
             getattr(self.provider, "verify", None)
             or getattr(self.provider, "verify_claims", None)
@@ -119,7 +127,14 @@ class StructuredVerifierAdapter:
         last_error: Exception | None = None
         for _ in range(self.max_attempts):
             try:
-                raw = self._call(method, claims=claims, source_text=source_text, run_id=run_id)
+                raw = self._call(
+                    method,
+                    claims=claims,
+                    source_text=source_text,
+                    run_id=run_id,
+                    source_id=source_id,
+                    source_version=source_version,
+                )
                 response = parse_verifier_output(raw)
                 if response.policy_version != ANNOTATION_POLICY_VERSION:
                     raise MalformedVerifierOutputError("Verifier output used an unsupported annotation policy version.")
@@ -137,7 +152,15 @@ class StructuredVerifierAdapter:
         raise ProviderUnavailableError("The evidence-verifier provider failed.") from last_error
 
     @staticmethod
-    def _call(method: object, *, claims: Sequence[object], source_text: str, run_id: str) -> object:
+    def _call(
+        method: object,
+        *,
+        claims: Sequence[object],
+        source_text: str,
+        run_id: str,
+        source_id: str | None = None,
+        source_version: int | None = None,
+    ) -> object:
         if not callable(method):
             raise ProviderUnavailableError("The evidence-verifier provider is not callable.")
         parameters = inspect.signature(method).parameters
@@ -152,6 +175,10 @@ class StructuredVerifierAdapter:
             kwargs["run_id"] = run_id
         elif "verification_run_id" in parameters:
             kwargs["verification_run_id"] = run_id
+        if "source_id" in parameters:
+            kwargs["source_id"] = source_id
+        if "source_version" in parameters:
+            kwargs["source_version"] = source_version
         if kwargs:
             return method(**kwargs)
         return method(claims, source_text, run_id)

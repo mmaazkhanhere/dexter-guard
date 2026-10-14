@@ -200,7 +200,13 @@ class ClaimExtractionService:
                 )
             )
 
-        raw_output, provider_failure = self._invoke_provider(context.note_body, run_id, metadata)
+        raw_output, provider_failure = self._invoke_provider(
+            context.note_body,
+            run_id,
+            metadata,
+            note_revision_id=context.note_revision_id,
+            resident_test_id=context.resident_test_id,
+        )
         if provider_failure is not None:
             return self._finish(self._failed(run_id, *provider_failure, context=context, provider_metadata=metadata))
         try:
@@ -324,7 +330,13 @@ class ClaimExtractionService:
         )
 
     def _invoke_provider(
-        self, note_text: str, run_id: str, metadata: dict[str, str | None]
+        self,
+        note_text: str,
+        run_id: str,
+        metadata: dict[str, str | None],
+        *,
+        note_revision_id: str | None = None,
+        resident_test_id: str | None = None,
     ) -> tuple[object | None, tuple[ExtractionErrorCode, str, bool] | None]:
         method = getattr(self.provider, "extract", None) or getattr(self.provider, "extract_claims", None)
         if method is None and callable(self.provider):
@@ -340,7 +352,15 @@ class ClaimExtractionService:
         for _ in range(self.max_provider_attempts):
             self.metrics.increment("provider_attempts")
             executor = ThreadPoolExecutor(max_workers=1)
-            future = executor.submit(self._call_provider, method, note_text, run_id, metadata)
+            future = executor.submit(
+                self._call_provider,
+                method,
+                note_text,
+                run_id,
+                metadata,
+                note_revision_id,
+                resident_test_id,
+            )
             timed_out = False
             try:
                 return future.result(timeout=self.provider_timeout_seconds), None
@@ -366,13 +386,24 @@ class ClaimExtractionService:
         return None, last_failure
 
     @staticmethod
-    def _call_provider(method: Callable[..., object], note_text: str, run_id: str, metadata: dict[str, str | None]) -> object:
+    def _call_provider(
+        method: Callable[..., object],
+        note_text: str,
+        run_id: str,
+        metadata: dict[str, str | None],
+        note_revision_id: str | None = None,
+        resident_test_id: str | None = None,
+    ) -> object:
         parameters = inspect.signature(method).parameters
         kwargs: dict[str, object] = {}
         if "extraction_run_id" in parameters:
             kwargs["extraction_run_id"] = run_id
         if "prompt_version" in parameters:
             kwargs["prompt_version"] = metadata["prompt_version"] or DEFAULT_PROMPT_VERSION
+        if "note_revision_id" in parameters:
+            kwargs["note_revision_id"] = note_revision_id
+        if "resident_test_id" in parameters:
+            kwargs["resident_test_id"] = resident_test_id
         return method(note_text, **kwargs)
 
     @staticmethod
