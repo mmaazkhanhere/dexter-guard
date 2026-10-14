@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 
-from .adapters import DeterministicFixtureAdapter
+from .adapters import ReliabilityEngineEvaluationAdapter
 from .benchmark import default_dataset
 from .contracts import EvaluationRunRequest
 from .report import build_report
@@ -19,7 +19,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     dataset = default_dataset()
     repo = SQLiteEvaluationRepository(args.database)
-    run = EvaluationRunner(dataset=dataset, adapter=DeterministicFixtureAdapter(), repository=repo).execute(EvaluationRunRequest(subjectKind="BENCHMARK", datasetId=dataset.dataset_id, datasetVersion=dataset.dataset_version, datasetHash=dataset.content_hash, selectedSplit=args.split, executionMode="MOCKED_PROVIDER", idempotencyKey=args.idempotency_key))
+    run = EvaluationRunner(dataset=dataset, adapter=ReliabilityEngineEvaluationAdapter(), repository=repo).execute(EvaluationRunRequest(subjectKind="BENCHMARK", datasetId=dataset.dataset_id, datasetVersion=dataset.dataset_version, datasetHash=dataset.content_hash, selectedSplit=args.split, executionMode="LIVE", idempotencyKey=args.idempotency_key))
     print(json.dumps(build_report(run), ensure_ascii=False, indent=2))
     return 0 if run.status.value in {"SUCCEEDED", "PARTIALLY_FAILED"} else 1
 

@@ -14,7 +14,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 
-from evaluation.adapters import DeterministicFixtureAdapter
+from evaluation.adapters import ReliabilityEngineEvaluationAdapter
 from evaluation.api import create_router as create_evaluation_router
 from evaluation.benchmark import default_dataset
 from evaluation.repository import SQLiteEvaluationRepository
@@ -201,7 +201,7 @@ def create_app() -> FastAPI:
 
     evaluation_runner = EvaluationRunner(
         dataset=default_dataset(),
-        adapter=DeterministicFixtureAdapter(),
+        adapter=ReliabilityEngineEvaluationAdapter(),
         repository=evaluation_repository,
     )
     app.state.evaluation_runner = evaluation_runner

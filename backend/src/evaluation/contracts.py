@@ -419,7 +419,10 @@ class CountMetric(MetricCommon):
     count: StrictInt = Field(ge=0)
     note_count: StrictInt = Field(alias="noteCount", ge=0)
     value_per_note: StrictFloat | None = Field(default=None, alias="valuePerNote")
-    unit: Literal["WARNINGS", "HUMAN_DECISIONS", "CORRECTION_ACTIONS", "ERRORS", "NOTES"]
+    unit: Literal[
+        "WARNINGS", "HUMAN_DECISIONS", "CORRECTION_ACTIONS", "ERRORS", "NOTES",
+        "TRUE_POSITIVES", "FALSE_POSITIVES", "FALSE_NEGATIVES",
+    ]
 
 
 class DistributionMetric(MetricCommon):

@@ -51,10 +51,63 @@ def _distribution(metric_id: str, values: Iterable[float], *, kind: str, unit: s
     return DistributionMetric(metricId=metric_id, metricKind=kind, state=MetricState.SCORED, scorableCount=len(data), unscorableCount=0, failedCount=0, aggregationMethod="linear-interpolated-percentiles", policyVersion="EVALUATION_METRICS-v1", observationCount=len(data), p50=percentile(.50), p95=percentile(.95), mean=mean(data), unit=unit, currency=currency)
 
 
+def finding_confusion_counts(case_results: Sequence[EvaluationCaseResult]) -> tuple[int, int, int]:
+    """Return strict finding-level TP, FP, and FN counts.
+
+    A target-linked misclassification is both an incorrect prediction and a
+    missed exact error, so it contributes to FP and FN.  This keeps the metric
+    conservative when a detector identifies the right claim but the wrong rule.
+    """
+    true_positives = false_positives = false_negatives = 0
+    for result in case_results:
+        for match in result.match_results:
+            if match.disposition is MatchDisposition.MATCHED:
+                true_positives += 1
+            elif match.disposition in {
+                MatchDisposition.UNMATCHED_WARNING,
+                MatchDisposition.DUPLICATE,
+                MatchDisposition.TARGET_LINKED_MISCLASSIFICATION,
+            }:
+                false_positives += 1
+                if match.disposition is MatchDisposition.TARGET_LINKED_MISCLASSIFICATION:
+                    false_negatives += 1
+            elif match.disposition is MatchDisposition.FALSE_NEGATIVE:
+                false_negatives += 1
+    return true_positives, false_positives, false_negatives
+
+
+def _count_metric(metric_id: str, count: int, unit: str, case_results: Sequence[EvaluationCaseResult], *, failed: int, unscorable: int) -> CountMetric:
+    return CountMetric(
+        metricId=metric_id,
+        metricKind="COUNT_PER_NOTE",
+        state=MetricState.SCORED if case_results else MetricState.NOT_APPLICABLE,
+        scorableCount=len(case_results),
+        unscorableCount=unscorable,
+        failedCount=failed,
+        aggregationMethod="exact-count-sum",
+        policyVersion="EVALUATION_METRICS-v1",
+        count=count,
+        noteCount=len(case_results),
+        valuePerNote=count / len(case_results) if case_results else None,
+        unit=unit,
+        reason="zero notes" if not case_results else None,
+    )
+
+
 def calculate_metrics(case_results: Sequence[EvaluationCaseResult], *, supported_claims: int = 0, supported_false_positives: int = 0, annotated_claims: int = 0, expected_facts: int = 0, covered_facts: int = 0, critical_errors: int = 0, detected_critical_errors: int = 0, scenario_critical_total: int = 0, scenario_critical_detected: int = 0) -> tuple[RateMetric | CountMetric | DistributionMetric, ...]:
     failed = sum(result.status in {CaseStatus.FAILED, CaseStatus.INVALID_OUTPUT} for result in case_results)
     unscorable = sum(result.status is CaseStatus.UNSCORABLE for result in case_results)
+    true_positives, false_positives, false_negatives = finding_confusion_counts(case_results)
     metrics: list[RateMetric | CountMetric | DistributionMetric] = [
+        _count_metric("finding-true-positives", true_positives, "TRUE_POSITIVES", case_results, failed=failed, unscorable=unscorable),
+        _count_metric("finding-false-positives", false_positives, "FALSE_POSITIVES", case_results, failed=failed, unscorable=unscorable),
+        _count_metric("finding-false-negatives", false_negatives, "FALSE_NEGATIVES", case_results, failed=failed, unscorable=unscorable),
+        calculate_rate(true_positives, true_positives + false_positives, metric_id="finding-precision", scorable_count=true_positives + false_positives, unscorable_count=unscorable, failed_count=failed),
+        calculate_rate(true_positives, true_positives + false_negatives, metric_id="finding-recall", scorable_count=true_positives + false_negatives, unscorable_count=unscorable, failed_count=failed),
+        calculate_rate(2 * true_positives, 2 * true_positives + false_positives + false_negatives, metric_id="finding-f1", scorable_count=2 * true_positives + false_positives + false_negatives, unscorable_count=unscorable, failed_count=failed),
+        # Finding-only annotations do not define the population of true
+        # negatives, so binary accuracy is intentionally reported as N/A.
+        calculate_rate(0, 0, metric_id="finding-accuracy", scorable_count=0, unscorable_count=unscorable, failed_count=failed),
         calculate_rate(detected_critical_errors, critical_errors, metric_id="critical-error-recall", scorable_count=critical_errors, unscorable_count=unscorable, failed_count=failed),
         calculate_rate(supported_false_positives, supported_claims, metric_id="supported-claim-false-positive-rate", scorable_count=supported_claims, unscorable_count=unscorable, failed_count=failed),
         calculate_rate(min(sum(result.status is CaseStatus.SUCCEEDED for result in case_results), annotated_claims), annotated_claims, metric_id="claim-classification-accuracy", scorable_count=annotated_claims, unscorable_count=unscorable, failed_count=failed),
