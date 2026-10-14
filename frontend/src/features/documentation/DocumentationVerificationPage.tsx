@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { safeMutationError, useCreateSource, useFullVerification, useGenerateNote, useReview, useSavedExamples, useSource } from "../../api/hooks";
+import { safeMutationError, useCreateSource, useFullVerification, useGenerateNote, useImportNote, useReview, useSavedExamples, useSource } from "../../api/hooks";
 import { userFacingFailureMessage } from "../../api/errors";
 import type { NursingFact, NoteResponse, SourceDocument } from "../../api/types";
 import { StateCard } from "../../components/shared/StateCard";
@@ -9,7 +9,7 @@ import { useToast } from "../../components/shared/Toaster";
 import { WorkspaceHeader } from "../../components/shared/WorkspaceHeader";
 import { VerificationResults } from "../../features/verification/VerificationPage";
 import { useWorkspace } from "../../state/workspace";
-import { isDuplicateGeneratedNote, isTranscriptValid } from "./validation";
+import { isDuplicateGeneratedNote, isExternalNoteValid, isTranscriptValid } from "./validation";
 
 export function DocumentationVerificationPage() {
   const navigate = useNavigate();
@@ -18,23 +18,27 @@ export function DocumentationVerificationPage() {
   const examples = useSavedExamples();
   const createSource = useCreateSource();
   const generate = useGenerateNote();
+  const importNote = useImportNote();
   const fullVerification = useFullVerification();
   const review = useReview(note?.noteId, note?.revision);
   const [transcript, setTranscript] = useState("");
   const [residentId, setResidentId] = useState("synthetic-resident-demo");
   const [selectedExample, setSelectedExample] = useState("");
+  const [noteMethod, setNoteMethod] = useState<"generate" | "existing">("generate");
+  const [existingNote, setExistingNote] = useState("");
   const [isEditingSource, setIsEditingSource] = useState(false);
   const [generatedFacts, setGeneratedFacts] = useState<NursingFact[]>();
   const [generatedResidentId, setGeneratedResidentId] = useState<string>();
   const example = examples.data?.find((item) => item.exampleId === selectedExample);
   const sourceQuery = useSource(example?.sourceId, example?.sourceVersion);
-  const error = examples.error ?? sourceQuery.error ?? createSource.error ?? generate.error ?? fullVerification.error;
+  const error = examples.error ?? sourceQuery.error ?? createSource.error ?? generate.error ?? importNote.error ?? fullVerification.error;
 
   function clearCandidate() {
     setNote(undefined);
     setDraftContent(undefined);
     setGeneratedFacts(undefined);
     setGeneratedResidentId(undefined);
+    setExistingNote("");
   }
 
   async function loadExample() {
@@ -53,7 +57,7 @@ export function DocumentationVerificationPage() {
     }
   }
 
-  async function sourceForGeneration(): Promise<SourceDocument | undefined> {
+  async function sourceForVerification(): Promise<SourceDocument | undefined> {
     if (source && !isEditingSource) return source;
     if (!isTranscriptValid(transcript)) return undefined;
     const result = await createSource.mutateAsync({ resident_test_id: residentId.trim(), language: "de-DE", transcript_text: transcript });
@@ -71,7 +75,7 @@ export function DocumentationVerificationPage() {
   async function verify(noteToVerify: NoteResponse): Promise<void> {
     const result = await fullVerification.mutateAsync({ noteId: noteToVerify.noteId, expectedRevision: noteToVerify.revision, reviewerLabel: "synthetic-reviewer" });
     if (result.status === "VALID") {
-      notify({ tone: "success", title: "Note checked", message: "The nursing note was generated and checked. Continue to Human Review to make corrections and approve or reject it." });
+      notify({ tone: "info", title: "Verification completed", message: "Inspect the findings, then continue to Human Review to resolve any issues. The source, note, and findings stay linked." });
     } else {
       notify({ tone: "error", title: "The note needs attention", message: `${userFacingFailureMessage(result.failureCode, result.failureMessage)} The note remains read-only until Human Review.` });
     }
@@ -80,7 +84,7 @@ export function DocumentationVerificationPage() {
   async function generateAndVerify() {
     let activeSource: SourceDocument | undefined;
     try {
-      activeSource = await sourceForGeneration();
+      activeSource = await sourceForVerification();
     } catch (actionError) {
       notifyFailure(notify, "Transcript was not saved", actionError, "No candidate note was created.");
       return;
@@ -122,9 +126,39 @@ export function DocumentationVerificationPage() {
     }
   }
 
-  const processing = createSource.isPending || generate.isPending || fullVerification.isPending;
+  async function verifyExistingNote() {
+    let activeSource: SourceDocument | undefined;
+    try {
+      activeSource = await sourceForVerification();
+    } catch (actionError) {
+      notifyFailure(notify, "Transcript was not saved", actionError, "No existing note was imported.");
+      return;
+    }
+    if (!activeSource || !isExternalNoteValid(existingNote)) return;
+
+    let imported: NoteResponse;
+    try {
+      imported = await importNote.mutateAsync({ sourceId: activeSource.source_id, sourceVersion: activeSource.source_version, content: existingNote, externalOrigin: { system: "synthetic-external-demo", externalNoteId: `external-${Date.now()}` }, requestedBy: "synthetic-reviewer", facts: [] });
+      applyNoteRevision(imported);
+      setDraftContent(imported.content);
+      setGeneratedFacts(undefined);
+      setGeneratedResidentId(undefined);
+      notify({ tone: "success", title: "Existing note imported", message: "The supplied note is now being checked against its locked source transcript." });
+    } catch (actionError) {
+      notifyFailure(notify, "Existing note could not be imported", actionError, "The source was retained and no note was verified.");
+      return;
+    }
+
+    try {
+      await verify(imported);
+    } catch (actionError) {
+      notifyFailure(notify, "Verification could not run", actionError, "The imported note was retained for Human Review but is not approval-eligible.");
+    }
+  }
+
+  const processing = createSource.isPending || generate.isPending || importNote.isPending || fullVerification.isPending;
   return <>
-    <WorkspaceHeader eyebrow="01 · DOCUMENTATION & VERIFICATION" title="Create and check a candidate nursing note" description="Enter and check a synthetic German transcript, then generate and verify one source-bound candidate before Human Review." />
+    <WorkspaceHeader eyebrow="01 · DOCUMENTATION & VERIFICATION" title="Create or verify a source-bound nursing note" description="Start with a synthetic German transcript, then either generate a new note or verify an existing AI-generated note before Human Review." />
     {error && <div className="error-banner" role="alert">{safeMutationError(error).message}</div>}
     <section className="documentation-verification-section" aria-label="Documentation and verification workflow">
       <StateCard title="Documentation & Verification" description="Enter and correct the transcript, then generate and verify the source-bound nursing note in this same workflow.">
@@ -140,10 +174,10 @@ export function DocumentationVerificationPage() {
           {source && <div className="identity-pill">Locked source snapshot · {source.source_id} · v{source.source_version} · {source.language}</div>}
         </div>
         <div className="workflow-step">
-          <h4>2. Generate and verify</h4>
-          <p className="workflow-step-description">Generate a professional draft and automatically run the complete backend verification workflow against this exact source version.</p>
-          <p className="muted">The transcript is saved automatically if needed. The generated note stays read-only here; corrections belong in Human Review.</p>
-          <button aria-busy={processing} onClick={generateAndVerify} disabled={processing || !isTranscriptValid(transcript)}>{processing ? <LoadingIndicator label={createSource.isPending ? "Saving transcript …" : generate.isPending ? "Generating nursing note …" : "Checking nursing note …"} /> : "Generate & Verify"}</button>
+          <h4>2. Choose a verification path</h4>
+          <p className="workflow-step-description">Both paths preserve the same transcript, note, findings, and evidence for Human Review. This workspace identifies and explains issues; it does not edit or approve notes.</p>
+          <div className="segmented" aria-label="Note input method"><button className={noteMethod === "generate" ? "selected" : ""} onClick={() => setNoteMethod("generate")}>Generate new note</button><button className={noteMethod === "existing" ? "selected" : ""} onClick={() => setNoteMethod("existing")}>Use existing note</button></div>
+          {noteMethod === "generate" ? <><h4>Generate a new note</h4><p className="muted">The transcript is saved automatically if needed. The AI generates a structured draft, then the engine verifies it against this exact source version.</p><button aria-busy={processing} onClick={generateAndVerify} disabled={processing || !isTranscriptValid(transcript)}>{processing ? <LoadingIndicator label={createSource.isPending ? "Saving transcript …" : generate.isPending ? "Generating nursing note …" : "Checking nursing note …"} /> : "Generate & Verify"}</button></> : <><h4>Verify an existing note</h4><p className="muted">Paste an existing synthetic AI-generated note. The engine compares this supplied note to the transcript without generating a replacement.</p><label>Existing AI-generated note<textarea aria-label="Existing AI-generated note" value={existingNote} onChange={(event) => setExistingNote(event.target.value)} placeholder="Fügen Sie die vorhandene KI-generierte Pflegenotiz ein …" /></label><button aria-busy={processing} onClick={verifyExistingNote} disabled={processing || !isTranscriptValid(transcript) || !isExternalNoteValid(existingNote)}>{processing ? <LoadingIndicator label={createSource.isPending ? "Saving transcript …" : importNote.isPending ? "Importing existing note …" : "Checking existing note …"} /> : "Verify existing note"}</button></>}
           {note && <><div className="identity-pill">Candidate note · {note.noteId} · revision {note.revision} · {note.origin}</div><FactList facts={note.facts} /><button className="secondary-button" onClick={() => navigate("/review")}>Continue to Human Review</button></>}
         </div>
       </StateCard>

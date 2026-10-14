@@ -70,6 +70,10 @@ button.finding { cursor:pointer; }
 .finding span, .finding em { color:#9baabd; font-size:11px; font-style:normal; margin-right:10px; }
 .finding strong { font-size:11px; letter-spacing:.08em; }
 .finding p { margin:8px 0 0; color:#c8d1de; font-size:13px; line-height:1.4; }
+.state-card .finding-select { width:100%; padding:0; border:0; background:transparent; color:inherit; text-align:left; font:inherit; cursor:pointer; }
+.finding-select strong { display:block; }
+.review-evidence h4 { margin:16px 0 6px; font-size:12px; letter-spacing:.06em; text-transform:uppercase; }
+.review-evidence .evidence-note { margin:6px 0; padding:10px; border:1px solid #334557; border-radius:6px; }
 .eligibility { font-size:18px; font-weight:800; letter-spacing:.04em; color:#f1c978; }
 @media (max-width: 1100px) { .main-content { padding: 28px; } .workspace-grid { grid-template-columns:1fr; } }
 
@@ -150,6 +154,9 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-
 .finding { border-color: var(--line); background: var(--surface); color: var(--ink); border-radius: 6px; }
 .finding.selected { border-color: var(--ink); box-shadow: inset 3px 0 0 var(--ink); }
 .finding span, .finding em, .finding p { color: var(--muted); }
+.state-card .finding-select { color: var(--ink); background: transparent; border-color: transparent; }
+.state-card .finding-select:hover:not(:disabled) { background: transparent; border-color: transparent; }
+.review-evidence .evidence-note { border-color: var(--line); background: var(--surface-muted); }
 .eligibility { color: var(--ink); }
 
 .toast-region { position: fixed; z-index: 20; top: 20px; right: 24px; width: min(420px, calc(100vw - 48px)); display: grid; gap: 10px; }

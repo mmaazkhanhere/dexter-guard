@@ -33,7 +33,7 @@ export function EvaluationWorkspace() {
   const metric = (id: string) => metrics.find((item) => item.metricId === id);
 
   return <>
-    <WorkspaceHeader eyebrow="04 · EVALUATION" title="Measure reliability on synthetic scenarios" description="Metrics, denominators, provenance, latency, cost, burden, and failing cases are read from backend evaluation runs." />
+    <WorkspaceHeader eyebrow="03 · EVALUATION" title="Measure reliability on synthetic scenarios" description="Analyze benchmark cases, critical-error recall, false positives, latency, and verification performance from backend evaluation runs." />
     <StateCard title="Benchmark run">
       <select aria-label="Evaluation run" value={selected} onChange={(event) => setSelected(event.target.value)}>
         <option value="">Choose a saved run …</option>

@@ -5,6 +5,8 @@ import { StateCard } from "../../components/shared/StateCard";
 import { useToast } from "../../components/shared/Toaster";
 import { WorkspaceHeader } from "../../components/shared/WorkspaceHeader";
 import { useWorkspace } from "../../state/workspace";
+import type { Finding } from "../../api/types";
+import { projectSourceSpan } from "../verification/spans";
 
 export function ReviewWorkspace() {
   const { note: noteMaybe, draftContent, setDraftContent, applyNoteRevision } = useWorkspace();
@@ -20,18 +22,20 @@ export function ReviewWorkspace() {
   const [content, setContent] = useState(draftContent ?? noteMaybe?.content ?? "");
   const [reviewer, setReviewer] = useState("synthetic-reviewer");
   const [reason, setReason] = useState("");
+  const [selectedFindingId, setSelectedFindingId] = useState<string>();
 
   useEffect(() => {
     setContent(draftContent ?? review.data?.candidateNote ?? noteMaybe?.content ?? "");
   }, [draftContent, review.data?.candidateNote, noteMaybe?.content]);
 
-  if (!note) return <><WorkspaceHeader eyebrow="03 · HUMAN REVIEW" title="Resolve findings and approve safely" description="Edits create successor revisions. Approval remains controlled by the backend's latest complete-note verification." /><div className="empty-state">Create or import a note in Documentation first.</div></>;
+  if (!note) return <><WorkspaceHeader eyebrow="02 · HUMAN REVIEW" title="Resolve findings and approve safely" description="Edits create successor revisions. Approval remains controlled by the backend's latest complete-note verification." /><div className="empty-state">Create or import a note in Documentation first.</div></>;
 
   const context = review.data;
   const currentVerification = context?.fullVerification?.noteRevision === note.revision ? context.fullVerification : undefined;
   const staleContext = Boolean(context && context.latestRevision > note.revision);
   const approvalEligible = Boolean(context?.approvalEligible && currentVerification?.status === "VALID" && !verify.isPending && !save.isPending);
   const firstError = save.error ?? verify.error ?? decide.error ?? approve.error ?? reject.error;
+  const selectedFinding = context?.findings.find((finding) => finding.reviewFindingId === selectedFindingId) ?? context?.findings[0];
 
   async function saveRevision() {
     if (!content.trim() || content === note.content) return;
@@ -102,7 +106,7 @@ export function ReviewWorkspace() {
   }
 
   return <>
-    <WorkspaceHeader eyebrow="03 · HUMAN REVIEW" title="Resolve findings and approve safely" description="Edits create successor revisions. Approval remains controlled by the backend's latest complete-note verification." />
+    <WorkspaceHeader eyebrow="02 · HUMAN REVIEW" title="Resolve findings and approve safely" description="Resolve the findings identified in Documentation & Verification. Edits create successor revisions and preserve the linked source, note, and evidence." />
     {firstError && <div className="error-banner" role="alert">{safeMutationError(firstError).message}</div>}
     {staleContext && <div className="error-banner" role="status">This review result is stale for the current note revision. Refresh before taking an approval or decision action.</div>}
     <div className="workspace-grid">
@@ -120,8 +124,11 @@ export function ReviewWorkspace() {
         <div className="button-row"><button onClick={approveNote} disabled={!approvalEligible || approve.isPending}>{approve.isPending ? "Approving …" : "Approve"}</button><button className="danger-button" onClick={rejectNote} disabled={reject.isPending || reason.trim().length < 3}>Reject</button></div>
         <label>Rejection or suggestion rationale<input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Required for rejection/dispute" /></label>
       </StateCard>
+      <StateCard title="Evidence for the selected finding" description="Use this compact evidence view while editing. Detailed inspection remains in Documentation & Verification.">
+        <ReviewEvidence finding={selectedFinding} transcript={context?.transcriptText ?? ""} candidateNote={context?.candidateNote ?? note.content} />
+      </StateCard>
       <StateCard title="Finding decisions">
-        <div className="finding-list">{context?.findings.length ? context.findings.map((finding) => <div className="finding" key={finding.reviewFindingId}><span>{finding.reviewFindingId}</span><strong>{finding.state}</strong><p>{finding.explanation}</p><div className="button-row"><button className="secondary-button" onClick={() => recordDecision(finding.reviewFindingId, "ACKNOWLEDGED")}>Acknowledge</button><button className="secondary-button" onClick={() => recordDecision(finding.reviewFindingId, "DISPUTED")} disabled={reason.trim().length < 3}>Dispute</button></div></div>) : <p className="muted">No findings loaded for this revision.</p>}</div>
+        <div className="finding-list">{context?.findings.length ? context.findings.map((finding) => <div className={`finding ${selectedFinding?.reviewFindingId === finding.reviewFindingId ? "selected" : ""}`} key={finding.reviewFindingId}><button className="finding-select" onClick={() => setSelectedFindingId(finding.reviewFindingId)} aria-pressed={selectedFinding?.reviewFindingId === finding.reviewFindingId}><span>{finding.reviewFindingId}</span><strong>{finding.state} · {finding.severity}</strong><p>{finding.explanation}</p></button><div className="button-row"><button className="secondary-button" onClick={() => recordDecision(finding.reviewFindingId, "ACKNOWLEDGED")}>Acknowledge</button><button className="secondary-button" onClick={() => recordDecision(finding.reviewFindingId, "DISPUTED")} disabled={reason.trim().length < 3}>Dispute</button></div></div>) : <p className="muted">No findings loaded for this revision.</p>}</div>
       </StateCard>
       <StateCard title="Suggested corrections">
         <div className="finding-list">{context?.suggestions.length ? context.suggestions.map((suggestion) => <div className="finding" key={suggestion.suggestionId}><span>{suggestion.suggestionId}</span><strong>{suggestion.supportStatus}</strong><p>Replace the backend-provided span with: {suggestion.replacement}</p><div className="button-row"><button onClick={() => suggestionDecision(suggestion.findingId, suggestion.suggestionId, "SUGGESTION_ACCEPTED")} disabled={suggestion.supportStatus !== "USABLE" || decide.isPending}>Accept explicitly</button><button className="secondary-button" onClick={() => suggestionDecision(suggestion.findingId, suggestion.suggestionId, "SUGGESTION_REJECTED")} disabled={suggestion.supportStatus !== "USABLE" || decide.isPending || reason.trim().length < 3}>Reject with rationale</button></div></div>) : <p className="muted">No backend-supported suggestions are available for this revision.</p>}</div>
@@ -131,6 +138,22 @@ export function ReviewWorkspace() {
       </StateCard>
     </div>
   </>;
+}
+
+function ReviewEvidence({ finding, transcript, candidateNote }: { finding?: Finding; transcript: string; candidateNote: string }) {
+  if (!finding) return <p className="muted">No finding is available for this revision.</p>;
+  const claimText = finding.claimSpan ? projectNoteSpan(candidateNote, finding.claimSpan.startCodePoint, finding.claimSpan.endCodePointExclusive) : undefined;
+  const excerpts = finding.evidence.availability === "AVAILABLE" ? finding.evidence.spans
+    .filter((span) => span.sourceId === finding.sourceId && span.sourceVersion === finding.sourceVersion)
+    .map((span) => projectSourceSpan(transcript, span))
+    .filter((excerpt): excerpt is string => Boolean(excerpt)) : [];
+  return <div className="review-evidence"><div className="finding-summary"><span className="status-label">{finding.upstreamStatus ?? "REVIEW FINDING"}</span><span className="status-label">{finding.severity}</span><span className="status-label">{finding.origin}</span></div><p>{finding.explanation}</p><h4>Candidate note reference</h4><p className="evidence-note">{claimText ?? "No valid candidate-note span is available for this finding."}</p><h4>Source evidence</h4>{excerpts.length ? excerpts.map((excerpt, index) => <p className="evidence-note" key={`${finding.reviewFindingId}-${index}`}>{excerpt}</p>) : <p className="muted">Evidence is {finding.evidence.availability.toLowerCase()}; no source excerpt is shown.</p>}</div>;
+}
+
+function projectNoteSpan(text: string, start: number, end: number): string | undefined {
+  const codePoints = Array.from(text);
+  if (start < 0 || end <= start || end > codePoints.length) return undefined;
+  return codePoints.slice(start, end).join("");
 }
 
 function notifyFailure(notify: ReturnType<typeof useToast>["notify"], title: string, error: unknown, unchanged: string) {
