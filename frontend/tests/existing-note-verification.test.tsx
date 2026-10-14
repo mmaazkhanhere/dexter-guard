@@ -18,6 +18,23 @@ function renderPage() {
 }
 
 describe("existing-note verification", () => {
+  it("shows only the active generation or existing-note workflow", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith("/saved-examples")) return new Response("[]", { status: 200 });
+      return new Response(JSON.stringify({ code: "NOT_FOUND", message: "test route not found" }), { status: 404 });
+    }));
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(screen.getByRole("button", { name: "Generate note & verify" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Existing AI-generated note")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Verify Existing Note" }));
+
+    expect(screen.getByLabelText("Existing AI-generated note")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Generate note & verify" })).not.toBeInTheDocument();
+  });
+
   it("switches between documentation and verification workspaces instead of rendering both", async () => {
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
       if (String(input).endsWith("/saved-examples")) return new Response("[]", { status: 200 });
@@ -28,13 +45,13 @@ describe("existing-note verification", () => {
 
     expect(screen.getByRole("tab", { name: "Documentation" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByLabelText("German transcript")).toBeInTheDocument();
-    expect(screen.queryByRole("tabpanel", { name: "Verification results" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tabpanel", { name: "Verification" })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("tab", { name: "Verification results" }));
+    await user.click(screen.getByRole("tab", { name: "Verification" }));
 
-    expect(screen.getByRole("tab", { name: "Verification results" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Verification" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByLabelText("German transcript")).not.toBeInTheDocument();
-    expect(screen.getByRole("tabpanel", { name: "Verification results" })).toHaveTextContent("No candidate note is available yet");
+    expect(screen.getByRole("tabpanel", { name: "Verification" })).toHaveTextContent("No candidate note is available yet");
   });
 
   it("verifies the supplied note without generating a replacement and retains the review handoff", async () => {
@@ -52,9 +69,9 @@ describe("existing-note verification", () => {
     renderPage();
 
     await user.type(screen.getByLabelText("German transcript"), source.transcript_text);
-    await user.click(screen.getByRole("button", { name: "Use existing note" }));
+    await user.click(screen.getByRole("tab", { name: "Verify Existing Note" }));
     await user.type(screen.getByLabelText("Existing AI-generated note"), note.content);
-    await user.click(screen.getByRole("button", { name: "Verify existing note" }));
+    await user.click(screen.getByRole("button", { name: "Verify Note" }));
 
     await waitFor(() => expect(screen.getByText(/Candidate note.*existing-note-1.*IMPORTED/)).toBeInTheDocument());
     expect(screen.getByRole("button", { name: "Continue to Human Review" })).toBeInTheDocument();

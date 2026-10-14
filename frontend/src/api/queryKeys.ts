@@ -1,4 +1,5 @@
 export const queryKeys = {
+  health: ["health"] as const,
   examples: ["saved-examples"] as const,
   source: (id: string, version: number) => ["source", id, version] as const,
   note: (id: string, revision: number) => ["note", id, revision] as const,

@@ -15,7 +15,7 @@ The engine validates consistency, not clinical truth. A temperature, intake, blo
 
 ### In scope
 
-- Compare aligned scalar measurements: temperature, fluid intake, and medication quantities.
+- Compare aligned scalar measurements: temperature, pulse, fluid intake, and medication quantities.
 - Compare aligned blood-pressure composite measurements.
 - Normalize only listed compatible unit conversions and reject incompatible categories.
 - Validate structured input fields, identifiers, types, required references, permitted categories, and valid category/unit pairs.
@@ -102,7 +102,7 @@ As Specs 007 and 008, I need stable findings that can be rendered, reviewed, and
 - **FR-16:** Execute deterministic, versioned validations for contracts, numeric values, units, and source evidence references without probabilistic inference.
 - **DVE-001:** Each submitted alignment is one explicit, immutable preselected comparison pair: it references exactly one source fact and one claim whose resolved measurements have a shared category. Multiple alignment records MAY reference the same source fact or the same claim, supporting repeated observations and one-to-many representation without semantic matching. Only `ALIGNED` pairs are numerically compared. `UNAVAILABLE`, `AMBIGUOUS`, or `REJECTED` pairs emit one `ALIGN-001` `NOT_EVALUABLE` result with the matching stable reason and do not emit `NUM-001` through `NUM-005`. Unaligned selected facts or claims are outside that run's comparison scope; an unknown, duplicate, or internally inconsistent submitted alignment reference is rejected as a provenance error.
 - **DVE-002:** Canonical numeric parsing accepts only documented decimal representations (German comma or dot decimal separator; optional sign; no locale guessing). Parsing failure yields `STR-001`.
-- **DVE-003:** The Ruleset `DVE-RULESET-v1` permits only `TEMPERATURE`, `FLUID_INTAKE`, `MEDICATION_QUANTITY`, and `BLOOD_PRESSURE`. The reference-only public request cannot submit a category; when a referenced immutable source fact or claim resolves to an unknown category, the resolver rejects the run as `409/PROVENANCE_CONFLICT`. No unsupported category is silently compared.
+- **DVE-003:** The Ruleset `DVE-RULESET-v1` permits only `TEMPERATURE`, `PULSE`, `FLUID_INTAKE`, `MEDICATION_QUANTITY`, and `BLOOD_PRESSURE`. The reference-only public request cannot submit a category; when a referenced immutable source fact or claim resolves to an unknown category, the resolver rejects the run as `409/PROVENANCE_CONFLICT`. No unsupported category is silently compared.
 - **DVE-004:** Unit conversion is exact decimal arithmetic. v1 allows Celsius↔Celsius, millilitre↔litre for fluid volume, and milligram↔gram for medication mass. Category/unit pairing is defined in `data-model.md`; no implicit conversion is allowed.
 - **DVE-005:** Equal values after a permitted conversion yield no `NUM-001`. `NUM-002` may be retained as an internal rule-trace `PASS` for tests and diagnostics, but the public API exposes only `FAIL` and `NOT_EVALUABLE` findings and has no public pass-trace option. Default reviewer findings omit passes.
 - **DVE-006:** Incompatible dimensions yield `NUM-003`; unknown/invalid category-unit pairs yield `STR-003`, not a numeric mismatch.
@@ -164,6 +164,7 @@ Spec 005 does not expose a severity value. Spec 007 maps rule findings to the pr
 | --- | --- | --- |
 | AT-001 | Source `37,2 C`; claim `37.2 C` | No failure; equal canonical values. |
 | AT-002 | Source `37,2 C`; claim `38,2 C` | `FAIL`, `NUM-001`. |
+| AT-002a | Source pulse `83 Schläge pro Minute`; claim pulse `110 Schläge pro Minute` | `FAIL`, `NUM-001`. |
 | AT-003 | Source `0,5 L`; claim `500 ml` | No failure; valid `NUM-002` conversion. |
 | AT-004 | Source `500 ml`; claim `500 mg` | `FAIL`, `NUM-003`. |
 | AT-005 | Source `120/80 mmHg`; claim `140/80 mmHg` | `FAIL`, `NUM-005`; systolic named. |

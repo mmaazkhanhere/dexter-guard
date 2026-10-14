@@ -16,7 +16,12 @@ def test_composed_app_exposes_safe_health_and_synthetic_examples() -> None:
         cached_examples = client.get("/api/v1/saved-examples")
 
     assert health.status_code == 200
-    assert health.json() == {"status": "degraded", "database": "unavailable"}
+    assert health.json() == {
+        "status": "degraded",
+        "database": "unavailable",
+        "generationProvider": "OFFLINE_DEMO",
+        "verificationProvider": "OFFLINE_DEMO",
+    }
     assert examples.status_code == 200
     assert examples.json()
     assert all(item["syntheticOnly"] is True for item in examples.json())

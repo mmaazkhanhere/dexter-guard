@@ -247,6 +247,7 @@ The normative field definitions and persistence invariants are in `data-model.md
 | CLM-007 | `Temperatur 37,8 °C.` | One measurement/vital-sign claim whose raw value and unit are exact. |
 | CLM-008 | `Temperatur 37,8 °C.` | Numeric raw form is `37,8`; normalized decimal is `37.8`, without changing raw text. |
 | CLM-009 | `Hinweis auf Harnwegsinfekt.` | A clinical-conclusion claim is extracted; it has no evidence-validity field/status. |
+| CLM-008a | `Die Temperatur beträgt 37,2 C und der Puls liegt bei 83 Schlägen pro Minute.` | Two measurement claims, each with one independently addressable numeric value and valid note spans. |
 | CLM-010 | `Bewohnerin berichtet keine Schmerzen beim Transfer.` | Independently addressable report, symptom-negation, and transfer-context claims/spans may overlap when justified; no span corruption. |
 | CLM-011 | A note is edited after initial extraction. | Old claims remain tied only to old revision; latest revision has a newly extracted result. |
 | CLM-012 | Model returns invalid JSON or a span that does not match text. | `FAILED`, explicit error, no partial claims persisted/returned. |

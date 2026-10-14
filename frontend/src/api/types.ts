@@ -4,6 +4,7 @@ type Schema = components["schemas"];
 export type Classification = "SUPPORTED" | "UNSUPPORTED" | "CONTRADICTED" | "UNCERTAIN";
 export type Severity = "CRITICAL" | "MAJOR" | "MINOR";
 export type SourceDocument = Schema["SourceDocument"];
+export type Health = Schema["Health"];
 export type SavedExample = Schema["SavedExample"];
 export type NursingFact = Schema["NursingFact"];
 export type NoteResponse = Schema["NoteResponse"];

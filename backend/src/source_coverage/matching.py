@@ -181,6 +181,7 @@ def _attribute_differences(fact: SourceFact, claim: Claim) -> tuple[tuple[Materi
             "C": (Decimal("1"), "CELSIUS"),
             "CELSIUS": (Decimal("1"), "CELSIUS"),
             "MMHG": (Decimal("1"), "MMHG"),
+            "BEATS_PER_MINUTE": (Decimal("1"), "BEATS_PER_MINUTE"),
         }
         conversion = factors.get(unit)
         return None if conversion is None else (value * conversion[0], conversion[1])

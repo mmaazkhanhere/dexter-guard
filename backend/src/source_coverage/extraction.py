@@ -114,7 +114,12 @@ def validate_extraction_result(result: SourceFactExtractionResult, source: Sourc
 
 
 _CLAUSE_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-ZÄÖÜ])|\s*;\s*|\s+und\s+(?=(?:die |der |das |es |sie |er |wurde |wurden |kann |benötigt))", re.IGNORECASE)
-_MEASUREMENT = re.compile(r"(?:temperatur|fieber)\s*(?:von\s*)?(ca\.\s*)?(-?\d+(?:[,.]\d+)?)\s*(°?c|grad|°celsius|celsius)", re.IGNORECASE)
+_MEASUREMENT = re.compile(
+    r"(?:(?:temperatur|fieber)\s*(?:(?:von|betr\u00e4gt)\s*)?|(?:puls|herzfrequenz)\s*(?:(?:liegt\s+)?bei\s*)?)"
+    r"(?P<approximation>ca\.\s*)?(?P<value>-?\d+(?:[,.]\d+)?)\s*"
+    r"(?P<unit>\u00b0?c|grad|\u00b0celsius|celsius|bpm|schl(?:\u00e4|ae)ge[n]?\s+pro\s+minute)",
+    re.IGNORECASE,
+)
 _TIME = re.compile(r"\b(?:um|gegen)\s+(\d{1,2}:\d{2})\s*uhr\b|\b(heute|gestern|morgen|seit\s+[^,.!?]+)", re.IGNORECASE)
 _LEFT = re.compile(r"\b(?:links(?:seitig(?:e|en|em)?)?|linken?|linker)\b", re.IGNORECASE)
 _RIGHT = re.compile(r"\b(?:rechts(?:seitig(?:e|en|em)?)?|rechten?|rechter)\b", re.IGNORECASE)
@@ -179,7 +184,7 @@ def _make_fact(source: SourceDocument, run_id: str, start: int, end: int, clause
     if category is SourceFactCategory.OBSERVATION and certainty is Certainty.UNCERTAIN:
         expectation, policy_key = expectation_for(SourceFactCategory.SYMPTOM, explicit_uncertainty=True)
     return SourceFact(
-        sourceFactId=f"{run_id}:fact-{start}", sourceFactExtractionRunId=run_id,
+        sourceFactId=f"{run_id}:fact-{start}-{end}", sourceFactExtractionRunId=run_id,
         sourceId=source.source_id, sourceVersion=source.source_version, residentContext=_context(source),
         sourceTextHash=source_text_hash(source.transcript_text), normalizationPolicy=NORMALIZATION_POLICY,
         category=category, factText=clause, subject=_subject(clause),
@@ -206,7 +211,23 @@ class HeuristicGermanSourceFactExtractor:
         unresolved: list[UnresolvedSourceItem] = []
         for start, end, clause in _find_clauses(source.transcript_text):
             lower = clause.casefold()
-            measurement = _MEASUREMENT.search(clause)
+            measurements = list(_MEASUREMENT.finditer(clause))
+            if measurements:
+                for measurement in measurements:
+                    raw_unit = measurement.group("unit").casefold().replace("°", "")
+                    unit = "BEATS_PER_MINUTE" if raw_unit.startswith(("bpm", "schl")) else {
+                        "c": "CELSIUS",
+                        "celsius": "CELSIUS",
+                        "grad": "CELSIUS",
+                        "bpm": "BEATS_PER_MINUTE",
+                        "schläge pro minute": "BEATS_PER_MINUTE",
+                        "schlaege pro minute": "BEATS_PER_MINUTE",
+                    }[raw_unit]
+                    facts.append(_make_fact(source, run_id, start, end, clause, SourceFactCategory.MEASUREMENT,
+                                            numeric=measurement.group("value").replace(",", "."), unit=unit,
+                                            approximation=Approximation.APPROXIMATE if measurement.group("approximation") else Approximation.EXACT))
+                continue
+            measurement = None
             if not measurement:
                 measurement = re.search(
                     r"(?:(?:trank|getrunken|aufnahme|menge|dosis|erhielt|verabreicht)\s*)"

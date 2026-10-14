@@ -274,6 +274,26 @@ def test_missing_note_measurement_fails_closed_instead_of_skipping_numeric_valid
     assert context.json()["approvalEligible"] is False
 
 
+def test_compound_vital_signs_preserve_pulse_for_numeric_validation() -> None:
+    app = create_app()
+    client = TestClient(app)
+    source_text = "Die Temperatur betr\u00e4gt 37,2 C und der Puls liegt bei 83 Schl\u00e4gen pro Minute."
+    note_text = "Die Temperatur betr\u00e4gt 37,2 C und der Puls liegt bei 110 Schl\u00e4gen pro Minute."
+    _, note = _import_note(client, source_text, "pulse-mismatch", content=note_text)
+
+    verification = _verify(client, note, "pulse-mismatch")
+    context = client.get(f"/api/v1/reviews/{note['noteId']}")
+
+    assert verification["status"] == "VALID"
+    assert context.status_code == 200
+    numeric = next(
+        item for item in context.json()["findings"]
+        if item["origin"] == "SPEC_005" and item["ruleCode"] == "NUM-001"
+    )
+    assert "Expected: 83; observed: 110." in numeric["explanation"]
+    assert context.json()["approvalEligible"] is False
+
+
 def test_complete_workflow_calls_real_components_in_order(monkeypatch) -> None:
     app = create_app()
     client = TestClient(app)

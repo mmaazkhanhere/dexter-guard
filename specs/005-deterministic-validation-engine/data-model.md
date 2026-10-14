@@ -23,8 +23,8 @@
 AlignmentStatus = ALIGNED | UNAVAILABLE | AMBIGUOUS | REJECTED
 Outcome         = PASS | FAIL | NOT_EVALUABLE
 Approximation   = EXACT | APPROXIMATE | UNSPECIFIED
-Category        = TEMPERATURE | FLUID_INTAKE | MEDICATION_QUANTITY | BLOOD_PRESSURE
-Unit            = CELSIUS | MILLILITRE | LITRE | MILLIGRAM | GRAM | MMHG
+Category        = TEMPERATURE | PULSE | FLUID_INTAKE | MEDICATION_QUANTITY | BLOOD_PRESSURE
+Unit            = CELSIUS | BEATS_PER_MINUTE | MILLILITRE | LITRE | MILLIGRAM | GRAM | MMHG
 ```
 
 `ALIGN-001` is the rule result for a non-`ALIGNED` `AlignmentStatus`; it is not a semantic evidence classification. Alignments are preselected comparison pairs, not a claim-coverage assertion or a semantic lookup request.
@@ -34,6 +34,7 @@ Unit            = CELSIUS | MILLILITRE | LITRE | MILLIGRAM | GRAM | MMHG
 | Category | Accepted v1 units | Canonical unit | Value shape |
 | --- | --- | --- | --- |
 | `TEMPERATURE` | `CELSIUS` | `CELSIUS` | exact decimal scalar |
+| `PULSE` | `BEATS_PER_MINUTE` | `BEATS_PER_MINUTE` | exact decimal scalar |
 | `FLUID_INTAKE` | `MILLILITRE`, `LITRE` | `MILLILITRE` | exact decimal scalar |
 | `MEDICATION_QUANTITY` | `MILLIGRAM`, `GRAM` | `MILLIGRAM` | exact decimal scalar |
 | `BLOOD_PRESSURE` | `MMHG` | `MMHG` | `{ systolic: positive integer, diastolic: positive integer }` |

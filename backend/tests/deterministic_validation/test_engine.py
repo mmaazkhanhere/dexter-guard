@@ -70,6 +70,16 @@ def test_numeric_mismatch_is_one_traceable_num001() -> None:
     assert result[0].evidence_reference_ids == ("evidence-1",)
 
 
+def test_pulse_mismatch_is_a_scalar_numeric_failure() -> None:
+    result = findings(
+        fact("83", category="PULSE", unit="BEATS_PER_MINUTE"),
+        claim("110", category="PULSE", unit="BEATS_PER_MINUTE"),
+    )
+    assert [(item.rule_id, item.expected_value, item.observed_value, item.unit) for item in result] == [
+        ("NUM-001", "83", "110", "BEATS_PER_MINUTE"),
+    ]
+
+
 def test_fluid_litre_and_millilitre_are_equal_after_decimal_conversion() -> None:
     result = findings(fact("0,5", category="FLUID_INTAKE", unit="LITRE"), claim("500", category="FLUID_INTAKE", unit="MILLILITRE"))
     assert result == ()

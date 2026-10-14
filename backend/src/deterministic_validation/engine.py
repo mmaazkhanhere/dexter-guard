@@ -20,12 +20,14 @@ _CATEGORY_UNITS: dict[MeasurementCategory, frozenset[Unit]] = {
     MeasurementCategory.FLUID_INTAKE: frozenset({Unit.MILLILITRE, Unit.LITRE}),
     MeasurementCategory.MEDICATION_QUANTITY: frozenset({Unit.MILLIGRAM, Unit.GRAM}),
     MeasurementCategory.BLOOD_PRESSURE: frozenset({Unit.MMHG}),
+    MeasurementCategory.PULSE: frozenset({Unit.BEATS_PER_MINUTE}),
 }
 _CANONICAL_UNITS = {
     MeasurementCategory.TEMPERATURE: Unit.CELSIUS,
     MeasurementCategory.FLUID_INTAKE: Unit.MILLILITRE,
     MeasurementCategory.MEDICATION_QUANTITY: Unit.MILLIGRAM,
     MeasurementCategory.BLOOD_PRESSURE: Unit.MMHG,
+    MeasurementCategory.PULSE: Unit.BEATS_PER_MINUTE,
 }
 _CONVERSION_FACTORS = {
     (Unit.MILLILITRE, Unit.MILLILITRE): Decimal("1"),
@@ -34,6 +36,7 @@ _CONVERSION_FACTORS = {
     (Unit.GRAM, Unit.MILLIGRAM): Decimal("1000"),
     (Unit.CELSIUS, Unit.CELSIUS): Decimal("1"),
     (Unit.MMHG, Unit.MMHG): Decimal("1"),
+    (Unit.BEATS_PER_MINUTE, Unit.BEATS_PER_MINUTE): Decimal("1"),
 }
 
 

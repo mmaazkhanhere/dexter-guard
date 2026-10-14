@@ -441,6 +441,10 @@ export interface components {
             status: "ok" | "degraded";
             /** @enum {string} */
             database: "ready" | "unavailable";
+            /** @enum {string} */
+            generationProvider: "LIVE_AI" | "OFFLINE_DEMO";
+            /** @enum {string} */
+            verificationProvider: "LIVE_AI" | "OFFLINE_DEMO";
         };
         /** @description Exactly one synthetic resident test identifier. */
         ResidentTestId: string;

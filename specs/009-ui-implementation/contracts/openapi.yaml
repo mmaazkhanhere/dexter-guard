@@ -486,8 +486,10 @@ components:
         syntheticOnly: { type: boolean, const: true }
     Health:
       type: object
-      required: [status, database]
+      required: [status, database, generationProvider, verificationProvider]
       properties:
         status: { type: string, enum: [ok, degraded] }
         database: { type: string, enum: [ready, unavailable] }
+        generationProvider: { type: string, enum: [LIVE_AI, OFFLINE_DEMO] }
+        verificationProvider: { type: string, enum: [LIVE_AI, OFFLINE_DEMO] }
 

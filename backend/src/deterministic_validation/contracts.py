@@ -36,6 +36,7 @@ class MeasurementCategory(StrEnum):
     FLUID_INTAKE = "FLUID_INTAKE"
     MEDICATION_QUANTITY = "MEDICATION_QUANTITY"
     BLOOD_PRESSURE = "BLOOD_PRESSURE"
+    PULSE = "PULSE"
 
 
 class Unit(StrEnum):
@@ -45,6 +46,7 @@ class Unit(StrEnum):
     MILLIGRAM = "MILLIGRAM"
     GRAM = "GRAM"
     MMHG = "MMHG"
+    BEATS_PER_MINUTE = "BEATS_PER_MINUTE"
 
 
 class AlignmentStatus(StrEnum):
@@ -98,6 +100,7 @@ class ScalarMeasurement(_Contract):
         MeasurementCategory.TEMPERATURE,
         MeasurementCategory.FLUID_INTAKE,
         MeasurementCategory.MEDICATION_QUANTITY,
+        MeasurementCategory.PULSE,
     ]
     value: StrictStr
     unit: Unit

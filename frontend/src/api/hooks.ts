@@ -2,8 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, idempotencyKey } from "./client";
 import { normalizeApiError } from "./errors";
 import { queryKeys } from "./queryKeys";
-import type { AuditResponse, EvaluationRun, EvaluationSummary, NoteDisposition, NoteResponse, ReviewContext, ReviewDecision, SavedExample, SourceDocument } from "./types";
+import type { AuditResponse, EvaluationRun, EvaluationSummary, Health, NoteDisposition, NoteResponse, ReviewContext, ReviewDecision, SavedExample, SourceDocument } from "./types";
 
+export function useHealth() { return useQuery({ queryKey: queryKeys.health, queryFn: () => apiRequest<Health>("/health"), staleTime: 60_000 }); }
 export function useSavedExamples() { return useQuery({ queryKey: queryKeys.examples, queryFn: () => apiRequest<SavedExample[]>("/saved-examples") }); }
 export function useSource(id?: string, version?: number) { return useQuery({ queryKey: id && version ? queryKeys.source(id, version) : ["source", "none"], queryFn: () => apiRequest<SourceDocument>(`/sources/${id}/versions/${version}`), enabled: Boolean(id && version) }); }
 export function useReview(noteId?: string, revision?: number) { return useQuery({ queryKey: noteId ? queryKeys.review(noteId, revision) : ["review", "none"], queryFn: () => apiRequest<ReviewContext>(`/reviews/${noteId}${revision ? `?revision=${revision}` : ""}`), enabled: Boolean(noteId) }); }

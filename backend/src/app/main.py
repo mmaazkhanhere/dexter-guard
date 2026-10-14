@@ -30,6 +30,7 @@ from human_review.repository import InMemoryReviewRepository
 from human_review.service import ReviewService
 from nursing_notes.repository import InMemoryNoteRepository
 from nursing_notes.service import NursingNoteService
+from nursing_notes.adapters import UnavailableGenerationAdapter
 from .postgres import PostgresPersistence, create_postgres_persistence
 from source_ingestion.app import create_app as create_source_app
 from source_ingestion.contracts import CreateSourceRequest, SourceDocument
@@ -163,10 +164,11 @@ def create_app() -> FastAPI:
     source_service = SourceIngestionService(repository=source_repository) if source_repository is not None else SourceIngestionService()
     review_service = ReviewService(repository=review_repository)
     evidence_verifier = evidence_verifier_from_environment()
+    generation_adapter = generation_adapter_from_environment()
     note_service = ReviewAwareNoteService(
         source_service,
         repository=note_repository,
-        generation_adapter=generation_adapter_from_environment(),
+        generation_adapter=generation_adapter,
         review_service=review_service,
     )
     review_service.attach_note_revision_writer(note_service.create_revision)
@@ -236,7 +238,12 @@ def create_app() -> FastAPI:
     @app.get("/api/v1/health", tags=["health"])
     def health() -> dict[str, str]:
         database_ready = persistence.check() if persistence is not None else False
-        return {"status": "ok" if database_ready else "degraded", "database": "ready" if database_ready else "unavailable"}
+        return {
+            "status": "ok" if database_ready else "degraded",
+            "database": "ready" if database_ready else "unavailable",
+            "generationProvider": "OFFLINE_DEMO" if isinstance(generation_adapter, UnavailableGenerationAdapter) else "LIVE_AI",
+            "verificationProvider": "OFFLINE_DEMO" if evidence_verifier is None else "LIVE_AI",
+        }
 
     @app.post("/api/v1/sources", response_model=SourceDocument, status_code=status.HTTP_201_CREATED)
     def create_v1_source(payload: CreateSourceRequest) -> SourceDocument:

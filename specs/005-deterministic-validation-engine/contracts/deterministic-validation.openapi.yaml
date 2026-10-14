@@ -105,9 +105,9 @@ components:
       additionalProperties: false
       required: [category, value, unit, approximation]
       properties:
-        category: { enum: [TEMPERATURE, FLUID_INTAKE, MEDICATION_QUANTITY] }
+        category: { enum: [TEMPERATURE, PULSE, FLUID_INTAKE, MEDICATION_QUANTITY] }
         value: { type: string }
-        unit: { enum: [CELSIUS, MILLILITRE, LITRE, MILLIGRAM, GRAM, MMHG] }
+        unit: { enum: [CELSIUS, BEATS_PER_MINUTE, MILLILITRE, LITRE, MILLIGRAM, GRAM, MMHG] }
         approximation: { enum: [EXACT, APPROXIMATE, UNSPECIFIED] }
     BloodPressureMeasurement:
       type: object
@@ -125,7 +125,7 @@ components:
             # domain validator requires a positive integer for both fields.
             systolic: { type: [integer, string], description: "Must parse as a positive integer; invalid or non-positive values yield STR-001." }
             diastolic: { type: [integer, string], description: "Must parse as a positive integer; invalid or non-positive values yield STR-001." }
-        unit: { enum: [CELSIUS, MILLILITRE, LITRE, MILLIGRAM, GRAM, MMHG] }
+        unit: { enum: [CELSIUS, BEATS_PER_MINUTE, MILLILITRE, LITRE, MILLIGRAM, GRAM, MMHG] }
         approximation: { enum: [EXACT, APPROXIMATE, UNSPECIFIED] }
     SourceFact:
       type: object

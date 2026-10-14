@@ -36,20 +36,20 @@ describe("documentation and verification workflow", () => {
     await user.clear(screen.getByLabelText("Synthetic resident identifier"));
     await user.type(screen.getByLabelText("Synthetic resident identifier"), source.resident_test_id);
     await user.type(screen.getByLabelText("German transcript"), source.transcript_text);
-    await user.click(screen.getByRole("button", { name: "Generate & Verify" }));
+    await user.click(screen.getByRole("button", { name: "Generate note & verify" }));
 
     await waitFor(() => expect(screen.getByText("Verification completed")).toBeInTheDocument());
-    expect(screen.getByText("Review the findings before approval; the note is not yet eligible for approval.")).toBeInTheDocument();
+    expect(screen.getByText("The verification run completed; this does not mean every statement is factually verified. Review findings before Human Review and approval.")).toBeInTheDocument();
     expect(screen.getByLabelText("German transcript")).toHaveAttribute("readonly");
     expect(screen.getByRole("button", { name: "Continue to Human Review" })).toBeInTheDocument();
-    await user.click(screen.getByRole("tab", { name: "Verification results" }));
+    await user.click(screen.getByRole("tab", { name: "Verification" }));
     expect(screen.getByText("Read-only candidate note")).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "Documentation" }));
     expect(fetchMock.mock.calls.filter(([input, request]) => String(input).endsWith("/sources") && request?.method === "POST")).toHaveLength(1);
     expect(fetchMock.mock.calls.filter(([input, request]) => String(input).endsWith("/notes/generate") && request?.method === "POST")).toHaveLength(1);
     expect(fetchMock.mock.calls.filter(([input, request]) => String(input).includes("/full-verifications") && request?.method === "POST")).toHaveLength(1);
 
-    await user.click(screen.getByRole("button", { name: "Generate & Verify" }));
+    await user.click(screen.getByRole("button", { name: "Generate note & verify" }));
     await waitFor(() => expect(screen.getByText("Existing note reused")).toBeInTheDocument());
     expect(fetchMock.mock.calls.filter(([input, request]) => String(input).endsWith("/notes/generate") && request?.method === "POST")).toHaveLength(1);
     expect(fetchMock.mock.calls.filter(([input, request]) => String(input).includes("/full-verifications") && request?.method === "POST")).toHaveLength(1);

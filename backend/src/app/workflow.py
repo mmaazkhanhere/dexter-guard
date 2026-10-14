@@ -65,12 +65,18 @@ class HeuristicClaimProvider:
     without changing the orchestration ports.
     """
 
-    provider_version = "heuristic-claim-provider-v1"
+    provider_version = "heuristic-claim-provider-v2"
     model_version = None
     prompt_version = "claim-extraction-heuristic-v1"
 
     _sentences = re.compile(r"[^.!?\r\n]+(?:[.!?]|$)")
-    _number = re.compile(r"(?P<value>\d+(?:[.,]\d+)?)\s*(?P<unit>°?C|ml|l|mg|g|mmHg)", re.IGNORECASE)
+    _number = re.compile(
+        r"(?P<value>\d+(?:[.,]\d+)?)\s*(?P<unit>\u00b0?C|grad\s+celsius|celsius|grad|mmHg|ml|mg|bpm|schl(?:\u00e4|ae)ge[n]?\s+pro\s+minute|l\b|g\b)",
+        re.IGNORECASE,
+    )
+    _coordinator = re.compile(r"\s+(?:und|sowie)\s+", re.IGNORECASE)
+    _predicate = re.compile(r"\b(?:ist|sind|war|waren|hat|haben|zeigt|zeigen|berichtet|klagt|wurde|wurden|erhielt|verabreicht|beträgt|liegt)\b", re.IGNORECASE)
+    _atomic_continuation = re.compile(r"\b(?:wach|orientiert|ruhig|unruhig|schmerz|schwindel|übelkeit|uebelkeit|atemnot|husten|gewaschen|gelagert|unterstützt|unterstuetzt)\w*\b", re.IGNORECASE)
 
     def extract(
         self,
@@ -96,6 +102,48 @@ class HeuristicClaimProvider:
                 start += len(prefix)
                 statement = note_text[start:end].lstrip()
                 start = end - len(statement)
+            segments = self._atomic_segments(statement, start)
+            for segment_start, segment_end, segment in segments:
+                claims.append(self._claim(
+                    note_text, segment_start, segment_end, segment, revision_id, resident_id, len(claims) + 1,
+                ))
+        return {"claims": claims}
+
+    @classmethod
+    def _atomic_segments(cls, statement: str, start: int) -> list[tuple[int, int, str]]:
+        """Split only coordinated, independently checkable assertions.
+
+        Multiple measured values are always separate claims.  A limited set of
+        coordinated observation/action continuations is also split so the local
+        fallback meets the atomic-claim contract without inventing text.
+        """
+        separators = list(cls._coordinator.finditer(statement))
+        if not separators:
+            return [(start, start + len(statement), statement)]
+        raw_parts: list[tuple[int, int, str]] = []
+        cursor = 0
+        for separator in separators:
+            raw_parts.append((cursor, separator.start(), statement[cursor:separator.start()]))
+            cursor = separator.end()
+        raw_parts.append((cursor, len(statement), statement[cursor:]))
+        parts = []
+        for raw_start, raw_end, raw in raw_parts:
+            leading = len(raw) - len(raw.lstrip())
+            text = raw.strip()
+            if text:
+                absolute_start = start + raw_start + leading
+                parts.append((absolute_start, absolute_start + len(text), text))
+        if len(parts) < 2:
+            return [(start, start + len(statement), statement)]
+        measurement_count = len(list(cls._number.finditer(statement)))
+        coordinated_assertions = bool(cls._predicate.search(parts[0][2])) and all(
+            cls._predicate.search(part[2]) or cls._atomic_continuation.search(part[2])
+            for part in parts[1:]
+        )
+        return parts if measurement_count >= 2 or coordinated_assertions else [(start, start + len(statement), statement)]
+
+    @classmethod
+    def _claim(cls, note_text: str, start: int, end: int, statement: str, revision_id: str, resident_id: str, ordinal: int) -> dict[str, object]:
             statement_span = make_text_span(note_text, start, end)
             lower = statement.casefold()
             polarity = "NEGATED" if re.search(r"\b(?:kein|keine|keinen|nicht|verneint|ohne)\b", lower) else "AFFIRMED"
@@ -105,7 +153,7 @@ class HeuristicClaimProvider:
             category = "OBSERVATION"
             if re.search(r"\b(?:schmerz|schmerzen|schwindel|übelkeit|uebelkeit|müde|muede|atemnot|husten)\w*\b", lower):
                 category = "SYMPTOM"
-            number = self._number.search(statement)
+            number = cls._number.search(statement)
             numeric_values: list[dict[str, object]] = []
             if number:
                 category = "NUTRITION_HYDRATION" if number.group("unit").casefold() in {"ml", "l"} else "MEASUREMENT"
@@ -114,9 +162,12 @@ class HeuristicClaimProvider:
                 unit_start = start + number.start("unit")
                 unit_end = start + number.end("unit")
                 unit_raw = number.group("unit")
-                unit_normalized = {
+                unit_normalized = "BEATS_PER_MINUTE" if unit_raw.casefold().startswith(("bpm", "schl")) else {
                     "ml": "MILLILITRE", "l": "LITRE", "mg": "MILLIGRAM", "g": "GRAM",
-                    "mmhg": "MMHG", "c": "CELSIUS", "°c": "CELSIUS",
+                    "mmhg": "MMHG", "c": "CELSIUS", "°c": "CELSIUS", "grad": "CELSIUS",
+                    "grad celsius": "CELSIUS", "celsius": "CELSIUS",
+                    "bpm": "BEATS_PER_MINUTE", "schläge pro minute": "BEATS_PER_MINUTE",
+                    "schlaege pro minute": "BEATS_PER_MINUTE",
                 }[unit_raw.casefold()]
                 numeric_values.append({
                     "raw": number.group("value"),
@@ -128,10 +179,10 @@ class HeuristicClaimProvider:
                     "unitSpan": make_text_span(note_text, unit_start, unit_end).model_dump(by_alias=True),
                 })
             claim: dict[str, object] = {
-                "id": f"{revision_id}:c{len(claims) + 1}",
+                "id": f"{revision_id}:c{ordinal}",
                 "noteRevisionId": revision_id,
                 "residentTestId": resident_id,
-                "ordinal": len(claims) + 1,
+                "ordinal": ordinal,
                 "category": category,
                 "statementSpan": statement_span.model_dump(by_alias=True),
                 "claimText": statement,
@@ -149,8 +200,7 @@ class HeuristicClaimProvider:
                 cue = re.search(certainty_match.group(0), statement, re.IGNORECASE)
                 if cue:
                     claim["certaintyCue"] = make_text_span(note_text, start + cue.start(), start + cue.end()).model_dump(by_alias=True)
-            claims.append(claim)
-        return {"claims": claims}
+            return claim
 
 
 class OfflineSemanticEvidenceProvider:
@@ -495,6 +545,7 @@ class WorkflowVerificationPorts:
                 "MILLIGRAM": {"MILLIGRAM", "GRAM"},
                 "GRAM": {"MILLIGRAM", "GRAM"},
                 "MMHG": {"MMHG"},
+                "BEATS_PER_MINUTE": {"BEATS_PER_MINUTE"},
             }
             comparable = any(
                 (value.unit_normalized or "").upper() in compatible_units.get(expected_unit, set())
@@ -629,7 +680,7 @@ class ReliabilityWorkflow:
 
 def _deterministic_records(source, note_id: str, revision: int, extraction: SourceFactExtractionResult, claims):
     """Translate comparable numeric records into the deterministic engine contract."""
-    unit_map = {"CELSIUS": (MeasurementCategory.TEMPERATURE, Unit.CELSIUS), "ML": (MeasurementCategory.FLUID_INTAKE, Unit.MILLILITRE), "MILLILITRE": (MeasurementCategory.FLUID_INTAKE, Unit.MILLILITRE), "L": (MeasurementCategory.FLUID_INTAKE, Unit.LITRE), "LITRE": (MeasurementCategory.FLUID_INTAKE, Unit.LITRE), "MG": (MeasurementCategory.MEDICATION_QUANTITY, Unit.MILLIGRAM), "MILLIGRAM": (MeasurementCategory.MEDICATION_QUANTITY, Unit.MILLIGRAM), "G": (MeasurementCategory.MEDICATION_QUANTITY, Unit.GRAM), "GRAM": (MeasurementCategory.MEDICATION_QUANTITY, Unit.GRAM), "MMHG": (MeasurementCategory.BLOOD_PRESSURE, Unit.MMHG)}
+    unit_map = {"CELSIUS": (MeasurementCategory.TEMPERATURE, Unit.CELSIUS), "ML": (MeasurementCategory.FLUID_INTAKE, Unit.MILLILITRE), "MILLILITRE": (MeasurementCategory.FLUID_INTAKE, Unit.MILLILITRE), "L": (MeasurementCategory.FLUID_INTAKE, Unit.LITRE), "LITRE": (MeasurementCategory.FLUID_INTAKE, Unit.LITRE), "MG": (MeasurementCategory.MEDICATION_QUANTITY, Unit.MILLIGRAM), "MILLIGRAM": (MeasurementCategory.MEDICATION_QUANTITY, Unit.MILLIGRAM), "G": (MeasurementCategory.MEDICATION_QUANTITY, Unit.GRAM), "GRAM": (MeasurementCategory.MEDICATION_QUANTITY, Unit.GRAM), "MMHG": (MeasurementCategory.BLOOD_PRESSURE, Unit.MMHG), "BEATS_PER_MINUTE": (MeasurementCategory.PULSE, Unit.BEATS_PER_MINUTE)}
     pairs = []
     for fact in extraction.facts:
         if not fact.numeric_value or not fact.unit or fact.unit.upper() not in unit_map:
@@ -647,6 +698,7 @@ def _deterministic_records(source, note_id: str, revision: int, extraction: Sour
                 "MILLIGRAM": {"MILLIGRAM", "GRAM"},
                 "GRAM": {"MILLIGRAM", "GRAM"},
                 "MMHG": {"MMHG"},
+                "BEATS_PER_MINUTE": {"BEATS_PER_MINUTE"},
             }
             if claim_unit in compatible_units.get(unit.value, set()):
                 pairs.append((fact, claim, category, unit, value))
