@@ -20,6 +20,11 @@ button, textarea { font: inherit; }
 .workflow-step + .workflow-step { margin-top: 28px; padding-top: 28px; border-top: 1px solid #2b3a4a; }
 .workflow-step h4 { margin: 0 0 8px; font-size: 17px; }
 .workflow-step-description { margin: 0 0 18px; color: #9baabd; line-height: 1.55; }
+.example-preview { margin: 14px 0; padding: 14px 16px; border: 1px solid #2b3a4a; border-radius: 8px; background: rgba(20,29,40,.5); }
+.example-preview-header { display: flex; align-items: baseline; gap: 10px; padding-bottom: 10px; border-bottom: 1px solid #2b3a4a; }
+.example-preview-header span { color: #9baabd; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.example-preview-header strong { font-size: 13px; }
+.example-preview-text { margin: 12px 0 0; color: #c8d1de; white-space: pre-wrap; line-height: 1.6; }
 .workspace-header h2 { margin: 8px 0; font-size:32px; letter-spacing:-.02em; }
 .workspace-header p, .muted { color:#9baabd; line-height:1.55; }
 .workspace-grid { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:18px; }
@@ -104,6 +109,14 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-
 .verification-results-header p { color: var(--muted); }
 .workflow-step + .workflow-step { border-top-color: var(--line); }
 .workflow-step-description { color: var(--muted); }
+.example-preview { border-color: var(--line); background: var(--surface); }
+.example-preview-header { border-bottom-color: var(--line); }
+.example-preview-header span { color: var(--muted); }
+.example-preview-text { color: var(--ink); }
+.loading-indicator { display: inline-flex; align-items: center; gap: 8px; }
+.loading-spinner { width: 14px; height: 14px; display: inline-block; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: loading-spin .7s linear infinite; }
+.loading-message { margin: 12px 0; }
+@keyframes loading-spin { to { transform: rotate(360deg); } }
 .state-card h3, .state-card label { color: var(--ink); }
 .state-card-description { color: var(--muted); }
 .field-description { color: var(--muted); }

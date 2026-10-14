@@ -58,36 +58,85 @@ class ReviewAwareNoteService(NursingNoteService):
         return self._register(super().import_note(payload))
 
 
+_DOCUMENTATION_EXAMPLES = (
+    (
+        "Guter Schlaf und ausreichendes Trinken",
+        "Die Bewohnerin berichtet, in der vergangenen Nacht gut und ohne längere Unterbrechungen geschlafen zu haben. Sie ist am Morgen wach, ansprechbar und orientiert. Im Verlauf des Vormittags trinkt sie selbstständig mehrere Schlucke Wasser; eine genaue Trinkmenge liegt zu diesem Zeitpunkt noch nicht vor.",
+    ),
+    (
+        "Schmerzfreiheit auf Nachfrage",
+        "Bei der morgendlichen Befragung verneint die Bewohnerin Schmerzen. Sie beschreibt weder Schmerzen in Ruhe noch Beschwerden bei der Bewegung im Bett. Die Bewohnerin wirkt entspannt und bittet nicht um ein Schmerzmittel.",
+    ),
+    (
+        "Morgendliche Temperaturkontrolle",
+        "Bei der morgendlichen Kontrolle wird eine Körpertemperatur von 37,2 °C gemessen. Die Messung erfolgt in Ruhe. Die Bewohnerin wirkt insgesamt stabil und berichtet über kein Kälte- oder Hitzegefühl.",
+    ),
+    (
+        "Dokumentierte Trinkmenge",
+        "Bis 10:00 Uhr trinkt die Bewohnerin insgesamt 500 ml Wasser und Tee. Sie nimmt die Getränke selbstständig zu sich und bittet einmal um Unterstützung beim Öffnen des Bechers. Übelkeit oder Erbrechen werden nicht beobachtet.",
+    ),
+    (
+        "Sicherer Transfer ohne Schwindel",
+        "Beim Aufstehen vom Bett wird die Bewohnerin begleitet und langsam an die Sitzkante geführt. Sie verneint Schwindel und Kreislaufbeschwerden. Anschließend geht sie mit Unterstützung wenige Schritte bis zum Stuhl und setzt sich sicher hin.",
+    ),
+    (
+        "Husten wird verneint",
+        "Die Bewohnerin verneint Husten und Auswurf. Die Atmung wirkt während des Gesprächs ruhig und regelmäßig. Bei der kurzen Mobilisation zeigt sie keine sichtbare Atemnot und kann in vollständigen Sätzen sprechen.",
+    ),
+    (
+        "Mögliche Müdigkeit beobachten",
+        "Die Bewohnerin wirkt am Vormittag etwas müde und antwortet mit leichter Verzögerung. Sie gibt an, sich möglicherweise erschöpft zu fühlen. Nach einer kurzen Ruhepause ist sie weiterhin ansprechbar und äußert keinen weiteren Unterstützungsbedarf.",
+    ),
+    (
+        "Übelkeit nach eigener Angabe",
+        "Die Bewohnerin berichtet über ein leichtes Übelkeitsgefühl nach dem Frühstück. Sie verneint Erbrechen und kann kleine Schlucke Wasser behalten. Die Beobachtung wird im weiteren Verlauf fortgeführt.",
+    ),
+    (
+        "Blasse Hautbeobachtung",
+        "Bei der morgendlichen Pflege wirkt die Haut der Bewohnerin blasser als zuvor. Die Bewohnerin ist wach und ansprechbar. Sie berichtet über keine Schmerzen und keinen Schwindel; die Beobachtung wird an die zuständige Pflegefachkraft weitergegeben.",
+    ),
+    (
+        "Wach und ansprechbar",
+        "Die Bewohnerin ist am Vormittag wach, ansprechbar und reagiert passend auf Fragen. Sie kann ihren Namen nennen und äußert den Wunsch, später im Sessel zu sitzen. Die Kommunikation ist ruhig und ohne erkennbare Verständigungsprobleme möglich.",
+    ),
+    (
+        "Unklare Schwindelangabe",
+        "Die Bewohnerin berichtet möglicherweise über ein leichtes Schwindelgefühl beim ersten Aufstehen. Sie kann die Stärke nicht genauer einschätzen und verneint einen Sturz. Der Transfer wird zunächst pausiert und nach einer kurzen Sitzpause erneut beurteilt.",
+    ),
+    (
+        "Begleitung zum Tisch",
+        "Die Bewohnerin geht mit Unterstützung zum Tisch im Zimmer. Sie setzt die Füße sicher auf und benötigt nur eine kurze verbale Anleitung. Nach dem Hinsetzen bleibt sie stabil sitzen und nimmt dort ihr Frühstück ein.",
+    ),
+)
+
+
 def _saved_examples(source_service: SourceIngestionService) -> list[dict[str, object]]:
-    """Expose immutable synthetic benchmark snapshots as selectable examples."""
+    """Expose curated, verbose, immutable synthetic examples for documentation."""
 
     examples: list[dict[str, object]] = []
-    dataset = default_dataset()
-    cases = dataset.scenarios[:12]
     source_documents = [
         SourceDocument(
-            source_id=case.source.source_id,
-            source_version=case.source.source_version,
-            resident_test_id=case.source.resident_test_id,
-            language=case.source.language,
-            transcript_text=case.source.transcript_text,
+            source_id=f"synthetic-documentation-source-{index:03d}",
+            source_version=1,
+            resident_test_id=f"synthetic-documentation-resident-{index:03d}",
+            language="de-DE",
+            transcript_text=transcript,
             created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
         )
-        for case in cases
+        for index, (_, transcript) in enumerate(_DOCUMENTATION_EXAMPLES, start=1)
     ]
     source_service.repository.ensure_initial(source_documents)
-    for case in cases:
-        source = case.source
+    for index, (title, _) in enumerate(_DOCUMENTATION_EXAMPLES, start=1):
+        source = source_documents[index - 1]
         examples.append(
             {
-                "exampleId": f"synthetic-example-{case.scenario_id}",
-                "title": f"{case.scenario_id}: {case.tags[0]}",
+                "exampleId": f"documentation-example-{index:02d}",
+                "title": title,
                 "sourceId": source.source_id,
                 "sourceVersion": source.source_version,
                 "kind": "DOCUMENTATION",
                 "evaluationRunId": None,
                 "syntheticOnly": True,
-                "candidateNote": case.candidate_notes[0].note_body,
             }
         )
     return examples

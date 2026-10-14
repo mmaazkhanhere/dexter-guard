@@ -20,6 +20,8 @@ def test_composed_app_exposes_safe_health_and_synthetic_examples() -> None:
     assert examples.status_code == 200
     assert examples.json()
     assert all(item["syntheticOnly"] is True for item in examples.json())
+    assert all(not item["title"].lower().startswith("scenario-") for item in examples.json())
+    assert all(len(client.get(f"/api/v1/sources/{item['sourceId']}/versions/{item['sourceVersion']}").json()["transcript_text"]) > 160 for item in examples.json())
     assert cached_examples.json() == examples.json()
     assert app.state.source_service.repository.count() == len(examples.json())
     version_exists.assert_not_called()

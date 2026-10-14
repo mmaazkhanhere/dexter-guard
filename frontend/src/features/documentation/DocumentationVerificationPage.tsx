@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { safeMutationError, useCreateSource, useFullVerification, useGenerateNote, useReview, useSavedExamples, useSource } from "../../api/hooks";
+import { userFacingFailureMessage } from "../../api/errors";
 import type { NursingFact, NoteResponse, SourceDocument } from "../../api/types";
 import { StateCard } from "../../components/shared/StateCard";
+import { LoadingIndicator } from "../../components/shared/LoadingIndicator";
 import { useToast } from "../../components/shared/Toaster";
 import { WorkspaceHeader } from "../../components/shared/WorkspaceHeader";
 import { VerificationResults } from "../../features/verification/VerificationPage";
@@ -45,7 +47,7 @@ export function DocumentationVerificationPage() {
       setResidentId(result.data.resident_test_id);
       setIsEditingSource(false);
       clearCandidate();
-      notify({ tone: "success", title: "Saved example loaded", message: `“${example.title}” is now the locked source ${result.data.source_id}, version ${result.data.source_version}.` });
+      notify({ tone: "success", title: "Example loaded", message: "Review the transcript, then generate the nursing note when it is ready." });
     } catch (actionError) {
       notifyFailure(notify, "Saved example could not be loaded", actionError, "The current transcript and candidate note were not changed.");
     }
@@ -61,12 +63,17 @@ export function DocumentationVerificationPage() {
     return result;
   }
 
+  function handleManualTranscriptChange(value: string) {
+    setTranscript(value);
+    setSelectedExample("");
+  }
+
   async function verify(noteToVerify: NoteResponse): Promise<void> {
     const result = await fullVerification.mutateAsync({ noteId: noteToVerify.noteId, expectedRevision: noteToVerify.revision, reviewerLabel: "synthetic-reviewer" });
     if (result.status === "VALID") {
-      notify({ tone: "success", title: "Generation and verification completed", message: `Note ${noteToVerify.noteId}, revision ${noteToVerify.revision}, is ready for Human Review. Backend approval eligibility remains authoritative.` });
+      notify({ tone: "success", title: "Note checked", message: "The nursing note was generated and checked. Continue to Human Review to make corrections and approve or reject it." });
     } else {
-      notify({ tone: "error", title: `Verification ${result.status}`, message: `${result.failureMessage ?? "Verification did not complete successfully."} The candidate remains read-only and cannot be approved until Human Review resolves the backend state.` });
+      notify({ tone: "error", title: "The note needs attention", message: `${userFacingFailureMessage(result.failureCode, result.failureMessage)} The note remains read-only until Human Review.` });
     }
   }
 
@@ -84,7 +91,7 @@ export function DocumentationVerificationPage() {
     if (reusableNote && isDuplicateGeneratedNote(reusableNote, activeSource, reusableNote.content, generatedFacts, generatedResidentId)) {
       const currentVerification = review.data?.fullVerification;
       if (currentVerification?.noteId === reusableNote.noteId && currentVerification.noteRevision === reusableNote.revision) {
-        notify({ tone: "info", title: "Existing candidate reused", message: "The generated note, facts, resident, and source version are unchanged, so the current candidate and verification results were reused." });
+        notify({ tone: "info", title: "Existing note reused", message: "Nothing changed, so the existing note and its check results were reused." });
         return;
       }
       try {
@@ -102,7 +109,7 @@ export function DocumentationVerificationPage() {
       setDraftContent(generated.content);
       setGeneratedFacts(generated.facts);
       setGeneratedResidentId(activeSource.resident_test_id);
-      notify({ tone: "success", title: "Candidate note generated", message: `Note ${generated.noteId}, revision ${generated.revision}, was created for source ${generated.sourceId}, version ${generated.sourceVersion}. Full verification is starting now.` });
+      notify({ tone: "success", title: "Draft note created", message: "The nursing note was created. It is now being checked against the transcript." });
     } catch (actionError) {
       notifyFailure(notify, "Note generation failed", actionError, "The saved source was retained; no candidate note was created.");
       return;
@@ -118,16 +125,17 @@ export function DocumentationVerificationPage() {
   const processing = createSource.isPending || generate.isPending || fullVerification.isPending;
   return <>
     <WorkspaceHeader eyebrow="01 · DOCUMENTATION & VERIFICATION" title="Create and check a candidate nursing note" description="Enter and check a synthetic German transcript, then generate and verify one source-bound candidate before Human Review." />
-    {error && <div className="error-banner" role="alert">{safeMutationError(error).message} <span>({safeMutationError(error).code})</span></div>}
+    {error && <div className="error-banner" role="alert">{safeMutationError(error).message}</div>}
     <section className="documentation-verification-section" aria-label="Documentation and verification workflow">
       <StateCard title="Documentation & Verification" description="Enter and correct the transcript, then generate and verify the source-bound nursing note in this same workflow.">
         <div className="workflow-step">
           <h4>1. Enter and check the transcript</h4>
           <p className="workflow-step-description">Enter a synthetic transcript or load an example. Correct speech-to-text mistakes here before generating the note.</p>
-          <label>Saved synthetic example<select aria-label="Saved synthetic example" disabled={Boolean(source) && !isEditingSource} value={selectedExample} onChange={(event) => setSelectedExample(event.target.value)}><option value="">Choose an example …</option>{examples.data?.map((item) => <option key={item.exampleId} value={item.exampleId}>{item.title}</option>)}</select></label><span className="field-description">Optional: load a saved synthetic scenario and its declared immutable source version.</span>
-          <button className="secondary-button" onClick={loadExample} disabled={!example || sourceQuery.isFetching || Boolean(source) && !isEditingSource}>Load example</button>
-          <label>Resident test ID<input readOnly={Boolean(source) && !isEditingSource} value={residentId} onChange={(event) => setResidentId(event.target.value)} /></label><span className="field-description">Use the synthetic resident identifier associated with this transcript.</span>
-          <label>German transcript<textarea aria-label="German transcript" readOnly={Boolean(source) && !isEditingSource} required aria-invalid={!isTranscriptValid(transcript)} value={transcript} onChange={(event) => setTranscript(event.target.value)} placeholder="Deutsches synthetisches Transkript …" /></label><span className="field-description">{source && !isEditingSource ? "Locked source snapshot. Choose Edit source to create a new source after changing the text." : "Check and correct the text now. It is saved automatically when you choose Generate & Verify."}</span>
+          <label>German transcript (manual entry)<textarea aria-label="German transcript" readOnly={Boolean(source) && !isEditingSource} required aria-invalid={!isTranscriptValid(transcript)} value={transcript} onChange={(event) => handleManualTranscriptChange(event.target.value)} placeholder="Type or paste the German transcript here …" /></label><span className="field-description">Type or paste the synthetic German transcript you want to document.</span>
+          <label>Example transcript (optional)<select aria-label="Example transcript" disabled={Boolean(source) && !isEditingSource} value={selectedExample} onChange={(event) => setSelectedExample(event.target.value)}><option value="">Choose an example transcript …</option>{examples.data?.map((item) => <option key={item.exampleId} value={item.exampleId}>{item.title}</option>)}</select></label><span className="field-description">Choose an example to preview its content first, then use it to replace the manual transcript.</span>
+          {example && <div className="example-preview" aria-label="Selected example preview" aria-live="polite"><div className="example-preview-header"><span>Example preview</span><strong>{example.title}</strong></div>{sourceQuery.isFetching && <p className="loading-message"><LoadingIndicator label="Loading example transcript …" /></p>}{sourceQuery.data && <p className="example-preview-text">{sourceQuery.data.transcript_text}</p>}{sourceQuery.error && <p className="muted">This example preview could not be loaded. You can continue with manual entry.</p>}</div>}
+          {example && sourceQuery.data && <button className="secondary-button" onClick={loadExample} disabled={sourceQuery.isFetching || Boolean(source) && !isEditingSource}>{sourceQuery.isFetching ? <LoadingIndicator label="Loading example …" /> : "Use selected example"}</button>}
+          <label>Synthetic resident identifier<input aria-label="Synthetic resident identifier" readOnly={Boolean(source) && !isEditingSource} value={residentId} onChange={(event) => setResidentId(event.target.value)} /></label><span className="field-description">This identifier links the transcript and generated nursing note to the synthetic resident test case.</span>
           <div className="button-row">{source && !isEditingSource && <button className="secondary-button" onClick={() => setIsEditingSource(true)}>Edit source</button>}{source && isEditingSource && <button className="secondary-button" onClick={() => { setTranscript(source.transcript_text); setResidentId(source.resident_test_id); setIsEditingSource(false); }}>Cancel edit</button>}</div>
           {source && <div className="identity-pill">Locked source snapshot · {source.source_id} · v{source.source_version} · {source.language}</div>}
         </div>
@@ -135,7 +143,7 @@ export function DocumentationVerificationPage() {
           <h4>2. Generate and verify</h4>
           <p className="workflow-step-description">Generate a professional draft and automatically run the complete backend verification workflow against this exact source version.</p>
           <p className="muted">The transcript is saved automatically if needed. The generated note stays read-only here; corrections belong in Human Review.</p>
-          <button onClick={generateAndVerify} disabled={processing || !isTranscriptValid(transcript)}>{processing ? "Generating and verifying …" : "Generate & Verify"}</button>
+          <button aria-busy={processing} onClick={generateAndVerify} disabled={processing || !isTranscriptValid(transcript)}>{processing ? <LoadingIndicator label={createSource.isPending ? "Saving transcript …" : generate.isPending ? "Generating nursing note …" : "Checking nursing note …"} /> : "Generate & Verify"}</button>
           {note && <><div className="identity-pill">Candidate note · {note.noteId} · revision {note.revision} · {note.origin}</div><FactList facts={note.facts} /><button className="secondary-button" onClick={() => navigate("/review")}>Continue to Human Review</button></>}
         </div>
       </StateCard>
@@ -146,7 +154,7 @@ export function DocumentationVerificationPage() {
 
 function notifyFailure(notify: ReturnType<typeof useToast>["notify"], title: string, error: unknown, unchanged: string) {
   const detail = safeMutationError(error);
-  notify({ tone: "error", title, message: `${detail.message} (code: ${detail.code}). ${unchanged}` });
+  notify({ tone: "error", title, message: `${detail.message} ${unchanged}` });
 }
 
 function FactList({ facts }: { facts: NursingFact[] }) {

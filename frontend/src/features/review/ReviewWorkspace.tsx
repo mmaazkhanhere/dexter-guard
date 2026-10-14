@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { safeMutationError, useApprove, useAudit, useFindingDecision, useFullVerification, useReject, useReview, useSaveRevision } from "../../api/hooks";
+import { userFacingFailureMessage } from "../../api/errors";
 import { StateCard } from "../../components/shared/StateCard";
 import { useToast } from "../../components/shared/Toaster";
 import { WorkspaceHeader } from "../../components/shared/WorkspaceHeader";
@@ -39,7 +40,7 @@ export function ReviewWorkspace() {
       applyNoteRevision({ ...note, revision: result.revision, content });
       setDraftContent(content);
       await review.refetch();
-      notify({ tone: "success", title: "Successor revision saved", message: `Note ${result.noteId}, revision ${result.revision}, is now current. Prior findings and verification are stale for approval; run full verification before approval.` });
+      notify({ tone: "success", title: "New version saved", message: "Your changes were saved as a new note version. Check it again before approval." });
     } catch (actionError) {
       notifyFailure(notify, "Revision was not saved", actionError, "The current persisted revision was not changed.");
     }
@@ -50,9 +51,9 @@ export function ReviewWorkspace() {
       const result = await verify.mutateAsync({ noteId: note.noteId, expectedRevision: note.revision, reviewerLabel: reviewer });
       await review.refetch();
       if (result.status === "VALID") {
-        notify({ tone: "success", title: "Full verification completed", message: `Verification ${result.fullVerificationId} is VALID for note ${result.noteId}, revision ${result.noteRevision}. The backend eligibility state has been refreshed.` });
+        notify({ tone: "success", title: "Note checked", message: "The note passed the current checks. Review the findings before approving it." });
       } else {
-        notify({ tone: "error", title: `Full verification ${result.status}`, message: `${result.failureMessage ?? "One or more verification components did not complete successfully."} Approval remains blocked until a current, valid full verification is available.` });
+        notify({ tone: "error", title: "The note needs attention", message: `${userFacingFailureMessage(result.failureCode, result.failureMessage)} Approval remains unavailable until the issues are resolved.` });
       }
     } catch (actionError) {
       notifyFailure(notify, "Full verification could not run", actionError, "The note remains in its prior verification state and approval eligibility was not changed.");
@@ -69,8 +70,8 @@ export function ReviewWorkspace() {
       const result = await decide.mutateAsync({ noteId: note.noteId, findingId, expectedRevision: note.revision, kind, suggestionId, reviewerLabel: reviewer, rationale: kind === "DISPUTED" || kind === "SUGGESTION_REJECTED" ? reason : undefined });
       const refreshed = await review.refetch();
       if (result.successorRevision && refreshed.data?.candidateNote) applyNoteRevision({ ...note, revision: result.successorRevision, content: refreshed.data.candidateNote });
-      const revisionDetail = result.successorRevision ? ` A successor revision ${result.successorRevision} was created and must be fully verified before approval.` : " No approval eligibility was inferred from this decision.";
-      notify({ tone: "success", title: "Finding decision recorded", message: `${result.kind} was recorded for finding ${result.findingId} with outcome ${result.outcome} on note revision ${result.noteRevision}.${revisionDetail}` });
+      const revisionDetail = result.successorRevision ? " A new version was created and must be checked again before approval." : "";
+      notify({ tone: "success", title: "Decision saved", message: `Your decision was saved.${revisionDetail}` });
     } catch (actionError) {
       notifyFailure(notify, "Finding decision was not recorded", actionError, "The finding and note revision were not changed.");
     }
@@ -79,9 +80,9 @@ export function ReviewWorkspace() {
   async function approveNote() {
     if (!currentVerification) return;
     try {
-      const result = await approve.mutateAsync({ noteId: note.noteId, expectedRevision: note.revision, fullVerificationId: currentVerification.fullVerificationId, reviewerLabel: reviewer });
+      await approve.mutateAsync({ noteId: note.noteId, expectedRevision: note.revision, fullVerificationId: currentVerification.fullVerificationId, reviewerLabel: reviewer });
       await review.refetch();
-      notify({ tone: "success", title: "Note approved by backend", message: `Note ${result.noteId}, revision ${result.noteRevision}, was recorded as ${result.kind}. Disposition ${result.dispositionId} is now part of the audit history.` });
+      notify({ tone: "success", title: "Note approved", message: "The note was approved and recorded." });
     } catch (actionError) {
       notifyFailure(notify, "Note was not approved", actionError, "The backend did not record an approval; review the current eligibility and verification state.");
     }
@@ -89,9 +90,9 @@ export function ReviewWorkspace() {
 
   async function rejectNote() {
     try {
-      const result = await reject.mutateAsync({ noteId: note.noteId, expectedRevision: note.revision, reviewerLabel: reviewer, reason });
+      await reject.mutateAsync({ noteId: note.noteId, expectedRevision: note.revision, reviewerLabel: reviewer, reason });
       await review.refetch();
-      notify({ tone: "success", title: "Note rejected by backend", message: `Note ${result.noteId}, revision ${result.noteRevision}, was recorded as ${result.kind}. Disposition ${result.dispositionId} is now part of the audit history.` });
+      notify({ tone: "success", title: "Note rejected", message: "The note was rejected and recorded." });
     } catch (actionError) {
       notifyFailure(notify, "Note was not rejected", actionError, "The backend did not record a rejection; the current disposition was not changed.");
     }
@@ -99,7 +100,7 @@ export function ReviewWorkspace() {
 
   return <>
     <WorkspaceHeader eyebrow="03 · HUMAN REVIEW" title="Resolve findings and approve safely" description="Edits create successor revisions. Approval remains controlled by the backend's latest complete-note verification." />
-    {firstError && <div className="error-banner" role="alert">{safeMutationError(firstError).message}<span> ({safeMutationError(firstError).code})</span></div>}
+    {firstError && <div className="error-banner" role="alert">{safeMutationError(firstError).message}</div>}
     {staleContext && <div className="error-banner" role="status">This review result is stale for the current note revision. Refresh before taking an approval or decision action.</div>}
     <div className="workspace-grid">
       <StateCard title={`Current persisted revision · ${note.revision}`}>
@@ -109,10 +110,10 @@ export function ReviewWorkspace() {
         <p className="muted">Unsaved edits are not verified. Saving creates an immutable successor and invalidates prior findings for approval.</p>
       </StateCard>
       <StateCard title="Approval eligibility" tone={approvalEligible ? "neutral" : "warning"}>
-        <div className="eligibility">{approvalEligible ? "ELIGIBLE FROM BACKEND" : "NOT ELIGIBLE"}</div>
-        <p>{currentVerification ? `Latest full verification: ${currentVerification.status}` : "A latest complete-note verification for this revision is required."}</p>
+        <div className="eligibility">{approvalEligible ? "Ready for approval" : "Not ready for approval"}</div>
+        <p>{currentVerification ? (currentVerification.status === "VALID" ? "The note passed the current verification checks." : "The note still needs attention.") : "A complete verification is required before approval."}</p>
         {verify.isPending && <p className="muted">Verification is in progress; approval is disabled.</p>}
-        {currentVerification?.failureMessage && <p className="muted">{currentVerification.failureMessage}</p>}
+        {currentVerification?.failureMessage && <p className="muted">{userFacingFailureMessage(currentVerification.failureCode, currentVerification.failureMessage)}</p>}
         <div className="button-row"><button onClick={approveNote} disabled={!approvalEligible || approve.isPending}>{approve.isPending ? "Approving …" : "Approve"}</button><button className="danger-button" onClick={rejectNote} disabled={reject.isPending || reason.trim().length < 3}>Reject</button></div>
         <label>Rejection or suggestion rationale<input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Required for rejection/dispute" /></label>
       </StateCard>
@@ -131,5 +132,5 @@ export function ReviewWorkspace() {
 
 function notifyFailure(notify: ReturnType<typeof useToast>["notify"], title: string, error: unknown, unchanged: string) {
   const detail = safeMutationError(error);
-  notify({ tone: "error", title, message: `${detail.message} (code: ${detail.code}). ${unchanged}` });
+  notify({ tone: "error", title, message: `${detail.message} ${unchanged}` });
 }

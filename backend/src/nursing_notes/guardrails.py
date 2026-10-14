@@ -45,6 +45,50 @@ class GenerationGuardrails:
     ruleset_version = "generation-guardrails-v1"
     normalization_policy = "unicode-code-point-v1"
 
+    @staticmethod
+    def normalize(result: GenerationResult, source: Any) -> GenerationResult:
+        """Repair a narrow model-span omission without changing asserted meaning.
+
+        A provider may return a valid temporal qualifier while anchoring only the
+        noun phrase that follows it. When the qualifier and the existing anchor
+        are both inside one exact source sentence, expand the anchor to that
+        sentence. If the qualifier cannot be located unambiguously, validation
+        remains fail-closed.
+        """
+
+        facts = tuple(
+            GenerationGuardrails._normalize_temporal_anchor(fact, source)
+            for fact in result.facts
+        )
+        return result.model_copy(update={"facts": facts})
+
+    @staticmethod
+    def _normalize_temporal_anchor(fact: Any, source: Any) -> Any:
+        anchor = fact.source_anchor
+        qualifier = fact.temporal_qualifier
+        if qualifier is None or anchor.start is None or anchor.end is None:
+            return fact
+        text = source.transcript_text
+        excerpt = text[anchor.start : anchor.end]
+        if qualifier.casefold() in excerpt.casefold():
+            return fact
+        statement_tokens = _tokens(fact.statement)
+        for match in re.finditer(r"[^.!?\r\n]+(?:[.!?]|$)", text):
+            sentence_start = match.start()
+            sentence_end = match.end()
+            sentence = text[sentence_start:sentence_end]
+            if qualifier.casefold() not in sentence.casefold():
+                continue
+            anchor_matches = sentence_start <= anchor.start and anchor.end <= sentence_end
+            statement_matches = bool(statement_tokens) and statement_tokens.issubset(_tokens(sentence))
+            if not anchor_matches and not statement_matches:
+                continue
+            trimmed_start = sentence_start + len(sentence) - len(sentence.lstrip())
+            trimmed_end = sentence_end - len(sentence) + len(sentence.rstrip())
+            expanded_anchor = anchor.model_copy(update={"start": trimmed_start, "end": trimmed_end})
+            return fact.model_copy(update={"source_anchor": expanded_anchor})
+        return fact
+
     def validate(self, result: GenerationResult, source: Any) -> None:
         if not result.facts:
             raise NoteError(NoteErrorCode.EMPTY_MODEL_OUTPUT, "The generation provider returned no nursing facts.")

@@ -33,12 +33,12 @@ describe("documentation and verification workflow", () => {
     renderPage();
     expect(screen.getByRole("region", { name: "Documentation and verification workflow" })).toBeInTheDocument();
 
-    await user.clear(screen.getByLabelText("Resident test ID"));
-    await user.type(screen.getByLabelText("Resident test ID"), source.resident_test_id);
+    await user.clear(screen.getByLabelText("Synthetic resident identifier"));
+    await user.type(screen.getByLabelText("Synthetic resident identifier"), source.resident_test_id);
     await user.type(screen.getByLabelText("German transcript"), source.transcript_text);
     await user.click(screen.getByRole("button", { name: "Generate & Verify" }));
 
-    await waitFor(() => expect(screen.getByText(/Full verification: VALID/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("The note passed the current verification checks.")).toBeInTheDocument());
     expect(screen.getByLabelText("German transcript")).toHaveAttribute("readonly");
     expect(screen.getByText("Read-only candidate note")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continue to Human Review" })).toBeInTheDocument();
@@ -47,8 +47,30 @@ describe("documentation and verification workflow", () => {
     expect(fetchMock.mock.calls.filter(([input, request]) => String(input).includes("/full-verifications") && request?.method === "POST")).toHaveLength(1);
 
     await user.click(screen.getByRole("button", { name: "Generate & Verify" }));
-    await waitFor(() => expect(screen.getByText("Existing candidate reused")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Existing note reused")).toBeInTheDocument());
     expect(fetchMock.mock.calls.filter(([input, request]) => String(input).endsWith("/notes/generate") && request?.method === "POST")).toHaveLength(1);
     expect(fetchMock.mock.calls.filter(([input, request]) => String(input).includes("/full-verifications") && request?.method === "POST")).toHaveLength(1);
+  });
+
+  it("keeps manual entry as the default and previews an example before loading it", async () => {
+    const example = { exampleId: "example-1", title: "Guter Schlaf und ausreichendes Trinken", sourceId: "source-1", sourceVersion: 1, kind: "DOCUMENTATION", syntheticOnly: true };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const path = String(input);
+      if (path.endsWith("/saved-examples")) return new Response(JSON.stringify([example]), { status: 200 });
+      if (path.endsWith("/sources/source-1/versions/1")) return new Response(JSON.stringify(source), { status: 200 });
+      return new Response(JSON.stringify({ code: "NOT_FOUND", message: "test route not found" }), { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(screen.getByLabelText("German transcript")).toHaveValue("");
+    await waitFor(() => expect(screen.getByRole("option", { name: "Guter Schlaf und ausreichendes Trinken" })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText("Example transcript"), "example-1");
+    await waitFor(() => expect(screen.getByText(source.transcript_text)).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Use selected example" })).toBeInTheDocument();
+    await user.type(screen.getByLabelText("German transcript"), " Manuelle Ergänzung.");
+    expect(screen.queryByRole("button", { name: "Use selected example" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("German transcript")).toHaveValue(" Manuelle Ergänzung.");
   });
 });

@@ -1,5 +1,7 @@
 import { WorkspaceHeader } from "../../components/shared/WorkspaceHeader";
 import { StateCard } from "../../components/shared/StateCard";
+import { LoadingIndicator } from "../../components/shared/LoadingIndicator";
+import { userFacingFailureMessage } from "../../api/errors";
 import { useEffect, useState, type ReactNode } from "react";
 import { useReview } from "../../api/hooks";
 import { useWorkspace } from "../../state/workspace";
@@ -34,8 +36,8 @@ export function VerificationResults({ note, source, context, isLoading = false }
   const verification = fullVerification?.noteRevision === note.revision ? fullVerification : undefined;
   const findings = context?.findings ?? [];
   return <>
-    {isLoading && <div className="empty-state" role="status">Loading backend verification results for this candidate note …</div>}
-    {verification && <div className={verification.status === "VALID" ? "status-banner" : "error-banner"} role="status">Full verification: {verification.status}{verification.failureMessage ? ` · ${verification.failureMessage}` : ""}</div>}
+    {isLoading && <div className="empty-state" role="status"><LoadingIndicator label="Checking the nursing note against the transcript …" /></div>}
+    {verification && <div className={verification.status === "VALID" ? "status-banner" : "error-banner"} role="status">{verification.status === "VALID" ? "The note passed the current verification checks." : `The note needs attention. ${userFacingFailureMessage(verification.failureCode, verification.failureMessage)}`}</div>}
     <div className="workspace-grid evidence-grid">
       <StateCard title="Locked source transcript"><EvidenceText text={context?.transcriptText ?? source?.transcript_text ?? ""} spans={selected?.evidence.spans ?? []} source={source} /></StateCard>
       <StateCard title="Read-only candidate note"><p className="note-meta">Note {note.noteId} · revision {note.revision}</p><NoteText text={context?.candidateNote ?? note.content} span={selected?.claimSpan ?? undefined} /></StateCard>

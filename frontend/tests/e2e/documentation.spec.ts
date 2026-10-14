@@ -11,7 +11,7 @@ test("combined workflow saves, generates, and verifies before human review", asy
     return route.fulfill({ status: 404, json: { code: "NOT_FOUND", message: "test route not found" } });
   });
   await page.goto("/documentation");
-  await page.getByLabel("Resident test ID").fill("synthetic-e2e-resident");
+  await page.getByLabel("Synthetic resident identifier").fill("synthetic-e2e-resident");
   await page.getByLabel("German transcript").fill("Die Bewohnerin berichtet guten Schlaf und trinkt ausreichend.");
   await page.getByRole("button", { name: "Generate & Verify" }).click();
   await expect(page.getByText(/Candidate note · note-e2e/)).toBeVisible();

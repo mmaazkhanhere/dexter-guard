@@ -107,6 +107,7 @@ The JSON object must have this shape:
 Rules:
 - Use only information explicitly present in the transcript.
 - Preserve negation, uncertainty, attribution, time, measurements, and units.
+- Only provide temporalQualifier when the exact temporal wording is inside the sourceAnchor span; otherwise omit it. Never add words such as today, currently, or this morning when they are absent from the transcript.
 - Use exact UTF-8 Python string character offsets for each sourceAnchor.
 - Keep every sourceAnchor inside one source sentence and within the supplied transcript.
 - Do not diagnose, recommend treatment, or add clinical conclusions.

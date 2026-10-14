@@ -69,6 +69,7 @@ class NursingNoteService:
         try:
             raw_result = self._invoke_provider(source, generation_run_id)
             result = self._validate_generation_result(raw_result)
+            result = self.guardrails.normalize(result, source)
             self.guardrails.validate(result, source)
         except NoteError as error:
             if error.code in {

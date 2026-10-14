@@ -77,6 +77,11 @@ class DeterministicNursingNoteAdapter:
                 attribution = "CAREGIVER_OBSERVED"
             else:
                 attribution = None
+            temporal_match = re.search(
+                r"\b(?:heute|gestern|morgen|seit\s+\w+|vor\s+\w+|nach\s+\w+|nachts|morgens|abends|aktuell|derzeit|momentan)\b",
+                statement,
+                flags=re.IGNORECASE,
+            )
             facts.append(
                 CandidateNursingFact(
                     type=fact_type,
@@ -91,6 +96,7 @@ class DeterministicNursingNoteAdapter:
                     polarity=polarity,
                     certainty=certainty,
                     attribution=attribution,
+                    temporalQualifier=temporal_match.group(0) if temporal_match else None,
                     numericValue=numeric_match.group("value") if numeric_match else None,
                     unit=numeric_match.group("unit") if numeric_match else None,
                     provenance="GENERATED_FROM_SOURCE",

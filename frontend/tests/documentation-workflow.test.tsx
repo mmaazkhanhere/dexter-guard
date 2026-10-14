@@ -102,7 +102,7 @@ describe("documentation workflow", () => {
     await user.type(screen.getByLabelText("German transcript"), source.transcript_text);
     await user.click(screen.getByRole("button", { name: "Submit transcript" }));
     await user.click(screen.getByRole("button", { name: "Generate nursing note" }));
-    await waitFor(() => expect(screen.getByText(/Note generated-note-1, revision/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Note generated-note-1/)).toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: "Generate nursing note" }));
 
     await waitFor(() => expect(screen.getByText("Candidate note already exists")).toBeInTheDocument());

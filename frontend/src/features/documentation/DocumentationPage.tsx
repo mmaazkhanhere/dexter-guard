@@ -33,7 +33,7 @@ export function DocumentationPage() {
       const result = await sourceQuery.refetch();
       if (!result.data) throw result.error ?? new Error("The saved example did not return a source document.");
       setTranscript(result.data.transcript_text); setResidentId(result.data.resident_test_id); setCandidate(example.candidateNote ?? "");
-      notify({ tone: "success", title: "Saved example loaded", message: `“${example.title}” loaded from source ${result.data.source_id}, version ${result.data.source_version}. No new source was created.` });
+      notify({ tone: "success", title: "Example loaded", message: "Review the transcript before continuing." });
     } catch (actionError) {
       notifyFailure(notify, "Saved example could not be loaded", actionError, "The current transcript and candidate note were not changed.");
     }
@@ -44,7 +44,7 @@ export function DocumentationPage() {
       const result = await createSource.mutateAsync({ resident_test_id: residentId.trim(), language: "de-DE", transcript_text: transcript });
       setSource(result); setNote(undefined); setDraftContent(undefined); setGeneratedFacts(undefined); setGeneratedResidentId(undefined);
       setIsEditingSource(false);
-      notify({ tone: "success", title: "Transcript saved", message: `Source ${result.source_id}, version ${result.source_version}, was created for ${result.resident_test_id} (${result.language}). Any previous candidate note was cleared.` });
+      notify({ tone: "success", title: "Transcript saved", message: "The transcript was saved and is ready for note generation." });
     } catch (actionError) {
       notifyFailure(notify, "Transcript was not saved", actionError, "No source or candidate note was changed.");
     }
@@ -62,14 +62,14 @@ export function DocumentationPage() {
       applyNoteRevision(result); setCandidate(result.content);
       if (mode === "generate") { setGeneratedFacts(result.facts); setGeneratedResidentId(source.resident_test_id); } else { setGeneratedFacts(undefined); setGeneratedResidentId(undefined); }
       const action = mode === "generate" ? "generated" : "imported";
-      notify({ tone: "success", title: `Candidate note ${action}`, message: `Note ${result.noteId}, revision ${result.revision}, is a ${result.origin} draft for source ${result.sourceId}, version ${result.sourceVersion}. Run full verification before approval.` });
+      notify({ tone: "success", title: `Candidate note ${action}`, message: "The draft is ready for verification before approval." });
     } catch (actionError) {
       notifyFailure(notify, mode === "generate" ? "Note generation failed" : "Note import failed", actionError, "The current source and candidate note were not changed.");
     }
   }
   return <>
     <WorkspaceHeader eyebrow="01 · DOCUMENTATION" title="Create a candidate nursing note" description="Submit a synthetic German transcript, generate or import a candidate note, and preserve the source identity through review." />
-    {error && <div className="error-banner" role="alert">{safeMutationError(error).message} <span>({safeMutationError(error).code})</span></div>}
+    {error && <div className="error-banner" role="alert">{safeMutationError(error).message}</div>}
     <div className="workspace-grid">
       <StateCard title="1. Add the source transcript" description="Load a saved synthetic example or enter the German transcript that will anchor the workflow. Next, submit it to create the immutable source record.">
         <label>Saved synthetic example<select aria-label="Saved synthetic example" disabled={Boolean(source) && !isEditingSource} value={selectedExample} onChange={(event) => setSelectedExample(event.target.value)}><option value="">Choose an example …</option>{examples.data?.map((item) => <option key={item.exampleId} value={item.exampleId}>{item.title}</option>)}</select></label><span className="field-description">Optional: choose a saved synthetic scenario, then load it into the transcript fields.</span>
@@ -91,7 +91,7 @@ export function DocumentationPage() {
 
 function notifyFailure(notify: ReturnType<typeof useToast>["notify"], title: string, error: unknown, unchanged: string) {
   const detail = safeMutationError(error);
-  notify({ tone: "error", title, message: `${detail.message} (code: ${detail.code}). ${unchanged}` });
+  notify({ tone: "error", title, message: `${detail.message} ${unchanged}` });
 }
 
 function FactList({ facts }: { facts: import("../../api/types").NursingFact[] }) {

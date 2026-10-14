@@ -41,6 +41,26 @@ def test_gen_001_valid_german_transcript_returns_editable_professional_draft(not
     assert "externalOrigin" not in body
 
 
+def test_deterministic_generation_preserves_temporal_qualifier(note_context):
+    client = note_context["client"]
+    source = create_source(client, "Die Bewohnerin berichtet morgens Ã¼ber guten Schlaf.")
+    adapter = DeterministicNursingNoteAdapter()
+    note_service = NursingNoteService(
+        note_context["source_service"],
+        repository=note_context["note_repository"],
+        generation_adapter=adapter,
+    )
+    client = TestClient(create_app(note_context["source_service"], note_service))
+
+    response = client.post(
+        "/api/v1/notes/generate",
+        json={"sourceId": source["source_id"], "sourceVersion": 1, "requestedBy": "synthetic-tester"},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["facts"][0]["temporalQualifier"] == "morgens"
+
+
 def test_gen_002_preserves_numeric_values_and_units_and_rejects_changes(note_context):
     client = note_context["client"]
     text = "Die Temperatur beträgt 37,5 °C."
@@ -192,6 +212,30 @@ def test_temporal_qualifier_is_preserved_and_not_invented(note_context):
     )
     assert rejected.status_code == 422
     assert rejected.json()["code"] == "GENERATION_REJECTED"
+
+
+def test_temporal_qualifier_expands_a_narrow_anchor_within_one_source_sentence(note_context):
+    client = note_context["client"]
+    text = "Die Bewohnerin berichtet morgens Ã¼ber guten Schlaf."
+    source = create_source(client, text)
+    source_model = note_context["source_service"].get_source_version(source["source_id"], 1)
+    narrow_fact = fact(
+        source_model,
+        "Ã¼ber guten Schlaf.",
+        fact_type="SYMPTOM",
+        attribution="RESIDENT_REPORTED",
+        temporalQualifier="morgens",
+    )
+    note_context["adapter"].factory = result_factory(narrow_fact)
+
+    response = client.post(
+        "/api/v1/notes/generate",
+        json={"sourceId": source["source_id"], "sourceVersion": 1, "requestedBy": "tester"},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["facts"][0]["sourceAnchor"]["start"] == 0
+    assert response.json()["facts"][0]["sourceAnchor"]["end"] == len(text)
 
 
 def test_fact_anchor_cannot_span_multiple_source_sentences(note_context):
