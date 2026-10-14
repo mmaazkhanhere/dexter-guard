@@ -20,13 +20,16 @@ const WorkspaceContext = createContext<WorkspaceState | null>(null);
 
 export function WorkspaceProvider({ children }: PropsWithChildren) {
   const [source, setSource] = useState<SourceDocument>();
-  const [note, setNote] = useState<NoteResponse>();
+  const [note, setNoteState] = useState<NoteResponse>();
   const [draftContent, setDraftContent] = useState<string>();
   const noteRef = useRef(note);
   noteRef.current = note;
+  const setNote = (candidate?: NoteResponse) => {
+    noteRef.current = candidate;
+    setNoteState(candidate);
+  };
   const applyNoteRevision = (candidate: NoteResponse) => {
     if (!shouldApplyNoteRevision(noteRef.current, candidate)) return false;
-    noteRef.current = candidate;
     setNote(candidate);
     setDraftContent(candidate.content);
     return true;

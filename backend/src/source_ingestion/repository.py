@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from threading import RLock
 from typing import Protocol
@@ -14,6 +15,8 @@ class SourceRepository(Protocol):
     """Persistence operations required by the source service."""
 
     def create_initial(self, document: SourceDocument) -> SourceDocument: ...
+
+    def ensure_initial(self, documents: Iterable[SourceDocument]) -> None: ...
 
     def create_next_version(
         self,
@@ -56,6 +59,29 @@ class InMemorySourceRepository:
             self._documents[key] = document
             self._latest_versions[document.source_id] = document.source_version
             return document.model_copy(deep=True)
+
+    def ensure_initial(self, documents: Iterable[SourceDocument]) -> None:
+        """Insert a batch of initial documents atomically and idempotently."""
+
+        pending = tuple(documents)
+        with self._lock:
+            for document in pending:
+                key = (document.source_id, document.source_version)
+                if key in self._documents:
+                    continue
+                if document.source_version != 1 or document.source_id in self._latest_versions:
+                    raise SourceError(
+                        ErrorCode.DUPLICATE_SOURCE_VERSION,
+                        "An initial source must use a new source ID at version 1.",
+                        "source_id",
+                    )
+
+            for document in pending:
+                key = (document.source_id, document.source_version)
+                if key in self._documents:
+                    continue
+                self._documents[key] = document
+                self._latest_versions[document.source_id] = document.source_version
 
     def create_next_version(
         self,

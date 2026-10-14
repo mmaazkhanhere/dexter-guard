@@ -20,15 +20,11 @@ A reviewer operates only on synthetic German scenarios. The backend is reachable
 
 ## Workspaces and user stories
 
-### A. Documentation
+### A. Documentation & Verification
 
-**US-009-A1 (P1):** As a reviewer, I can enter a synthetic German transcript or load a saved synthetic demonstration so I can start a traceable workflow.  
-**US-009-A2 (P1):** As a reviewer, I can generate a professional note or paste an external candidate note, inspect backend-produced structured facts, edit an unapproved note, and initiate verification.
-
-### B. Evidence Verification
-
-**US-009-B1 (P1):** As a reviewer, I can view immutable source and candidate note side by side, inspect atomic claims, statuses, severities, explanations, and source evidence.  
-**US-009-B2 (P1):** As a reviewer, I can distinguish unsupported from contradicted claims, uncertainties, numerical/unit findings, omissions, negation/certainty/attribution changes, unsupported clinical conclusions, deterministic-rule findings, and unavailable evidence.
+**US-009-A1 (P1):** As a reviewer, I can enter or load a synthetic German transcript, inspect and correct it before the workflow persists it, so I can start from the intended source text.  
+**US-009-A2 (P1):** As a reviewer, I can generate a professional note and automatically run the backend's complete verification workflow against the immutable transcript.  
+**US-009-A3 (P1):** As a reviewer, I can view the read-only candidate note alongside backend-returned findings, statuses, severities, explanations, and source evidence before continuing to Human Review.
 
 ### C. Human Review
 
@@ -44,9 +40,9 @@ A reviewer operates only on synthetic German scenarios. The backend is reachable
 
 | ID | Requirement | Verifiable acceptance scenarios |
 | --- | --- | --- |
-| FR-34 | Provide a desktop web interface for the complete reliability workflow. | AC-34a: a 1280px-wide viewport exposes Documentation, Evidence Verification, Human Review, and Evaluation navigation. AC-34b: keyboard navigation and text labels make all actions available without color-only meaning. |
-| FR-35 | Allow entry of a German synthetic transcript and selection of saved examples. | AC-35a: valid de-DE synthetic transcript submission shows persisted source ID/version. AC-35b: blank/invalid input exposes backend field error without claiming it saved. AC-35c: selecting an example loads only its declared immutable source/version. |
-| FR-36 | Allow generation of a professional German note or external candidate input for verification. | AC-36a: generation shows DRAFT note, origin, facts, and source reference. AC-36b: external-note import does not label the result generated. AC-36c: provider failure/timeout has a failure state and no editable false-success record. AC-36d: repeating generation for an unchanged generated candidate is a no-op when whitespace-normalized content, semantic structured facts, resident identity, and source ID/version all match; no new provider request or candidate note is created. |
+| FR-34 | Provide a desktop web interface for the complete reliability workflow. | AC-34a: a 1280px-wide viewport exposes Documentation & Verification, Human Review, and Evaluation navigation. AC-34b: keyboard navigation and text labels make all actions available without color-only meaning. |
+| FR-35 | Allow entry of a German synthetic transcript and selection of saved examples before generation. | AC-35a: valid de-DE transcript is persisted automatically when Generate & Verify begins and shows its returned source ID/version. AC-35b: blank/invalid input exposes backend field error without claiming it saved. AC-35c: selecting an example loads only its declared immutable source/version. AC-35d: a persisted transcript is shown as a locked snapshot; an explicit edit action is required before replacement text can create a new source. |
+| FR-36 | Generate a professional German note and automatically perform complete verification. | AC-36a: Generate & Verify saves any unsaved transcript, creates a DRAFT note, and requests the backend's current full-note verification for that exact note/source revision. AC-36b: the generated note remains read-only in this workspace; corrections occur only in Human Review. AC-36c: provider failure/timeout has a failure state and no editable false-success record. AC-36d: repeating generation for an unchanged generated candidate is a no-op when whitespace-normalized content, semantic structured facts, resident identity, and source ID/version all match; no new provider request or candidate note is created. AC-36e: a failed, invalid, or unavailable verification remains visibly non-eligible and does not hide the generated candidate or imply approval. |
 | FR-37 | Display backend-returned observations, symptoms, measurements, and actions. | AC-37a: facts are grouped by returned fact type with source anchors. AC-37b: absent fact fields display as absent, not inferred values. |
 | FR-38 | Display individually addressable claims and their evidence statuses. | AC-38a: each claim row has its immutable ID, note span, status, explanation, and run reference. AC-38b: supported, unsupported, contradicted, and uncertain are textually distinct. |
 | FR-39 | Highlight affected note claims and source spans with explanations and severities. | AC-39a: selecting a valid finding scrolls both immutable texts to its returned spans. AC-39b: invalid/missing evidence says unavailable and highlights nothing. AC-39c: rule and source-based findings carry visibly distinct provenance labels. |
@@ -64,9 +60,7 @@ A reviewer operates only on synthetic German scenarios. The backend is reachable
 
 ## Required workflows
 
-Documentation first submits or selects a source, then generates/imports a draft. It displays source facts supplied by Spec 002. A draft can be saved only while unapproved/unrejected and is always associated with a source ID/version. Repeating generation for an unchanged generated candidate must not create another provider request or candidate note when its whitespace-normalized content, semantic structured facts, resident identity, and source ID/version are unchanged.
-
-Evidence Verification consumes the current review context and full-note results. Claim selection uses backend note spans and source spans; it exposes semantic, deterministic, and coverage findings without collapsing their meaning.
+Documentation & Verification accepts or loads a transcript, lets the reviewer correct it before generation, and automatically persists the resulting source when Generate & Verify begins. It then creates a draft and requests the backend's complete verification for that exact note/source revision. The workspace displays the generated note read-only beside the backend's full-note results; it cannot correct or approve the note. Repeating the action for an unchanged generated candidate must reuse the existing candidate and current results when its whitespace-normalized content, semantic structured facts, resident identity, and source ID/version are unchanged.
 
 Human Review creates immutable successors and decision events only through Spec 007. Any edit or accepted correction makes predecessor findings stale for approval. Claim-level re-verification supplies feedback only; final approval requires an eligible current full-note run. Rejection remains possible after a verification failure.
 
@@ -84,6 +78,7 @@ Evaluation uses Spec 008 evaluation-run records. It displays metrics and pairing
 8. The backend remains the final enforcer for revision state, decision persistence, and approval eligibility; client disabling is advisory.
 9. LLM credentials exist only in server-side environment variables. No client build variable, API response, log, or source map may contain them.
 10. Every asynchronous response is compared with its requested note/source/revision/run identity before it can update visible state.
+11. Documentation & Verification never enables note editing, finding decisions, approval, or rejection; those actions remain exclusive to Human Review.
 
 ## Error and boundary behavior
 

@@ -7,6 +7,7 @@ in-memory/SQLite repositories while storing immutable records in PostgreSQL.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
@@ -145,6 +146,34 @@ class PostgresSourceRepository:
                 ),
             )
         return document.model_copy(deep=True)
+
+    def ensure_initial(self, documents: Iterable[SourceDocument]) -> None:
+        """Insert initial documents in one transaction without overwriting them."""
+
+        pending = tuple(documents)
+        if not pending:
+            return
+        with self._database.transaction() as connection:
+            with connection.cursor() as cursor:
+                cursor.executemany(
+                    """
+                    INSERT INTO source_documents
+                    (source_id, source_version, resident_test_id, language, transcript_text, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (source_id, source_version) DO NOTHING
+                    """,
+                    [
+                        (
+                            document.source_id,
+                            document.source_version,
+                            document.resident_test_id,
+                            document.language,
+                            document.transcript_text,
+                            document.created_at,
+                        )
+                        for document in pending
+                    ],
+                )
 
     def create_next_version(
         self, source_id: str, expected_source_version: int, transcript_text: str, created_at: datetime

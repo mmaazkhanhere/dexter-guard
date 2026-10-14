@@ -1,8 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 
 const navigation = [
-  ["/documentation", "Documentation"],
-  ["/verification", "Evidence Verification"],
+  ["/documentation", "Documentation & Verification"],
   ["/review", "Human Review"],
   ["/evaluation", "Evaluation"],
 ] as const;

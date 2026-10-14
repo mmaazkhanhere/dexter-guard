@@ -1,19 +1,28 @@
+from unittest.mock import patch
+
 from fastapi.testclient import TestClient
 
 from app.main import create_app
 
 
 def test_composed_app_exposes_safe_health_and_synthetic_examples() -> None:
-    client = TestClient(create_app())
+    app = create_app()
+    client = TestClient(app)
+    repository = app.state.source_service.repository
 
     health = client.get("/api/v1/health")
-    examples = client.get("/api/v1/saved-examples")
+    with patch.object(repository, "version_exists", wraps=repository.version_exists) as version_exists:
+        examples = client.get("/api/v1/saved-examples")
+        cached_examples = client.get("/api/v1/saved-examples")
 
     assert health.status_code == 200
     assert health.json() == {"status": "degraded", "database": "unavailable"}
     assert examples.status_code == 200
     assert examples.json()
     assert all(item["syntheticOnly"] is True for item in examples.json())
+    assert cached_examples.json() == examples.json()
+    assert app.state.source_service.repository.count() == len(examples.json())
+    version_exists.assert_not_called()
 
 
 def test_composed_app_preserves_source_and_note_routes() -> None:

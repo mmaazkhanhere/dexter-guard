@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import os
+from threading import Lock
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query, status
@@ -62,20 +63,21 @@ def _saved_examples(source_service: SourceIngestionService) -> list[dict[str, ob
 
     examples: list[dict[str, object]] = []
     dataset = default_dataset()
-    for case in dataset.scenarios[:12]:
+    cases = dataset.scenarios[:12]
+    source_documents = [
+        SourceDocument(
+            source_id=case.source.source_id,
+            source_version=case.source.source_version,
+            resident_test_id=case.source.resident_test_id,
+            language=case.source.language,
+            transcript_text=case.source.transcript_text,
+            created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        )
+        for case in cases
+    ]
+    source_service.repository.ensure_initial(source_documents)
+    for case in cases:
         source = case.source
-        repository = source_service.repository
-        if not repository.version_exists(source.source_id, source.source_version):
-            repository.create_initial(
-                SourceDocument(
-                    source_id=source.source_id,
-                    source_version=source.source_version,
-                    resident_test_id=source.resident_test_id,
-                    language=source.language,
-                    transcript_text=source.transcript_text,
-                    created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
-                )
-            )
         examples.append(
             {
                 "exampleId": f"synthetic-example-{case.scenario_id}",
@@ -140,6 +142,8 @@ def create_app() -> FastAPI:
     app.state.deterministic_validation_service = workflow.validation_service
     app.state.source_coverage_service = workflow.coverage_service
     app.state.persistence = persistence
+    saved_examples_cache: list[dict[str, object]] | None = None
+    saved_examples_lock = Lock()
 
     @app.get("/api/v1/health", tags=["health"])
     def health() -> dict[str, str]:
@@ -156,7 +160,12 @@ def create_app() -> FastAPI:
 
     @app.get("/api/v1/saved-examples", tags=["examples"])
     def saved_examples() -> list[dict[str, object]]:
-        return _saved_examples(source_service)
+        nonlocal saved_examples_cache
+        if saved_examples_cache is None:
+            with saved_examples_lock:
+                if saved_examples_cache is None:
+                    saved_examples_cache = _saved_examples(source_service)
+        return saved_examples_cache
 
     def _note_revision(note_id: str, revision: int) -> Any:
         try:
