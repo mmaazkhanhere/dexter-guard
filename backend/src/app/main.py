@@ -10,7 +10,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import os
 from threading import Lock
+from time import perf_counter
 from typing import Any
+from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Query, status
 from fastapi.responses import JSONResponse
@@ -21,6 +23,7 @@ from evaluation.benchmark import default_dataset
 from evaluation.repository import SQLiteEvaluationRepository
 from evaluation.runner import EvaluationRunner
 from .llm_config import evidence_verifier_from_environment, generation_adapter_from_environment
+from .observability import workflow_log
 from human_review.api import create_router as create_review_router
 from human_review.contracts import ClaimReverificationRequest
 from human_review.repository import InMemoryReviewRepository
@@ -180,6 +183,42 @@ def create_app() -> FastAPI:
         deterministic_validation_service=workflow.validation_service,
         coverage_service=workflow.coverage_service,
     )
+
+    @app.middleware("http")
+    async def observe_request(request, call_next):
+        """Trace every API request without logging its body or query parameters."""
+
+        request_id = request.headers.get("x-request-id") or f"request-{uuid4()}"
+        path = request.url.path
+        operation = _operation_for_path(path)
+        started = perf_counter()
+        workflow_log(operation, "HTTP_REQUEST_STARTED", requestId=request_id, method=request.method, path=path)
+        try:
+            response = await call_next(request)
+        except Exception as error:
+            workflow_log(
+                operation,
+                "HTTP_REQUEST_FAILED",
+                outcome="ERROR",
+                requestId=request_id,
+                method=request.method,
+                path=path,
+                errorType=type(error).__name__,
+                latencyMs=round((perf_counter() - started) * 1000, 2),
+            )
+            raise
+        response.headers["x-request-id"] = request_id
+        workflow_log(
+            operation,
+            "HTTP_REQUEST_COMPLETED",
+            outcome="SUCCESS" if response.status_code < 400 else "ERROR",
+            requestId=request_id,
+            method=request.method,
+            path=path,
+            statusCode=response.status_code,
+            latencyMs=round((perf_counter() - started) * 1000, 2),
+        )
+        return response
     app.title = "Dexter Guard Reliability Engine"
     app.version = "UI-INTEGRATION-CONTRACT-v1"
     app.state.source_service = source_service
@@ -267,6 +306,30 @@ def create_app() -> FastAPI:
     app.state.evaluation_runner = evaluation_runner
     app.include_router(create_evaluation_router(evaluation_runner))
     return app
+
+
+def _operation_for_path(path: str) -> str:
+    """Classify route paths into a workflow boundary for readable console logs."""
+
+    if path.endswith("/health"):
+        return "HEALTH"
+    if "/evaluation" in path:
+        return "EVALUATION"
+    if "/reviews/" in path:
+        return "HUMAN_REVIEW"
+    if "/coverage" in path:
+        return "SOURCE_COVERAGE"
+    if "/deterministic-validation" in path:
+        return "DETERMINISTIC_VALIDATION"
+    if "/verification" in path:
+        return "EVIDENCE_VERIFICATION"
+    if "/claims/" in path:
+        return "CLAIM_EXTRACTION"
+    if "/notes/" in path:
+        return "NOTE"
+    if "/sources" in path or "/source-spans" in path or "/saved-examples" in path:
+        return "SOURCE"
+    return "REQUEST"
 
 
 app = create_app()

@@ -44,6 +44,7 @@ from evidence_verification.service import VerificationService
 from human_review.contracts import EvidenceDisplay, NoteSpan, ReviewFinding
 from human_review.ports import ReferenceOnlyVerificationPorts, UpstreamRun
 from human_review.policy import severity_for
+from app.observability import workflow_log, workflow_step
 from nursing_notes.repository import NoteRepository
 from source_coverage.contracts import CoverageRunRequest
 from source_coverage.extraction import SourceFactExtractionResult, source_text_hash
@@ -200,8 +201,9 @@ class WorkflowVerificationPorts:
         return note, self.source_service.get_source_version(note.source_id, note.source_version)
 
     def extract(self, note_id: str, revision: int) -> UpstreamRun:
-        note, source = self._source(note_id, revision)
-        result = self.claim_service.extract_claims(f"{note_id}:r{revision}")
+        with workflow_step("CLAIM_EXTRACTION", "CLAIM_EXTRACTION", noteId=note_id, noteRevision=revision):
+            note, source = self._source(note_id, revision)
+            result = self.claim_service.extract_claims(f"{note_id}:r{revision}")
         claim_set_id = result.extraction_run_id
         if result.status in {ExtractionStatus.SUCCEEDED, ExtractionStatus.EMPTY}:
             source_facts = self.coverage_service.extractor.extract(source, extraction_run_id=f"source-facts-{claim_set_id}")
@@ -211,14 +213,17 @@ class WorkflowVerificationPorts:
                 resident_test_id=source.resident_test_id, source_id=source.source_id,
                 source_version=source.source_version, claims=tuple(result.claims),
             )
-        return UpstreamRun(
+        run = UpstreamRun(
             run_id=result.extraction_run_id,
             status="SUCCEEDED" if result.status in {ExtractionStatus.SUCCEEDED, ExtractionStatus.EMPTY} else "FAILED",
             source_id=source.source_id, source_version=source.source_version,
             note_id=note_id, note_revision=revision, claim_set_id=claim_set_id,
         )
+        workflow_log("CLAIM_EXTRACTION", "CLAIM_EXTRACTION_RESULT", outcome="SUCCESS" if run.status == "SUCCEEDED" else "ERROR", noteId=note_id, noteRevision=revision, runId=run.run_id, status=run.status, claimCount=len(result.claims))
+        return run
 
     def evidence(self, note_id: str, revision: int, claim_set_id: str) -> UpstreamRun:
+        workflow_log("EVIDENCE_VERIFICATION", "EVIDENCE_VERIFICATION_STARTED", noteId=note_id, noteRevision=revision, claimSetId=claim_set_id)
         note, source = self._source(note_id, revision)
         result = self.claim_service.repository.get_current_result(f"{note_id}:r{revision}")
         if result is None or result.extraction_run_id != claim_set_id or not result.claims:
@@ -232,7 +237,9 @@ class WorkflowVerificationPorts:
         run = self.evidence_service.verify(request)
         self._persist_evidence_findings(run, result.claims, source)
         status = "SUCCEEDED" if getattr(run, "status", None) == "SUCCEEDED" else "FAILED"
-        return UpstreamRun(run_id=run.verification_run_id, status=status, source_id=source.source_id, source_version=source.source_version, note_id=note_id, note_revision=revision, claim_set_id=claim_set_id)
+        upstream = UpstreamRun(run_id=run.verification_run_id, status=status, source_id=source.source_id, source_version=source.source_version, note_id=note_id, note_revision=revision, claim_set_id=claim_set_id)
+        workflow_log("EVIDENCE_VERIFICATION", "EVIDENCE_VERIFICATION_RESULT", outcome="SUCCESS" if status == "SUCCEEDED" else "ERROR", noteId=note_id, noteRevision=revision, runId=upstream.run_id, status=status, findingCount=len(getattr(run, "findings", ())))
+        return upstream
 
     def _claim_span(self, claims, claim_id: str | None) -> NoteSpan | None:
         if not claim_id:
@@ -383,6 +390,7 @@ class WorkflowVerificationPorts:
             ))
 
     def validation(self, note_id: str, revision: int, claim_set_id: str) -> UpstreamRun:
+        workflow_log("DETERMINISTIC_VALIDATION", "DETERMINISTIC_VALIDATION_STARTED", noteId=note_id, noteRevision=revision, claimSetId=claim_set_id)
         note, source = self._source(note_id, revision)
         result = self.claim_service.repository.get_current_result(f"{note_id}:r{revision}")
         extraction = self.extraction_repository.get(f"source-facts-{claim_set_id}")
@@ -393,7 +401,9 @@ class WorkflowVerificationPorts:
         )
         prepared = _deterministic_records(source, note_id, revision, extraction, result.claims)
         if prepared is None:
-            return UpstreamRun(run_id=f"validation-{claim_set_id}", status="FAILED" if uncomparable_numeric else "SUCCEEDED", source_id=source.source_id, source_version=source.source_version, note_id=note_id, note_revision=revision, claim_set_id=claim_set_id)
+            upstream = UpstreamRun(run_id=f"validation-{claim_set_id}", status="FAILED" if uncomparable_numeric else "SUCCEEDED", source_id=source.source_id, source_version=source.source_version, note_id=note_id, note_revision=revision, claim_set_id=claim_set_id)
+            workflow_log("DETERMINISTIC_VALIDATION", "DETERMINISTIC_VALIDATION_RESULT", outcome="SUCCESS" if upstream.status == "SUCCEEDED" else "ERROR", noteId=note_id, noteRevision=revision, runId=upstream.run_id, status=upstream.status, findingCount=0)
+            return upstream
         snapshot, facts, claims, alignments, request = prepared
         self.validation_transcripts._items[(snapshot.source_id, snapshot.source_version)] = snapshot
         self.validation_facts._items.update({item.source_fact_id: item for item in facts})
@@ -401,7 +411,9 @@ class WorkflowVerificationPorts:
         self.validation_alignments._items.update({item.alignment_id: item for item in alignments})
         run = self.validation_service.execute(request)
         self._persist_validation_findings(run, result.claims, source)
-        return UpstreamRun(run_id=run.validation_run_id, status="FAILED" if uncomparable_numeric else "SUCCEEDED", source_id=source.source_id, source_version=source.source_version, note_id=note_id, note_revision=revision, claim_set_id=claim_set_id)
+        upstream = UpstreamRun(run_id=run.validation_run_id, status="FAILED" if uncomparable_numeric else "SUCCEEDED", source_id=source.source_id, source_version=source.source_version, note_id=note_id, note_revision=revision, claim_set_id=claim_set_id)
+        workflow_log("DETERMINISTIC_VALIDATION", "DETERMINISTIC_VALIDATION_RESULT", outcome="SUCCESS" if upstream.status == "SUCCEEDED" else "ERROR", noteId=note_id, noteRevision=revision, runId=upstream.run_id, status=upstream.status, findingCount=len(run.findings))
+        return upstream
 
     def _persist_uncomparable_numeric_findings(self, note_id, revision, claim_set_id, extraction, claims, source) -> bool:
         numeric_facts = tuple(fact for fact in extraction.facts if fact.numeric_value and fact.unit)
@@ -465,6 +477,7 @@ class WorkflowVerificationPorts:
         return uncomparable
 
     def coverage(self, note_id: str, revision: int, claim_set_id: str) -> UpstreamRun:
+        workflow_log("SOURCE_COVERAGE", "SOURCE_COVERAGE_STARTED", noteId=note_id, noteRevision=revision, claimSetId=claim_set_id)
         note, source = self._source(note_id, revision)
         extraction = self.extraction_repository.get(f"source-facts-{claim_set_id}")
         request = CoverageRunRequest(
@@ -479,7 +492,9 @@ class WorkflowVerificationPorts:
         self._persist_coverage_findings(run, self.claim_sets.get(claim_set_id).claims, source)
         status = "SUCCEEDED" if getattr(run, "status", None) == "SUCCEEDED" else "FAILED"
         unresolved = getattr(getattr(run, "runtime_counts", None), "unresolved_source_items", 0)
-        return UpstreamRun(run_id=run.coverage_run_id, status=status, source_id=source.source_id, source_version=source.source_version, note_id=note_id, note_revision=revision, claim_set_id=claim_set_id, unresolved_source_items=unresolved)
+        upstream = UpstreamRun(run_id=run.coverage_run_id, status=status, source_id=source.source_id, source_version=source.source_version, note_id=note_id, note_revision=revision, claim_set_id=claim_set_id, unresolved_source_items=unresolved)
+        workflow_log("SOURCE_COVERAGE", "SOURCE_COVERAGE_RESULT", outcome="SUCCESS" if status == "SUCCEEDED" else "ERROR", noteId=note_id, noteRevision=revision, runId=upstream.run_id, status=status, findingCount=len(getattr(run, "findings", ()),), unresolvedSourceItemCount=unresolved)
+        return upstream
 
 
 class ReliabilityWorkflow:

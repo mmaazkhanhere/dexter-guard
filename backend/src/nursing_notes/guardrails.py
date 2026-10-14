@@ -49,35 +49,49 @@ class GenerationGuardrails:
     def normalize(result: GenerationResult, source: Any) -> GenerationResult:
         """Repair a narrow model-span omission without changing asserted meaning.
 
-        A provider may return a valid temporal qualifier while anchoring only the
-        noun phrase that follows it. When the qualifier and the existing anchor
-        are both inside one exact source sentence, expand the anchor to that
-        sentence. If the qualifier cannot be located unambiguously, validation
-        remains fail-closed.
+        A provider may return valid context while anchoring only the noun phrase
+        that follows it. When the context and the existing anchor are both inside
+        one exact source sentence, expand the anchor to that sentence. If the
+        context cannot be located unambiguously, validation remains fail-closed.
         """
 
         facts = tuple(
-            GenerationGuardrails._normalize_temporal_anchor(fact, source)
+            GenerationGuardrails._normalize_contextual_anchor(fact, source)
             for fact in result.facts
         )
         return result.model_copy(update={"facts": facts})
 
     @staticmethod
-    def _normalize_temporal_anchor(fact: Any, source: Any) -> Any:
+    def _normalize_contextual_anchor(fact: Any, source: Any) -> Any:
         anchor = fact.source_anchor
         qualifier = fact.temporal_qualifier
-        if qualifier is None or anchor.start is None or anchor.end is None:
+        attribution = fact.attribution
+        if anchor.start is None or anchor.end is None:
             return fact
         text = source.transcript_text
         excerpt = text[anchor.start : anchor.end]
-        if qualifier.casefold() in excerpt.casefold():
+        temporal_missing = qualifier is not None and qualifier.casefold() not in excerpt.casefold()
+        attribution_missing = (
+            attribution == "RESIDENT_REPORTED"
+            and _RESIDENT_REPORT.search(excerpt) is None
+        ) or (
+            attribution == "CAREGIVER_OBSERVED"
+            and _CAREGIVER_OBSERVATION.search(excerpt) is None
+        )
+        if not temporal_missing and not attribution_missing:
             return fact
         statement_tokens = _tokens(fact.statement)
         for match in re.finditer(r"[^.!?\r\n]+(?:[.!?]|$)", text):
             sentence_start = match.start()
             sentence_end = match.end()
             sentence = text[sentence_start:sentence_end]
-            if qualifier.casefold() not in sentence.casefold():
+            temporal_supported = qualifier is None or qualifier.casefold() in sentence.casefold()
+            attribution_supported = (
+                attribution != "RESIDENT_REPORTED" or _RESIDENT_REPORT.search(sentence) is not None
+            ) and (
+                attribution != "CAREGIVER_OBSERVED" or _CAREGIVER_OBSERVATION.search(sentence) is not None
+            )
+            if not temporal_supported or not attribution_supported:
                 continue
             anchor_matches = sentence_start <= anchor.start and anchor.end <= sentence_end
             statement_matches = bool(statement_tokens) and statement_tokens.issubset(_tokens(sentence))

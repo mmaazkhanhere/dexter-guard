@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "Evidence-oriented source ingestion foundation"
 requires-python = ">=3.11"
 dependencies = [
+  "colorama>=0.4.6,<1",
   "fastapi>=0.115,<1",
   "openai>=1.0,<2",
   "psycopg[binary]>=3.2,<4",

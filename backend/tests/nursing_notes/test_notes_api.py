@@ -276,6 +276,29 @@ def test_gen_005_resident_reported_information_retains_attribution(note_context)
     assert response.json()["facts"][0]["attribution"] == "RESIDENT_REPORTED"
 
 
+def test_gen_005b_expands_narrow_resident_attribution_anchor(note_context):
+    client = note_context["client"]
+    text = "Die Bewohnerin berichtet über Übelkeit."
+    source = create_source(client, text)
+    source_model = note_context["source_service"].get_source_version(source["source_id"], 1)
+    candidate = fact(
+        source_model,
+        "Übelkeit",
+        fact_type="SYMPTOM",
+        attribution="RESIDENT_REPORTED",
+    )
+    note_context["adapter"].factory = result_factory(candidate)
+
+    response = client.post(
+        "/api/v1/notes/generate",
+        json={"sourceId": source["source_id"], "sourceVersion": 1, "requestedBy": "tester"},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["facts"][0]["attribution"] == "RESIDENT_REPORTED"
+    assert response.json()["facts"][0]["sourceAnchor"]["start"] == 0
+
+
 def test_gen_006_returns_observation_symptom_measurement_and_action_facts(note_context):
     client = note_context["client"]
     text = "Die Haut ist trocken. Die Bewohnerin berichtet über Schmerz. Die Temperatur beträgt 36,8 °C. Die Pflegekraft führte eine Lagerung durch."
