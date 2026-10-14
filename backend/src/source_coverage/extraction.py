@@ -207,9 +207,25 @@ class HeuristicGermanSourceFactExtractor:
         for start, end, clause in _find_clauses(source.transcript_text):
             lower = clause.casefold()
             measurement = _MEASUREMENT.search(clause)
+            if not measurement:
+                measurement = re.search(
+                    r"(?:(?:trank|getrunken|aufnahme|menge|dosis|erhielt|verabreicht)\s*)"
+                    r"(ca\.\s*)?(-?\d+(?:[,.]\d+)?)\s*(mmhg|ml|mg|g|l)\b",
+                    clause,
+                    re.IGNORECASE,
+                )
             if measurement:
                 raw_unit = measurement.group(3).casefold().replace("°", "")
-                unit = "CELSIUS" if raw_unit in {"c", "celsius", "grad"} else raw_unit.upper()
+                unit = {
+                    "c": "CELSIUS",
+                    "celsius": "CELSIUS",
+                    "grad": "CELSIUS",
+                    "ml": "MILLILITRE",
+                    "l": "LITRE",
+                    "mg": "MILLIGRAM",
+                    "g": "GRAM",
+                    "mmhg": "MMHG",
+                }[raw_unit]
                 facts.append(_make_fact(source, run_id, start, end, clause, SourceFactCategory.MEASUREMENT,
                                         numeric=measurement.group(2).replace(",", "."), unit=unit,
                                         approximation=Approximation.APPROXIMATE if measurement.group(1) else Approximation.EXACT))

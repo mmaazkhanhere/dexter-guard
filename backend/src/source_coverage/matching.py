@@ -156,8 +156,45 @@ def _attribute_differences(fact: SourceFact, claim: Claim) -> tuple[tuple[Materi
     compare(MaterialAttribute.TEMPORAL, fact.temporal_text, claim.temporal_text)
     compare(MaterialAttribute.LATERALITY, fact.laterality.value, _infer_laterality(claim_text))
     claim_numeric, claim_unit, claim_approximation = _claim_numeric(claim)
-    compare(MaterialAttribute.NUMERIC_VALUE, fact.numeric_value, claim_numeric)
-    compare(MaterialAttribute.UNIT, fact.unit, claim_unit)
+    source_numeric = (fact.numeric_value, fact.unit)
+    claim_numeric_pair = (claim_numeric, claim_unit)
+    from decimal import Decimal, InvalidOperation
+
+    def canonical_numeric(pair):
+        raw_value, raw_unit = pair
+        if raw_value is None or raw_unit is None:
+            return None
+        try:
+            value = Decimal(str(raw_value).replace(",", "."))
+        except (InvalidOperation, ValueError):
+            return None
+        unit = str(raw_unit).upper()
+        factors = {
+            "ML": (Decimal("1"), "MILLILITRE"),
+            "MILLILITRE": (Decimal("1"), "MILLILITRE"),
+            "L": (Decimal("1000"), "MILLILITRE"),
+            "LITRE": (Decimal("1000"), "MILLILITRE"),
+            "MG": (Decimal("1"), "MILLIGRAM"),
+            "MILLIGRAM": (Decimal("1"), "MILLIGRAM"),
+            "G": (Decimal("1000"), "MILLIGRAM"),
+            "GRAM": (Decimal("1000"), "MILLIGRAM"),
+            "C": (Decimal("1"), "CELSIUS"),
+            "CELSIUS": (Decimal("1"), "CELSIUS"),
+            "MMHG": (Decimal("1"), "MMHG"),
+        }
+        conversion = factors.get(unit)
+        return None if conversion is None else (value * conversion[0], conversion[1])
+
+    source_canonical = canonical_numeric(source_numeric)
+    claim_canonical = canonical_numeric(claim_numeric_pair)
+    if source_canonical is not None and claim_canonical is not None:
+        if source_canonical == claim_canonical:
+            preserved.extend((MaterialAttribute.NUMERIC_VALUE, MaterialAttribute.UNIT))
+        else:
+            distorted.append(MaterialAttribute.NUMERIC_VALUE)
+    else:
+        compare(MaterialAttribute.NUMERIC_VALUE, fact.numeric_value, claim_numeric)
+        compare(MaterialAttribute.UNIT, fact.unit, claim_unit)
     compare(MaterialAttribute.APPROXIMATION, fact.approximation.value, claim_approximation.value)
     if fact.mobility_assistance:
         if not any(token in claim_text.casefold() for token in ("hilfe", "unterstützung", "unterstuetzung", "assist", "rollator")):

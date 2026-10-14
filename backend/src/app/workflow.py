@@ -388,9 +388,12 @@ class WorkflowVerificationPorts:
         extraction = self.extraction_repository.get(f"source-facts-{claim_set_id}")
         if result is None or result.extraction_run_id != claim_set_id:
             raise LookupError("CLAIM_SET_NOT_FOUND")
+        uncomparable_numeric = self._persist_uncomparable_numeric_findings(
+            note_id, revision, claim_set_id, extraction, result.claims, source,
+        )
         prepared = _deterministic_records(source, note_id, revision, extraction, result.claims)
         if prepared is None:
-            return UpstreamRun(run_id=f"validation-{claim_set_id}", status="SUCCEEDED", source_id=source.source_id, source_version=source.source_version, note_id=note_id, note_revision=revision, claim_set_id=claim_set_id)
+            return UpstreamRun(run_id=f"validation-{claim_set_id}", status="FAILED" if uncomparable_numeric else "SUCCEEDED", source_id=source.source_id, source_version=source.source_version, note_id=note_id, note_revision=revision, claim_set_id=claim_set_id)
         snapshot, facts, claims, alignments, request = prepared
         self.validation_transcripts._items[(snapshot.source_id, snapshot.source_version)] = snapshot
         self.validation_facts._items.update({item.source_fact_id: item for item in facts})
@@ -398,7 +401,68 @@ class WorkflowVerificationPorts:
         self.validation_alignments._items.update({item.alignment_id: item for item in alignments})
         run = self.validation_service.execute(request)
         self._persist_validation_findings(run, result.claims, source)
-        return UpstreamRun(run_id=run.validation_run_id, status="SUCCEEDED", source_id=source.source_id, source_version=source.source_version, note_id=note_id, note_revision=revision, claim_set_id=claim_set_id)
+        return UpstreamRun(run_id=run.validation_run_id, status="FAILED" if uncomparable_numeric else "SUCCEEDED", source_id=source.source_id, source_version=source.source_version, note_id=note_id, note_revision=revision, claim_set_id=claim_set_id)
+
+    def _persist_uncomparable_numeric_findings(self, note_id, revision, claim_set_id, extraction, claims, source) -> bool:
+        numeric_facts = tuple(fact for fact in extraction.facts if fact.numeric_value and fact.unit)
+        if not numeric_facts:
+            return False
+        numeric_claims = tuple(value for claim in claims for value in claim.numeric_values)
+        uncomparable = False
+        run_id = f"validation-{claim_set_id}"
+        for fact in numeric_facts:
+            expected_unit = fact.unit.upper()
+            compatible_units = {
+                "CELSIUS": {"CELSIUS"},
+                "MILLILITRE": {"MILLILITRE", "LITRE"},
+                "LITRE": {"MILLILITRE", "LITRE"},
+                "MILLIGRAM": {"MILLIGRAM", "GRAM"},
+                "GRAM": {"MILLIGRAM", "GRAM"},
+                "MMHG": {"MMHG"},
+            }
+            comparable = any(
+                (value.unit_normalized or "").upper() in compatible_units.get(expected_unit, set())
+                for value in numeric_claims
+            )
+            if comparable:
+                continue
+            uncomparable = True
+            finding_id = f"review-{run_id}-NUM-006-{fact.source_fact_id}"
+            if finding_id in self.review_service.repository.findings:
+                continue
+            severity, rationale = severity_for(origin="SPEC_005", rule_code="NUM-006")
+            if numeric_claims:
+                explanation = (
+                    f"The source measurement {fact.numeric_value} {fact.unit} has no comparable note measurement. "
+                    "The note value or unit could not be matched deterministically."
+                )
+            else:
+                explanation = (
+                    f"The source measurement {fact.numeric_value} {fact.unit} has no numeric value in the note. "
+                    "Numeric comparison was not evaluable."
+                )
+            self.review_service.add_finding(ReviewFinding(
+                reviewFindingId=finding_id,
+                origin="SPEC_005",
+                originRunId=run_id,
+                originFindingId=f"{run_id}:NUM-006:{fact.source_fact_id}",
+                noteId=note_id,
+                noteRevision=revision,
+                sourceId=source.source_id,
+                sourceVersion=source.source_version,
+                claimId=None,
+                claimSpan=None,
+                upstreamStatus="NOT_EVALUABLE",
+                ruleCode="NUM-006",
+                severity=severity,
+                severityPolicyVersion="REVIEW_SEVERITY-v1",
+                severityRationale=rationale,
+                explanation=explanation,
+                evidence=self._source_evidence(source, fact.source_spans),
+                state="OPEN",
+                createdAt=datetime.now(timezone.utc),
+            ))
+        return uncomparable
 
     def coverage(self, note_id: str, revision: int, claim_set_id: str) -> UpstreamRun:
         note, source = self._source(note_id, revision)
@@ -495,7 +559,16 @@ def _deterministic_records(source, note_id: str, revision: int, extraction: Sour
             if not claim.numeric_values:
                 continue
             value = claim.numeric_values[0]
-            if (value.unit_normalized or "").upper() == unit.value:
+            claim_unit = (value.unit_normalized or "").upper()
+            compatible_units = {
+                "CELSIUS": {"CELSIUS"},
+                "MILLILITRE": {"MILLILITRE", "LITRE"},
+                "LITRE": {"MILLILITRE", "LITRE"},
+                "MILLIGRAM": {"MILLIGRAM", "GRAM"},
+                "GRAM": {"MILLIGRAM", "GRAM"},
+                "MMHG": {"MMHG"},
+            }
+            if claim_unit in compatible_units.get(unit.value, set()):
                 pairs.append((fact, claim, category, unit, value))
                 break
     if not pairs:
@@ -511,7 +584,7 @@ def _deterministic_records(source, note_id: str, revision: int, extraction: Sour
         claim_id = f"dve-{claim.id}"
         alignment_id = f"dve-alignment-{index}"
         facts_out.append(DeterministicSourceFact(sourceFactId=fact_id, sourceId=source.source_id, sourceVersion=source.source_version, measurement={"category": category.value, "value": fact.numeric_value, "unit": unit.value, "approximation": approximation}, evidence=(evidence,)))
-        claims_out.append(DeterministicClaim(claimId=claim_id, noteId=note_id, noteRevision=revision, measurement={"category": category.value, "value": str(value.normalized_decimal or value.raw).replace(",", "."), "unit": unit.value, "approximation": approximation}, evidence=(evidence,)))
+        claims_out.append(DeterministicClaim(claimId=claim_id, noteId=note_id, noteRevision=revision, measurement={"category": category.value, "value": str(value.normalized_decimal or value.raw).replace(",", "."), "unit": value.unit_normalized or unit.value, "approximation": approximation}, evidence=(evidence,)))
         alignments.append(Alignment(alignmentId=alignment_id, sourceFactId=fact_id, claimId=claim_id, status="ALIGNED"))
     request = ValidationRequest(rulesetVersion="DVE-RULESET-v1", sourceId=source.source_id, sourceVersion=source.source_version, noteId=note_id, noteRevision=revision, sourceFactIds=tuple(item.source_fact_id for item in facts_out), claimIds=tuple(item.claim_id for item in claims_out), alignmentIds=tuple(item.alignment_id for item in alignments))
     return TranscriptSnapshot(sourceId=source.source_id, sourceVersion=source.source_version, transcriptText=source.transcript_text), tuple(facts_out), tuple(claims_out), tuple(alignments), request

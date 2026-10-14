@@ -248,6 +248,32 @@ def test_review_context_exposes_validation_and_coverage_details() -> None:
     assert body["approvalEligible"] is False
 
 
+def test_missing_note_measurement_fails_closed_instead_of_skipping_numeric_validation() -> None:
+    app = create_app()
+    client = TestClient(app)
+    source_text = "Die Bewohnerin berichtet eine Temperatur von 37,2 C."
+    note_text = "Die Bewohnerin berichtet eine normale Temperatur."
+    _, note = _import_note(client, source_text, "missing-number", content=note_text)
+
+    verification = _verify(client, note, "missing-number")
+    context = client.get(f"/api/v1/reviews/{note['noteId']}")
+
+    assert verification["status"] == "FAILED"
+    validation_status = next(
+        item for item in verification["componentStatuses"] if item["component"] == "DETERMINISTIC_VALIDATION"
+    )
+    assert validation_status["status"] == "FAILED"
+    assert context.status_code == 200
+    finding = next(
+        item for item in context.json()["findings"]
+        if item["origin"] == "SPEC_005" and item["ruleCode"] == "NUM-006"
+    )
+    assert finding["upstreamStatus"] == "NOT_EVALUABLE"
+    assert "37.2" in finding["explanation"] or "37,2" in finding["explanation"]
+    assert finding["evidence"]["availability"] == "AVAILABLE"
+    assert context.json()["approvalEligible"] is False
+
+
 def test_complete_workflow_calls_real_components_in_order(monkeypatch) -> None:
     app = create_app()
     client = TestClient(app)
