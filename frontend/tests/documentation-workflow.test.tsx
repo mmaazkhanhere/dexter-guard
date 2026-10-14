@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { DocumentationPage } from "../src/features/documentation/DocumentationPage";
+import { ToasterProvider } from "../src/components/shared/Toaster";
 import { WorkspaceProvider } from "../src/state/workspace";
 
 const source = { source_id: "source-1", source_version: 1, resident_test_id: "synthetic-1", language: "de-DE", transcript_text: "Die Bewohnerin berichtet guten Schlaf.", created_at: "2026-01-01T00:00:00Z" } as const;
@@ -11,7 +12,7 @@ const note = { noteId: "note-1", revision: 1, content: "Bewohnerin berichtet gut
 
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<MemoryRouter><QueryClientProvider client={queryClient}><WorkspaceProvider><DocumentationPage /></WorkspaceProvider></QueryClientProvider></MemoryRouter>);
+  return render(<MemoryRouter><QueryClientProvider client={queryClient}><WorkspaceProvider><ToasterProvider><DocumentationPage /></ToasterProvider></WorkspaceProvider></QueryClientProvider></MemoryRouter>);
 }
 
 describe("documentation workflow", () => {
@@ -30,11 +31,13 @@ describe("documentation workflow", () => {
     await user.type(screen.getByLabelText("Resident test ID"), "synthetic-1");
     await user.type(screen.getByLabelText("German transcript"), source.transcript_text);
     await user.click(screen.getByRole("button", { name: "Submit transcript" }));
-    await waitFor(() => expect(screen.getByText(/Source source-1/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Source source-1 · v1 · de-DE/)).toBeInTheDocument());
+    expect(screen.getByText(/Transcript saved/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "External note" }));
     await user.type(screen.getByLabelText("Candidate nursing note"), note.content);
     await user.click(screen.getByRole("button", { name: "Import note" }));
-    await waitFor(() => expect(screen.getByText(/Note note-1/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Note note-1 · revision 1 · IMPORTED/)).toBeInTheDocument());
+    expect(screen.getByText(/Candidate note imported/)).toBeInTheDocument();
 
     expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith("/notes/generate"))).toBe(false);
     expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith("/notes/import"))).toBe(true);

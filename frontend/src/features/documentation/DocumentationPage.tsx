@@ -3,11 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { safeMutationError, useCreateSource, useGenerateNote, useImportNote, useSavedExamples, useSource } from "../../api/hooks";
 import { WorkspaceHeader } from "../../components/shared/WorkspaceHeader";
 import { StateCard } from "../../components/shared/StateCard";
+import { useToast } from "../../components/shared/Toaster";
 import { useWorkspace } from "../../state/workspace";
 import { isExternalNoteValid, isTranscriptValid } from "./validation";
 
 export function DocumentationPage() {
   const navigate = useNavigate();
+  const { notify } = useToast();
   const { setSource, source, note, setNote, applyNoteRevision, setDraftContent } = useWorkspace();
   const examples = useSavedExamples();
   const createSource = useCreateSource();
@@ -24,20 +26,37 @@ export function DocumentationPage() {
 
   async function loadExample() {
     if (!example) return;
-    const result = await sourceQuery.refetch();
-    if (result.data) { setTranscript(result.data.transcript_text); setResidentId(result.data.resident_test_id); setCandidate(example.candidateNote ?? ""); }
+    try {
+      const result = await sourceQuery.refetch();
+      if (!result.data) throw result.error ?? new Error("The saved example did not return a source document.");
+      setTranscript(result.data.transcript_text); setResidentId(result.data.resident_test_id); setCandidate(example.candidateNote ?? "");
+      notify({ tone: "success", title: "Saved example loaded", message: `“${example.title}” loaded from source ${result.data.source_id}, version ${result.data.source_version}. No new source was created.` });
+    } catch (actionError) {
+      notifyFailure(notify, "Saved example could not be loaded", actionError, "The current transcript and candidate note were not changed.");
+    }
   }
   async function submitTranscript() {
     if (!isTranscriptValid(transcript)) return;
-    const result = await createSource.mutateAsync({ resident_test_id: residentId.trim(), language: "de-DE", transcript_text: transcript });
-    setSource(result); setNote(undefined); setDraftContent(undefined);
+    try {
+      const result = await createSource.mutateAsync({ resident_test_id: residentId.trim(), language: "de-DE", transcript_text: transcript });
+      setSource(result); setNote(undefined); setDraftContent(undefined);
+      notify({ tone: "success", title: "Transcript saved", message: `Source ${result.source_id}, version ${result.source_version}, was created for ${result.resident_test_id} (${result.language}). Any previous candidate note was cleared.` });
+    } catch (actionError) {
+      notifyFailure(notify, "Transcript was not saved", actionError, "No source or candidate note was changed.");
+    }
   }
   async function createNote() {
     if (!source) return;
-    const result = mode === "generate"
-      ? await generate.mutateAsync({ sourceId: source.source_id, sourceVersion: source.source_version, requestedBy: "synthetic-reviewer" })
-      : await importNote.mutateAsync({ sourceId: source.source_id, sourceVersion: source.source_version, content: candidate, externalOrigin: { system: "synthetic-external-demo", externalNoteId: `external-${Date.now()}` }, requestedBy: "synthetic-reviewer", facts: [] });
-    applyNoteRevision(result); setCandidate(result.content);
+    try {
+      const result = mode === "generate"
+        ? await generate.mutateAsync({ sourceId: source.source_id, sourceVersion: source.source_version, requestedBy: "synthetic-reviewer" })
+        : await importNote.mutateAsync({ sourceId: source.source_id, sourceVersion: source.source_version, content: candidate, externalOrigin: { system: "synthetic-external-demo", externalNoteId: `external-${Date.now()}` }, requestedBy: "synthetic-reviewer", facts: [] });
+      applyNoteRevision(result); setCandidate(result.content);
+      const action = mode === "generate" ? "generated" : "imported";
+      notify({ tone: "success", title: `Candidate note ${action}`, message: `Note ${result.noteId}, revision ${result.revision}, is a ${result.origin} draft for source ${result.sourceId}, version ${result.sourceVersion}. Run full verification before approval.` });
+    } catch (actionError) {
+      notifyFailure(notify, mode === "generate" ? "Note generation failed" : "Note import failed", actionError, "The current source and candidate note were not changed.");
+    }
   }
   return <>
     <WorkspaceHeader eyebrow="01 · DOCUMENTATION" title="Create a candidate nursing note" description="Submit a synthetic German transcript, generate or import a candidate note, and preserve the source identity through review." />
@@ -59,6 +78,11 @@ export function DocumentationPage() {
       </StateCard>
     </div>
   </>;
+}
+
+function notifyFailure(notify: ReturnType<typeof useToast>["notify"], title: string, error: unknown, unchanged: string) {
+  const detail = safeMutationError(error);
+  notify({ tone: "error", title, message: `${detail.message} (code: ${detail.code}). ${unchanged}` });
 }
 
 function FactList({ facts }: { facts: import("../../api/types").NursingFact[] }) {

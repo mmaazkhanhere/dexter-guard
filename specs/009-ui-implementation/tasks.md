@@ -41,6 +41,7 @@ Tasks are ordered by dependency and vertical slices. Checked tasks have implemen
 ## Phase 6 - integration, deployment, and acceptance
 
 - [x] T019 Add an application error boundary, responsive desktop layout, accessible text labels, and safe-error tests. Evidence: `frontend/src/components/shared/ErrorBoundary.tsx`, `frontend/tests/error-boundary.test.tsx`, `npm run lint`, Vitest.
+- [x] T023 Add accessible terminal-action notifications for source/example, note, review, verification, decision, and disposition workflows. Evidence: `frontend/src/components/shared/Toaster.tsx`, action handlers, and frontend notification tests.
 - [ ] T020 Configure PostgreSQL migrations/repository adapters and restart-safe deployed persistence. Blocked: no PostgreSQL provider/credentials or migration framework is available; local SQLite/in-memory repositories are not claimed as deployed persistence.
 - [ ] T021 Complete Vercel preview configuration and smoke verification. Repository configuration and build scripts exist in `vercel.json`, but Vercel account access, preview build, one-URL smoke, and production secrets remain unavailable.
 - [ ] T022 Execute the complete API-contract, backend, frontend, Playwright, deployed-smoke, and traceability matrix. Backend and frontend unit/build gates pass; Playwright/deployed/PostgreSQL gates remain open.

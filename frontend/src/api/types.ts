@@ -13,6 +13,7 @@ export type Finding = Schema["ReviewFinding"];
 export type Suggestion = Schema["SuggestedCorrection"];
 export type ReviewContext = Schema["ReviewContext"];
 export type ReviewDecision = Schema["ReviewDecision"];
+export type NoteDisposition = Schema["NoteDisposition"];
 export type AuditEvent = Schema["AuditEvent"];
 export type AuditResponse = Schema["AuditHistoryResponse"];
 export type FullVerification = Schema["FullNoteVerification"];

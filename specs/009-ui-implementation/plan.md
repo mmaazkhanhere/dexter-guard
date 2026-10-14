@@ -25,6 +25,8 @@ Feature modules own presentation only:
 - state: React Query hooks, revision-identity guards, local draft state.
 - ui: shadcn/ui primitives and accessible common components.
 
+The shared notification region announces terminal action outcomes through accessible status and alert semantics. Success messages identify the affected source, note, revision, verification, decision, or disposition and state any required next step. Failure messages include the normalized stable error code and explicitly state which persisted state was not changed. Notifications supplement, rather than replace, persistent inline error and eligibility states.
+
 Use Tailwind CSS and shadcn/ui for consistent controls. Use React Hook Form with Zod for only browser-owned input validation; backend Pydantic validation remains authoritative. Use TanStack Query for server state, not duplicated domain stores.
 
 ## Component boundaries and state

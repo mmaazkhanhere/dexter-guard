@@ -115,3 +115,13 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-
 .finding.selected { border-color: var(--ink); box-shadow: inset 3px 0 0 var(--ink); }
 .finding span, .finding em, .finding p { color: var(--muted); }
 .eligibility { color: var(--ink); }
+
+.toast-region { position: fixed; z-index: 20; top: 20px; right: 24px; width: min(420px, calc(100vw - 48px)); display: grid; gap: 10px; }
+.toast { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 14px 16px; border: 1px solid var(--ink); border-left-width: 4px; border-radius: 6px; background: var(--surface); box-shadow: 0 12px 30px rgba(17, 17, 17, .16); }
+.toast-success { border-left-color: #167a4a; }
+.toast-error { border-left-color: #a52a2a; }
+.toast-info { border-left-color: #285a9f; }
+.toast strong { display: block; font-size: 14px; }
+.toast p { margin: 5px 0 0; color: var(--muted); font-size: 13px; line-height: 1.4; }
+.toast-dismiss { flex: 0 0 auto; border: 1px solid var(--ink); border-radius: 4px; background: var(--surface); color: var(--ink); padding: 5px 7px; font-size: 12px; }
+.toast-dismiss:hover { background: var(--surface-muted); }
