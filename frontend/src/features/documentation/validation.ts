@@ -1,6 +1,7 @@
 import type { NoteResponse, NursingFact, SourceDocument } from "../../api/types";
 
 export const MIN_DOCUMENTATION_TEXT_LENGTH = 10;
+export const RESIDENT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 export function isTranscriptValid(value: string): boolean {
   return value.trim().length >= MIN_DOCUMENTATION_TEXT_LENGTH;
@@ -8,6 +9,22 @@ export function isTranscriptValid(value: string): boolean {
 
 export function isExternalNoteValid(value: string): boolean {
   return value.trim().length >= MIN_DOCUMENTATION_TEXT_LENGTH;
+}
+
+export function isResidentIdValid(value: string): boolean {
+  return RESIDENT_ID_PATTERN.test(value);
+}
+
+export function transcriptValidationMessage(value: string): string | undefined {
+  return isTranscriptValid(value) ? undefined : "Enter the original German caregiver transcript. It cannot be blank.";
+}
+
+export function residentIdValidationMessage(value: string): string | undefined {
+  return isResidentIdValid(value) ? undefined : "Use a synthetic resident ID starting with a letter or number; only letters, numbers, dots, underscores, and hyphens are allowed.";
+}
+
+export function existingNoteValidationMessage(value: string): string | undefined {
+  return isExternalNoteValid(value) ? undefined : "Paste the existing AI-generated nursing note before verification.";
 }
 
 function normalizedContent(value: string): string {

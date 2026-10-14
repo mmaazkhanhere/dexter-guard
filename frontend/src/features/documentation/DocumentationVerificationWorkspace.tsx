@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { safeMutationError, useCreateSource, useFullVerification, useGenerateNote, useImportNote, useReview, useSavedExamples, useSource } from "../../api/hooks";
 import { userFacingFailureMessage } from "../../api/errors";
@@ -9,14 +9,14 @@ import { useToast } from "../../components/shared/Toaster";
 import { WorkspaceHeader } from "../../components/shared/WorkspaceHeader";
 import { VerificationResults } from "../verification/VerificationPage";
 import { useWorkspace } from "../../state/workspace";
-import { isExternalNoteValid, isTranscriptValid } from "./validation";
+import { isExternalNoteValid, isResidentIdValid, isTranscriptValid } from "./validation";
 
 type Mode = "generate" | "existing";
 
 export function DocumentationVerificationWorkspace() {
   const navigate = useNavigate();
   const { notify } = useToast();
-  const { source, note, setSource, setNote, applyNoteRevision, setDraftContent } = useWorkspace();
+  const { source, note, transcript: savedTranscript, residentId: savedResidentId, setSource, setNote, setTranscript: saveTranscript, setResidentId: saveResidentId, applyNoteRevision, setDraftContent } = useWorkspace();
   const createSource = useCreateSource();
   const generate = useGenerateNote();
   const importNote = useImportNote();
@@ -24,8 +24,8 @@ export function DocumentationVerificationWorkspace() {
   const review = useReview(note?.noteId, note?.revision);
   const examples = useSavedExamples();
   const [mode, setMode] = useState<Mode>("generate");
-  const [transcript, setTranscript] = useState("");
-  const [residentId, setResidentId] = useState("synthetic-resident-demo");
+  const [transcript, setTranscript] = useState(savedTranscript ?? "");
+  const [residentId, setResidentId] = useState(savedResidentId ?? "synthetic-resident-demo");
   const [existingNote, setExistingNote] = useState("");
   const [selectedExample, setSelectedExample] = useState("");
   const [editingSource, setEditingSource] = useState(false);
@@ -36,9 +36,24 @@ export function DocumentationVerificationWorkspace() {
   const isWorking = createSource.isPending || generate.isPending || importNote.isPending || fullVerification.isPending;
   const activeResult = note && (mode === "generate" ? note.origin === "GENERATED" : note.origin === "IMPORTED") ? note : undefined;
 
+  useEffect(() => {
+    if (!transcript && savedTranscript) setTranscript(savedTranscript);
+    if (residentId === "synthetic-resident-demo" && savedResidentId) setResidentId(savedResidentId);
+  }, [residentId, savedResidentId, savedTranscript, transcript]);
+
+  function updateTranscript(value: string) {
+    setTranscript(value);
+    saveTranscript(value);
+  }
+
+  function updateResidentId(value: string) {
+    setResidentId(value);
+    saveResidentId(value);
+  }
+
   async function ensureSource(): Promise<SourceDocument | undefined> {
     if (source && !editingSource) return source;
-    if (!isTranscriptValid(transcript)) return undefined;
+    if (!isTranscriptValid(transcript) || !isResidentIdValid(residentId.trim())) return undefined;
     const created = await createSource.mutateAsync({ resident_test_id: residentId.trim(), language: "de-DE", transcript_text: transcript });
     setSource(created);
     setEditingSource(false);
@@ -51,8 +66,8 @@ export function DocumentationVerificationWorkspace() {
       const result = await scenarioSource.refetch();
       if (!result.data) throw result.error ?? new Error("The selected scenario could not be loaded.");
       setSource(result.data);
-      setTranscript(result.data.transcript_text);
-      setResidentId(result.data.resident_test_id);
+      updateTranscript(result.data.transcript_text);
+      updateResidentId(result.data.resident_test_id);
       setNote(undefined);
       setDraftContent(undefined);
       setGeneratedIdentity(undefined);
@@ -117,7 +132,7 @@ export function DocumentationVerificationWorkspace() {
         <button role="tab" type="button" aria-selected={mode === "generate"} aria-controls="generate-and-verify-panel" className={mode === "generate" ? "selected" : ""} onClick={() => setMode("generate")}>Generate &amp; Verify</button>
         <button role="tab" type="button" aria-selected={mode === "existing"} aria-controls="verify-existing-note-panel" className={mode === "existing" ? "selected" : ""} onClick={() => setMode("existing")}>Verify Existing Note</button>
       </div>
-      {mode === "generate" ? <ModePanel id={panelId} mode="generate" transcript={transcript} residentId={residentId} sourceLocked={sourceLocked} onTranscript={setTranscript} onResident={setResidentId} onEditSource={() => setEditingSource(true)} onCancelEdit={() => { setTranscript(source?.transcript_text ?? transcript); setResidentId(source?.resident_test_id ?? residentId); setEditingSource(false); }} source={source} scenarios={examples.data?.map((example) => ({ id: example.exampleId, title: example.title }))} selectedScenario={selectedExample} onScenarioChange={setSelectedExample} onLoadScenario={loadScenario} scenarioLoading={scenarioSource.isFetching} action={<button onClick={generateAndVerify} disabled={isWorking || !isTranscriptValid(transcript)}>{isWorking ? <LoadingIndicator label={busyLabel} /> : "Generate note & verify"}</button>} /> : <ModePanel id={panelId} mode="existing" transcript={transcript} residentId={residentId} sourceLocked={sourceLocked} onTranscript={setTranscript} onResident={setResidentId} onEditSource={() => setEditingSource(true)} onCancelEdit={() => { setTranscript(source?.transcript_text ?? transcript); setResidentId(source?.resident_test_id ?? residentId); setEditingSource(false); }} source={source} existingNote={existingNote} onExistingNote={setExistingNote} action={<button onClick={verifyExistingNote} disabled={isWorking || !isTranscriptValid(transcript) || !isExternalNoteValid(existingNote)}>{isWorking ? <LoadingIndicator label={busyLabel} /> : "Verify Note"}</button>} />}
+      {mode === "generate" ? <ModePanel id={panelId} mode="generate" transcript={transcript} residentId={residentId} sourceLocked={sourceLocked} onTranscript={updateTranscript} onResident={updateResidentId} onEditSource={() => setEditingSource(true)} onCancelEdit={() => { updateTranscript(source?.transcript_text ?? transcript); updateResidentId(source?.resident_test_id ?? residentId); setEditingSource(false); }} source={source} scenarios={examples.data?.map((example) => ({ id: example.exampleId, title: example.title }))} selectedScenario={selectedExample} onScenarioChange={setSelectedExample} onLoadScenario={loadScenario} scenarioLoading={scenarioSource.isFetching} action={<button onClick={generateAndVerify} disabled={isWorking || !isTranscriptValid(transcript)}>{isWorking ? <LoadingIndicator label={busyLabel} /> : "Generate note & verify"}</button>} /> : <ModePanel id={panelId} mode="existing" transcript={transcript} residentId={residentId} sourceLocked={sourceLocked} onTranscript={updateTranscript} onResident={updateResidentId} onEditSource={() => setEditingSource(true)} onCancelEdit={() => { updateTranscript(source?.transcript_text ?? transcript); updateResidentId(source?.resident_test_id ?? residentId); setEditingSource(false); }} source={source} existingNote={existingNote} onExistingNote={setExistingNote} action={<button onClick={verifyExistingNote} disabled={isWorking || !isTranscriptValid(transcript) || !isExternalNoteValid(existingNote)}>{isWorking ? <LoadingIndicator label={busyLabel} /> : "Verify Note"}</button>} />}
       {activeResult && <section className="verification-results" aria-label="Verification results">
         <div className="verification-results-header"><span className="eyebrow">VERIFICATION RESULTS</span><h3>Review the note against its evidence</h3><p>A completed run is not a factual pass. Select a finding to highlight the affected statement in the note and the supporting or contradicting source evidence.</p></div>
         <VerificationResults note={activeResult} source={source} context={review.data} isLoading={review.isLoading || review.isFetching || fullVerification.isPending} />

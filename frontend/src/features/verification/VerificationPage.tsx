@@ -6,7 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useReview } from "../../api/hooks";
 import { useWorkspace } from "../../state/workspace";
 import type { Finding, NoteResponse, ReviewContext, SourceDocument } from "../../api/types";
-import { nonOverlappingSpans, validSourceSpans } from "./spans";
+import { nonOverlappingSpans, projectSourceSpan, validSourceSpans } from "./spans";
 
 export function VerificationPage() {
   const { note, source } = useWorkspace();
@@ -30,22 +30,56 @@ type VerificationResultsProps = { note: NoteResponse; source?: SourceDocument; c
 export function VerificationResults({ note, source, context, isLoading = false }: VerificationResultsProps) {
   const [selected, setSelected] = useState<Finding>();
   useEffect(() => {
-    if (selected) document.getElementById("selected-finding")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    if (selected) document.getElementById("selected-finding")?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
   }, [selected]);
   const fullVerification = context?.fullVerification;
   const verification = fullVerification?.noteRevision === note.revision ? fullVerification : undefined;
   const findings = context?.findings ?? [];
   const approvalEligible = verification?.status === "VALID" && context?.approvalEligible === true;
+  const orderedFindings = [...findings].sort((left, right) => severityRank(left.severity) - severityRank(right.severity) || unresolvedRank(left.state) - unresolvedRank(right.state));
+  const unresolvedFindings = findings.filter((finding) => finding.state === "OPEN" || finding.state === "STALE").length;
+  const criticalFindings = findings.filter((finding) => finding.severity === "CRITICAL").length;
+  const majorFindings = findings.filter((finding) => finding.severity === "MAJOR").length;
+  const sourceText = context?.transcriptText ?? source?.transcript_text ?? "";
   return <>
     {isLoading && <div className="empty-state" role="status"><LoadingIndicator label="Checking the nursing note against the transcript …" /></div>}
     {verification && <div className={verification.status === "VALID" ? (approvalEligible ? "status-banner" : "warning-banner") : "error-banner"} role="status">{verification.status !== "VALID" ? `Verification did not complete successfully. ${userFacingFailureMessage(verification.failureCode, verification.failureMessage)}` : approvalEligible ? "Verification completed with no blocking findings. The note is ready for human approval." : "Verification completed. Review the findings before approval; the note is not yet eligible for approval."}</div>}
+    {verification && <section className="verification-overview" aria-label="Verification overview">
+      <div className="verification-summary" aria-label="Finding summary">
+        <div><span>Total findings</span><strong>{findings.length}</strong></div>
+        <div><span>Critical</span><strong>{criticalFindings}</strong></div>
+        <div><span>Major</span><strong>{majorFindings}</strong></div>
+        <div><span>Unresolved</span><strong>{unresolvedFindings}</strong></div>
+      </div>
+      <div className={approvalEligible ? "eligibility-callout eligible" : "eligibility-callout"} role="status">
+        <strong>Approval eligibility: {approvalEligible ? "Eligible" : "Not eligible"}</strong>
+        <p>{approvalEligible ? "A human reviewer must still approve the note." : unresolvedFindings ? "Caregiver action: resolve the prioritized findings in Human Review, save a new revision, and run full verification again." : "Caregiver action: inspect the findings and complete the Human Review approval workflow."}</p>
+      </div>
+    </section>}
     <div className="workspace-grid evidence-grid">
-      <StateCard title="Locked source transcript"><EvidenceText text={context?.transcriptText ?? source?.transcript_text ?? ""} spans={selected?.evidence.spans ?? []} source={source} /></StateCard>
+      <StateCard title="Locked source transcript"><EvidenceText text={sourceText} spans={selected?.evidence.spans ?? []} source={source} /></StateCard>
       <StateCard title="Read-only candidate note"><p className="note-meta">Note {note.noteId} · revision {note.revision}</p><NoteText text={context?.candidateNote ?? note.content} span={selected?.claimSpan ?? undefined} /></StateCard>
-      <StateCard title="Verification findings"><div className="finding-list">{findings.length ? findings.map((finding) => <button key={finding.reviewFindingId} className={selected?.reviewFindingId === finding.reviewFindingId ? "finding selected" : "finding"} onClick={() => setSelected(finding)}><span>{finding.reviewFindingId}</span><strong>{finding.upstreamStatus ?? "REVIEW FINDING"}</strong><em>{finding.severity}</em><p>{finding.explanation}</p></button>) : <p className="muted">{verification ? "No persisted findings were returned for this verification." : "Verification results are not available yet."}</p>}</div></StateCard>
-      <StateCard title="Selected finding" tone={selected?.severity === "CRITICAL" ? "warning" : "neutral"}>{selected ? <div id="selected-finding" tabIndex={-1}><div className="finding-summary"><span className="status-label">Classification: {selected.upstreamStatus ?? "UNAVAILABLE"}</span><span className="status-label">Severity: {selected.severity}</span><span className="status-label">Provenance: {selected.origin}</span></div><p>{selected.explanation}</p><p className="muted">{selected.evidence.availability === "AVAILABLE" ? `${selected.evidence.spans.length} backend-provided source span(s); the affected note span is highlighted when available.` : "Evidence unavailable or invalid; no source highlight is shown."}</p></div> : <p className="muted">Select a finding to inspect its highlighted note text and source-bound evidence.</p>}</StateCard>
+      <StateCard title="Verification findings"><div className="finding-list">{orderedFindings.length ? orderedFindings.map((finding) => <button key={finding.reviewFindingId} className={selected?.reviewFindingId === finding.reviewFindingId ? "finding selected" : "finding"} onClick={() => setSelected(finding)}><span>{finding.reviewFindingId}</span><strong>{classificationLabel(finding.upstreamStatus)}</strong><em>{finding.severity}</em><p>{finding.explanation}</p><p className="finding-evidence-preview">Source evidence: {sourceEvidencePreview(finding, sourceText) ?? "Unavailable or invalid; no source excerpt is shown."}</p></button>) : <p className="muted">{verification ? "No persisted findings were returned for this verification." : "Verification results are not available yet."}</p>}</div></StateCard>
+      <StateCard title="Selected finding" tone={selected?.severity === "CRITICAL" ? "warning" : "neutral"}>{selected ? <div id="selected-finding" tabIndex={-1}><div className="finding-summary"><span className="status-label">Classification: {classificationLabel(selected.upstreamStatus)}</span><span className="status-label">Severity: {selected.severity}</span><span className="status-label">Provenance: {selected.origin}</span></div><p>{selected.explanation}</p><h4>Problematic note text</h4><div className="evidence-note">{selected.claimSpan ? <NoteText text={context?.candidateNote ?? note.content} span={selected.claimSpan} /> : "No valid candidate-note span is available for this finding."}</div><h4>Corresponding source evidence</h4><p className="evidence-note">{sourceEvidencePreview(selected, sourceText) ?? "Evidence is unavailable or invalid; no source highlight is shown."}</p><details><summary>Technical details</summary><dl className="technical-details"><dt>Finding</dt><dd>{selected.reviewFindingId}</dd><dt>Rule</dt><dd>{selected.ruleCode ?? "Not supplied"}</dd><dt>Source</dt><dd>{selected.sourceId} · version {selected.sourceVersion}</dd><dt>Severity rationale</dt><dd>{selected.severityRationale}</dd></dl></details></div> : <p className="muted">Select a finding to inspect its highlighted note text and source-bound evidence.</p>}</StateCard>
     </div>
   </>;
+}
+
+function severityRank(severity: Finding["severity"]): number { return severity === "CRITICAL" ? 0 : severity === "MAJOR" ? 1 : 2; }
+function unresolvedRank(state: Finding["state"]): number { return state === "OPEN" || state === "STALE" ? 0 : 1; }
+function classificationLabel(status?: string | null): string {
+  const normalized = status?.toUpperCase();
+  if (normalized === "SUPPORTED") return "Supported";
+  if (normalized === "UNSUPPORTED") return "Unsupported";
+  if (normalized === "CONTRADICTED") return "Contradicted";
+  if (normalized === "UNCERTAIN") return "Uncertain";
+  return "Classification unavailable";
+}
+function sourceEvidencePreview(finding: Finding, transcript: string): string | undefined {
+  if (!transcript || finding.evidence.availability !== "AVAILABLE") return undefined;
+  const spans = nonOverlappingSpans(validSourceSpans(transcript, finding.sourceId, finding.sourceVersion, finding.evidence.spans));
+  const excerpts = spans.map((span) => projectSourceSpan(transcript, span)).filter((excerpt): excerpt is string => Boolean(excerpt));
+  return excerpts.length ? excerpts.join(" … ") : undefined;
 }
 
 function EvidenceText({ text, spans, source }: { text: string; spans: Finding["evidence"]["spans"]; source?: { source_id: string; source_version: number } }) {
