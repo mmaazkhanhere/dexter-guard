@@ -46,7 +46,7 @@ A reviewer operates only on synthetic German scenarios. The backend is reachable
 | --- | --- | --- |
 | FR-34 | Provide a desktop web interface for the complete reliability workflow. | AC-34a: a 1280px-wide viewport exposes Documentation, Evidence Verification, Human Review, and Evaluation navigation. AC-34b: keyboard navigation and text labels make all actions available without color-only meaning. |
 | FR-35 | Allow entry of a German synthetic transcript and selection of saved examples. | AC-35a: valid de-DE synthetic transcript submission shows persisted source ID/version. AC-35b: blank/invalid input exposes backend field error without claiming it saved. AC-35c: selecting an example loads only its declared immutable source/version. |
-| FR-36 | Allow generation of a professional German note or external candidate input for verification. | AC-36a: generation shows DRAFT note, origin, facts, and source reference. AC-36b: external-note import does not label the result generated. AC-36c: provider failure/timeout has a failure state and no editable false-success record. |
+| FR-36 | Allow generation of a professional German note or external candidate input for verification. | AC-36a: generation shows DRAFT note, origin, facts, and source reference. AC-36b: external-note import does not label the result generated. AC-36c: provider failure/timeout has a failure state and no editable false-success record. AC-36d: repeating generation for an unchanged generated candidate is a no-op when whitespace-normalized content, semantic structured facts, resident identity, and source ID/version all match; no new provider request or candidate note is created. |
 | FR-37 | Display backend-returned observations, symptoms, measurements, and actions. | AC-37a: facts are grouped by returned fact type with source anchors. AC-37b: absent fact fields display as absent, not inferred values. |
 | FR-38 | Display individually addressable claims and their evidence statuses. | AC-38a: each claim row has its immutable ID, note span, status, explanation, and run reference. AC-38b: supported, unsupported, contradicted, and uncertain are textually distinct. |
 | FR-39 | Highlight affected note claims and source spans with explanations and severities. | AC-39a: selecting a valid finding scrolls both immutable texts to its returned spans. AC-39b: invalid/missing evidence says unavailable and highlights nothing. AC-39c: rule and source-based findings carry visibly distinct provenance labels. |
@@ -64,7 +64,7 @@ A reviewer operates only on synthetic German scenarios. The backend is reachable
 
 ## Required workflows
 
-Documentation first submits or selects a source, then generates/imports a draft. It displays source facts supplied by Spec 002. A draft can be saved only while unapproved/unrejected and is always associated with a source ID/version.
+Documentation first submits or selects a source, then generates/imports a draft. It displays source facts supplied by Spec 002. A draft can be saved only while unapproved/unrejected and is always associated with a source ID/version. Repeating generation for an unchanged generated candidate must not create another provider request or candidate note when its whitespace-normalized content, semantic structured facts, resident identity, and source ID/version are unchanged.
 
 Evidence Verification consumes the current review context and full-note results. Claim selection uses backend note spans and source spans; it exposes semantic, deterministic, and coverage findings without collapsing their meaning.
 

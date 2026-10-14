@@ -22,6 +22,7 @@ button, textarea { font: inherit; }
 .state-card.warning { border-color:#8e7040; }
 .state-card.error { border-color:#914c56; }
 .state-card textarea { width:100%; min-height:220px; resize:vertical; padding:12px; border:1px solid #3c4b5d; background:#0e141c; color:#e8edf5; border-radius:8px; }
+.state-card textarea[readonly] { background:#f1f1ef; border-style:dashed; cursor:not-allowed; }
 .state-card strong { display:block; font-size:24px; margin-bottom:10px; }
 .state-card span { color:#9baabd; font-size:13px; }
 .state-card label { display:block; margin: 0 0 14px; color:#c8d1de; font-size:13px; }
@@ -94,6 +95,7 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-
 .field-description { color: var(--muted); }
 .state-card.warning, .state-card.error { border-color: var(--ink); border-left-width: 4px; }
 .state-card textarea, .state-card input, .state-card select { border-color: var(--line-strong); background: var(--surface); color: var(--ink); border-radius: 5px; }
+.state-card textarea[readonly] { background: var(--surface-muted); }
 .state-card textarea:focus, .state-card input:focus, .state-card select:focus { border-color: var(--ink); outline: 2px solid var(--ink); outline-offset: 1px; }
 .state-card span { color: var(--muted); }
 .state-card button { border: 1px solid var(--accent); border-radius: 5px; background: var(--accent); color: var(--accent-contrast); transition: background-color .15s ease, border-color .15s ease; }
