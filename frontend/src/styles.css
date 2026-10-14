@@ -54,3 +54,64 @@ button.finding { cursor:pointer; }
 .finding p { margin:8px 0 0; color:#c8d1de; font-size:13px; line-height:1.4; }
 .eligibility { font-size:18px; font-weight:800; letter-spacing:.04em; color:#f1c978; }
 @media (max-width: 1100px) { .main-content { padding: 28px; } .workspace-grid { grid-template-columns:1fr; } }
+
+/* Minimal monochrome theme: white surfaces, black typography, black accent. */
+:root {
+  color: #111111;
+  background: #f7f7f5;
+  --ink: #111111;
+  --muted: #6f6f6f;
+  --line: #dededb;
+  --line-strong: #b9b9b5;
+  --surface: #ffffff;
+  --surface-muted: #f1f1ef;
+  --accent: #111111;
+  --accent-contrast: #ffffff;
+}
+
+body { background: #f7f7f5; color: var(--ink); }
+button, textarea, input, select { font: inherit; }
+button, select { cursor: pointer; }
+button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+.topbar { border-bottom-color: var(--line); background: var(--surface); }
+.topbar h1 { letter-spacing: -.02em; }
+.eyebrow { color: var(--muted); font-weight: 800; }
+.environment-badge { border-color: var(--ink); background: var(--ink); color: var(--accent-contrast); }
+.sidebar { border-right-color: var(--line); background: var(--surface); }
+.nav-link { color: var(--muted); border-radius: 6px; transition: background-color .15s ease, color .15s ease; }
+.nav-link:hover { color: var(--ink); background: var(--surface-muted); }
+.nav-link.active { color: var(--accent-contrast); background: var(--accent); }
+.main-content { max-width: 1500px; }
+.workspace-header h2 { letter-spacing: -.035em; }
+.workspace-header p, .muted { color: var(--muted); }
+
+.state-card { border-color: var(--line); border-radius: 8px; background: var(--surface); box-shadow: 0 8px 24px rgba(17, 17, 17, .04); }
+.state-card h3, .state-card label { color: var(--ink); }
+.state-card.warning, .state-card.error { border-color: var(--ink); border-left-width: 4px; }
+.state-card textarea, .state-card input, .state-card select { border-color: var(--line-strong); background: var(--surface); color: var(--ink); border-radius: 5px; }
+.state-card textarea:focus, .state-card input:focus, .state-card select:focus { border-color: var(--ink); outline: 2px solid var(--ink); outline-offset: 1px; }
+.state-card span { color: var(--muted); }
+.state-card button { border: 1px solid var(--accent); border-radius: 5px; background: var(--accent); color: var(--accent-contrast); transition: background-color .15s ease, border-color .15s ease; }
+.state-card button:hover:not(:disabled) { background: #3a3a3a; border-color: #3a3a3a; }
+.state-card button:disabled { opacity: .45; }
+.secondary-button { background: var(--surface) !important; color: var(--ink) !important; border-color: var(--ink) !important; }
+.secondary-button:hover:not(:disabled) { background: var(--surface-muted) !important; }
+.danger-button { background: var(--ink) !important; color: var(--accent-contrast) !important; }
+
+.segmented button { background: var(--surface); color: var(--muted); border-color: var(--line-strong); }
+.segmented button.selected { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); }
+.identity-pill, .status-label { border-color: var(--ink); color: var(--ink); }
+.facts { border-top-color: var(--line); }
+.facts p { color: var(--ink); }
+.error-banner { border-color: var(--ink); border-left-width: 4px; background: var(--surface-muted); color: var(--ink); }
+.error-banner span { color: var(--muted); }
+.error-boundary { border-color: var(--ink); border-left-width: 4px; background: var(--surface); color: var(--ink); }
+.empty-state { border-color: var(--line-strong); color: var(--muted); background: var(--surface); }
+.evidence-note { color: var(--ink); }
+.evidence-note mark { background: var(--ink); color: var(--accent-contrast); border-radius: 2px; }
+.note-meta { color: var(--muted); }
+.finding { border-color: var(--line); background: var(--surface); color: var(--ink); border-radius: 6px; }
+.finding.selected { border-color: var(--ink); box-shadow: inset 3px 0 0 var(--ink); }
+.finding span, .finding em, .finding p { color: var(--muted); }
+.eligibility { color: var(--ink); }
