@@ -153,25 +153,89 @@ class HeuristicClaimProvider:
         return {"claims": claims}
 
 
-class HeuristicEvidenceProvider:
-    """Source-bound verifier used by the synthetic workflow when no remote verifier is configured."""
+class OfflineSemanticEvidenceProvider:
+    """Conservative local fallback when the configured LLM verifier is unavailable.
 
-    model_id = "heuristic-evidence-verifier"
-    model_version = "heuristic-evidence-v1"
-    prompt_version = "evidence-verification-heuristic-v1"
-    prompt_hash = "sha256:evidence-verification-heuristic-v1"
+    Production selects the configured OpenAI-compatible semantic verifier first.
+    This offline adapter exists only to keep synthetic/local workflows runnable;
+    it compares normalized German meaning cues rather than requiring literal
+    sentence equality. Exact numeric and unit validation remains owned by the
+    deterministic-validation component.
+    """
+
+    model_id = "offline-semantic-evidence-verifier"
+    model_version = "offline-semantic-v1"
+    prompt_version = "evidence-verification-offline-semantic-v1"
+    prompt_hash = "sha256:evidence-verification-offline-semantic-v1"
+
+    _sentences = re.compile(r"[^.!?\r\n]+(?:[.!?]|$)")
+    _words = re.compile(r"[\wäöüÄÖÜß]+")
+    _stop_words = frozenset({"die", "der", "das", "den", "dem", "des", "ein", "eine", "einer", "einem", "und", "oder", "ist", "sind", "hat", "haben", "wurde", "wird", "bei", "im", "in", "am", "an", "zu", "von", "mit", "für", "auf", "aus", "die", "frau", "herr", "bewohnerin", "bewohner", "patient", "patientin"})
+    _semantic_terms = {
+        "schmerz": "pain", "schmerzen": "pain", "beschwerde": "pain", "beschwerden": "pain",
+        "verneint": "negated", "kein": "negated", "keine": "negated", "keinen": "negated", "ohne": "negated", "nicht": "negated",
+        "möglich": "uncertain", "möglicherweise": "uncertain", "vielleicht": "uncertain", "unklar": "uncertain",
+        "berichtet": "reported", "gibt": "reported", "an": "reported", "sagt": "reported", "klagt": "reported",
+        "wirkt": "observed", "beobachtet": "observed", "erscheint": "observed",
+        "fieber": "fever", "temperatur": "temperature", "trinkt": "drinks", "trank": "drinks", "wasser": "drinks",
+        "schläft": "sleep", "geschlafen": "sleep", "schlief": "sleep", "ruhig": "calm", "entspannt": "calm",
+        "schwindel": "dizziness", "übelkeit": "nausea", "uebelkeit": "nausea",
+    }
 
     def verify(self, *, claims, source_text: str, run_id: str, source_id: str | None = None, source_version: int | None = None):
         findings = []
         for candidate in claims:
             claim_text = str(getattr(candidate, "claim_text", "")).strip()
-            start = source_text.find(claim_text)
-            if start >= 0 and source_id and source_version:
-                spans = [{"sourceId": source_id, "sourceVersion": source_version, "start": start, "end": start + len(claim_text)}]
-                findings.append({"claimId": candidate.id, "status": "SUPPORTED", "explanation": "The claim text is present in the immutable source.", "sourceSpans": spans})
-            else:
-                findings.append({"claimId": candidate.id, "status": "UNSUPPORTED", "explanation": "The claim could not be located in the immutable source.", "sourceSpans": []})
+            status, explanation, start, end, discrepancies = self._classify(claim_text, source_text)
+            spans = []
+            if start is not None and source_id is not None and source_version is not None:
+                spans = [{"sourceId": source_id, "sourceVersion": source_version, "start": start, "end": end}]
+            findings.append({"claimId": candidate.id, "status": status, "explanation": explanation, "sourceSpans": spans, "discrepancies": discrepancies})
         return {"findings": findings}
+
+    @classmethod
+    def _meaning_tokens(cls, text: str) -> set[str]:
+        tokens: set[str] = set()
+        for word in cls._words.findall(text.casefold()):
+            if word in cls._stop_words:
+                continue
+            token = cls._semantic_terms.get(word, word)
+            if len(token) > 4 and token.endswith(("en", "er", "es", "em", "e")):
+                token = token.rstrip("enrsm")
+            tokens.add(token)
+        return tokens
+
+    @classmethod
+    def _classify(cls, claim_text: str, source_text: str) -> tuple[str, str, int | None, int | None, list[str]]:
+        claim_tokens = cls._meaning_tokens(claim_text)
+        best: tuple[set[str], int, int, str] | None = None
+        for match in cls._sentences.finditer(source_text):
+            sentence = match.group(0)
+            sentence_tokens = cls._meaning_tokens(sentence)
+            overlap = claim_tokens & sentence_tokens
+            if best is None or len(overlap) > len(best[0]):
+                best = (overlap, match.start(), match.end(), sentence)
+        if best is None or not best[0]:
+            return "UNSUPPORTED", "No source statement establishes the claim's meaning.", None, None, []
+
+        overlap, start, end, sentence = best
+        source_tokens = cls._meaning_tokens(sentence)
+        semantic_cues = set(cls._semantic_terms.values())
+        if not (overlap & semantic_cues) and len(overlap) < 2:
+            return "UNSUPPORTED", "The source shares only an identity reference, not clinical evidence for the claim.", None, None, []
+        claim_negated = "negated" in claim_tokens
+        source_negated = "negated" in source_tokens
+        if claim_negated != source_negated and overlap - {"negated"}:
+            return "CONTRADICTED", "The source expresses the opposite polarity for the same subject matter.", start, end, ["NEGATION"]
+        if "uncertain" in source_tokens and "uncertain" not in claim_tokens:
+            return "UNCERTAIN", "The source qualifies this information, so the unqualified claim is not established.", start, end, ["CERTAINTY"]
+        material_claim_tokens = claim_tokens - {"reported", "observed", "uncertain", "negated"}
+        material_source_tokens = source_tokens - {"reported", "observed", "uncertain", "negated"}
+        if material_claim_tokens and material_claim_tokens <= material_source_tokens:
+            return "SUPPORTED", "The source supports the claim's meaning, including its material qualifiers.", start, end, []
+        if overlap:
+            return "UNCERTAIN", "The source is related but does not establish every material part of the claim.", start, end, ["OTHER"]
+        return "UNSUPPORTED", "No source statement establishes the claim's meaning.", None, None, []
 
 
 class WorkflowVerificationPorts:
@@ -526,7 +590,7 @@ class ReliabilityWorkflow:
             source_service=source_service,
             note_repository=self.note_repository,
             claim_resolver=lambda claim_set_id: self.claim_repository.get_current_result_by_extraction_run_id(claim_set_id) if hasattr(self.claim_repository, "get_current_result_by_extraction_run_id") else self._claim_result(claim_set_id),
-            verifier=evidence_verifier or HeuristicEvidenceProvider(),
+            verifier=evidence_verifier or OfflineSemanticEvidenceProvider(),
             repository=self.evidence_runs,
         )
         self.validation_runs = InMemoryValidationRunRepository()

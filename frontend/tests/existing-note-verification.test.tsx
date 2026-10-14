@@ -18,6 +18,25 @@ function renderPage() {
 }
 
 describe("existing-note verification", () => {
+  it("switches between documentation and verification workspaces instead of rendering both", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith("/saved-examples")) return new Response("[]", { status: 200 });
+      return new Response(JSON.stringify({ code: "NOT_FOUND", message: "test route not found" }), { status: 404 });
+    }));
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(screen.getByRole("tab", { name: "Documentation" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByLabelText("German transcript")).toBeInTheDocument();
+    expect(screen.queryByRole("tabpanel", { name: "Verification results" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Verification results" }));
+
+    expect(screen.getByRole("tab", { name: "Verification results" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByLabelText("German transcript")).not.toBeInTheDocument();
+    expect(screen.getByRole("tabpanel", { name: "Verification results" })).toHaveTextContent("No candidate note is available yet");
+  });
+
   it("verifies the supplied note without generating a replacement and retains the review handoff", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const path = String(input);

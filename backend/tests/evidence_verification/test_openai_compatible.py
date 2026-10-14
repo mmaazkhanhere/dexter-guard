@@ -34,6 +34,7 @@ def test_openai_compatible_verifier_captures_usage_and_cost() -> None:
     assert provider.last_output_tokens == 30
     assert provider.last_inference_cost == 0.0018
     assert completions.kwargs["model"] == "verifier-model"
+    assert "Compare claim meaning, not wording" in completions.kwargs["messages"][0]["content"]
 
 
 def test_verifier_configuration_is_optional_and_uses_verification_overrides() -> None:

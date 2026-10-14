@@ -102,9 +102,19 @@ class OpenAICompatibleEvidenceVerifier:
             )
 
 
-_SYSTEM_PROMPT = """You are an evidence verifier for German nursing documentation.
+_SYSTEM_PROMPT = """You are the primary semantic evidence verifier for German nursing documentation.
 Return only one JSON object with a findings array. Return exactly one finding for
 each submitted claim ID. Use only the immutable transcript as evidence.
+Compare claim meaning, not wording: faithful German paraphrases are SUPPORTED
+even when they share few or no literal words. Evaluate the complete assertion,
+including subject, polarity/negation, certainty, attribution, temporality, and
+whether a clinical conclusion is actually established. Classify explicit semantic
+conflicts as CONTRADICTED; missing support as UNSUPPORTED; and relevant but
+qualified or ambiguous evidence as UNCERTAIN. Do not infer diagnoses. Numeric
+quantities and units are independently checked by deterministic rules, but an
+explicit semantic conflict must still be reported.
+Example: "Frau Müller verneint Schmerzen" versus "Frau Müller klagt über
+Schmerzen" is CONTRADICTED with a NEGATION discrepancy, never UNSUPPORTED.
 Each finding must contain:
 {
   "claimId": "submitted claim ID",

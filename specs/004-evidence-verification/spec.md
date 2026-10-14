@@ -244,7 +244,7 @@ Tests must assert the exact claim ID, primary status, applicable discrepancy typ
 ## Non-functional requirements
 
 - **Safety:** Invalid provenance, spans, structured output, or claim coverage can never yield a successful result.
-- **Deterministic boundary:** Validate inputs, span integrity, contract shape, status normalization, claim coverage, and persistence deterministically. Semantic comparison may use a model through a structured contract.
+- **Semantic and deterministic boundaries:** A configured LLM is the primary semantic verifier and compares complete German claim meaning rather than literal token overlap. Deterministic code independently validates inputs, span integrity, contract shape, status normalization, claim coverage, persistence, and exact numeric/unit rules owned by Spec 005. The local synthetic fallback is conservative, preserves the same four-status contract, and never replaces configured LLM verification.
 - **Traceability:** Reproduce each result to exact source snapshot, note revision, immutable claim set, model/prompt, and annotation policy.
 - **Privacy:** Send only the minimum required transcript and claim material to an approved semantic verifier, following system data handling rules.
 - **Observability:** Expose lifecycle state, safe failure code, model/prompt identity, correlation identifiers, latency, inference cost, token usage, rejection reasons, and warning counts without treating invalid evidence as fact or exposing sensitive text.

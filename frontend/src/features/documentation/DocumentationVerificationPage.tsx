@@ -24,6 +24,7 @@ export function DocumentationVerificationPage() {
   const [transcript, setTranscript] = useState("");
   const [residentId, setResidentId] = useState("synthetic-resident-demo");
   const [selectedExample, setSelectedExample] = useState("");
+  const [workspaceMode, setWorkspaceMode] = useState<"documentation" | "verification">("documentation");
   const [noteMethod, setNoteMethod] = useState<"generate" | "existing">("generate");
   const [existingNote, setExistingNote] = useState("");
   const [isEditingSource, setIsEditingSource] = useState(false);
@@ -75,7 +76,7 @@ export function DocumentationVerificationPage() {
   async function verify(noteToVerify: NoteResponse): Promise<void> {
     const result = await fullVerification.mutateAsync({ noteId: noteToVerify.noteId, expectedRevision: noteToVerify.revision, reviewerLabel: "synthetic-reviewer" });
     if (result.status === "VALID") {
-      notify({ tone: "info", title: "Verification completed", message: "Inspect the findings, then continue to Human Review to resolve any issues. The source, note, and findings stay linked." });
+      notify({ tone: "info", title: "Verification completed", message: "Review the findings before approval; the note is not yet eligible for approval." });
     } else {
       notify({ tone: "error", title: "The note needs attention", message: `${userFacingFailureMessage(result.failureCode, result.failureMessage)} The note remains read-only until Human Review.` });
     }
@@ -161,7 +162,12 @@ export function DocumentationVerificationPage() {
     <WorkspaceHeader eyebrow="01 · DOCUMENTATION & VERIFICATION" title="Create or verify a source-bound nursing note" description="Start with a synthetic German transcript, then either generate a new note or verify an existing AI-generated note before Human Review." />
     {error && <div className="error-banner" role="alert">{safeMutationError(error).message}</div>}
     <section className="documentation-verification-section" aria-label="Documentation and verification workflow">
-      <StateCard title="Documentation & Verification" description="Enter and correct the transcript, then generate and verify the source-bound nursing note in this same workflow.">
+      <div className="workspace-mode-switch" role="tablist" aria-label="Documentation and verification mode">
+        <button type="button" role="tab" aria-selected={workspaceMode === "documentation"} aria-controls="documentation-mode" className={workspaceMode === "documentation" ? "selected" : ""} onClick={() => setWorkspaceMode("documentation")}>Documentation</button>
+        <button type="button" role="tab" aria-selected={workspaceMode === "verification"} aria-controls="verification-mode" className={workspaceMode === "verification" ? "selected" : ""} onClick={() => setWorkspaceMode("verification")}>Verification results</button>
+      </div>
+      <p className="workspace-mode-description">Switch between the documentation workspace and the verification workspace. Only the selected workspace is shown.</p>
+      {workspaceMode === "documentation" && <div id="documentation-mode"><StateCard title="Documentation" description="Enter and correct the transcript, then generate or import the source-bound nursing note.">
         <div className="workflow-step">
           <h4>1. Enter and check the transcript</h4>
           <p className="workflow-step-description">Enter a synthetic transcript or load an example. Correct speech-to-text mistakes here before generating the note.</p>
@@ -180,8 +186,11 @@ export function DocumentationVerificationPage() {
           {noteMethod === "generate" ? <><h4>Generate a new note</h4><p className="muted">The transcript is saved automatically if needed. The AI generates a structured draft, then the engine verifies it against this exact source version.</p><button aria-busy={processing} onClick={generateAndVerify} disabled={processing || !isTranscriptValid(transcript)}>{processing ? <LoadingIndicator label={createSource.isPending ? "Saving transcript …" : generate.isPending ? "Generating nursing note …" : "Checking nursing note …"} /> : "Generate & Verify"}</button></> : <><h4>Verify an existing note</h4><p className="muted">Paste an existing synthetic AI-generated note. The engine compares this supplied note to the transcript without generating a replacement.</p><label>Existing AI-generated note<textarea aria-label="Existing AI-generated note" value={existingNote} onChange={(event) => setExistingNote(event.target.value)} placeholder="Fügen Sie die vorhandene KI-generierte Pflegenotiz ein …" /></label><button aria-busy={processing} onClick={verifyExistingNote} disabled={processing || !isTranscriptValid(transcript) || !isExternalNoteValid(existingNote)}>{processing ? <LoadingIndicator label={createSource.isPending ? "Saving transcript …" : importNote.isPending ? "Importing existing note …" : "Checking existing note …"} /> : "Verify existing note"}</button></>}
           {note && <><div className="identity-pill">Candidate note · {note.noteId} · revision {note.revision} · {note.origin}</div><FactList facts={note.facts} /><button className="secondary-button" onClick={() => navigate("/review")}>Continue to Human Review</button></>}
         </div>
-      </StateCard>
-      {note && <div className="verification-results"><div className="verification-results-header"><span className="eyebrow">03 · RESULTS</span><h3>Inspect verification results</h3><p>Select a finding to see the affected note text, explanation, severity, and source-bound evidence. Corrections and approval remain in Human Review.</p></div><VerificationResults note={note} source={source} context={review.data} isLoading={review.isLoading || review.isFetching || fullVerification.isPending} /></div>}
+      </StateCard></div>}
+      {workspaceMode === "verification" && <div id="verification-mode" className="verification-results" role="tabpanel" aria-label="Verification results">
+        <div className="verification-results-header"><span className="eyebrow">03 · RESULTS</span><h3>Inspect verification results</h3><p>Select a finding to see the affected note text, explanation, severity, and source-bound evidence. Corrections and approval remain in Human Review.</p></div>
+        {note ? <VerificationResults note={note} source={source} context={review.data} isLoading={review.isLoading || review.isFetching || fullVerification.isPending} /> : <div className="empty-state">No candidate note is available yet. Return to Documentation to create or import a note, then switch back here to inspect its verification results.</div>}
+      </div>}
     </section>
   </>;
 }
