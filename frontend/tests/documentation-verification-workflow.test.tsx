@@ -38,7 +38,7 @@ describe("documentation and verification workflow", () => {
     await user.type(screen.getByLabelText("German transcript"), source.transcript_text);
     await user.click(screen.getByRole("button", { name: "Generate & Verify" }));
 
-    await waitFor(() => expect(screen.getByText("The note passed the current verification checks.")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Verification completed. Review the findings before approval; the note is not yet eligible for approval.")).toBeInTheDocument());
     expect(screen.getByLabelText("German transcript")).toHaveAttribute("readonly");
     expect(screen.getByText("Read-only candidate note")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continue to Human Review" })).toBeInTheDocument();

@@ -35,9 +35,10 @@ export function VerificationResults({ note, source, context, isLoading = false }
   const fullVerification = context?.fullVerification;
   const verification = fullVerification?.noteRevision === note.revision ? fullVerification : undefined;
   const findings = context?.findings ?? [];
+  const approvalEligible = verification?.status === "VALID" && context?.approvalEligible === true;
   return <>
     {isLoading && <div className="empty-state" role="status"><LoadingIndicator label="Checking the nursing note against the transcript …" /></div>}
-    {verification && <div className={verification.status === "VALID" ? "status-banner" : "error-banner"} role="status">{verification.status === "VALID" ? "The note passed the current verification checks." : `The note needs attention. ${userFacingFailureMessage(verification.failureCode, verification.failureMessage)}`}</div>}
+    {verification && <div className={verification.status === "VALID" ? (approvalEligible ? "status-banner" : "warning-banner") : "error-banner"} role="status">{verification.status !== "VALID" ? `Verification did not complete successfully. ${userFacingFailureMessage(verification.failureCode, verification.failureMessage)}` : approvalEligible ? "Verification completed with no blocking findings. The note is ready for human approval." : "Verification completed. Review the findings before approval; the note is not yet eligible for approval."}</div>}
     <div className="workspace-grid evidence-grid">
       <StateCard title="Locked source transcript"><EvidenceText text={context?.transcriptText ?? source?.transcript_text ?? ""} spans={selected?.evidence.spans ?? []} source={source} /></StateCard>
       <StateCard title="Read-only candidate note"><p className="note-meta">Note {note.noteId} · revision {note.revision}</p><NoteText text={context?.candidateNote ?? note.content} span={selected?.claimSpan ?? undefined} /></StateCard>

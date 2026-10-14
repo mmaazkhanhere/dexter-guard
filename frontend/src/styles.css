@@ -56,6 +56,7 @@ button, textarea { font: inherit; }
 .facts p { margin:5px 0; color:#c8d1de; font-size:13px; }
 .error-banner { margin-bottom:18px; padding:12px 14px; border:1px solid #914c56; border-radius:8px; background:#2d1b24; color:#f4bcc5; }
 .error-banner span { color:#d59aa6; font-size:12px; }
+.warning-banner { margin-bottom:18px; padding:12px 14px; border:1px solid #9a762f; border-radius:8px; background:#332a18; color:#f3d99a; }
 .error-boundary { max-width:680px; margin:12vh auto; padding:32px; border:1px solid #914c56; border-radius:12px; background:#2d1b24; color:#f4bcc5; }
 .empty-state { padding:24px; border:1px dashed #42566d; border-radius:10px; color:#a9b8c9; }
 .evidence-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -140,6 +141,7 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-
 .facts p { color: var(--ink); }
 .error-banner { border-color: var(--ink); border-left-width: 4px; background: var(--surface-muted); color: var(--ink); }
 .error-banner span { color: var(--muted); }
+.warning-banner { border-color: var(--ink); border-left-width: 4px; background: var(--surface-muted); color: var(--ink); }
 .error-boundary { border-color: var(--ink); border-left-width: 4px; background: var(--surface); color: var(--ink); }
 .empty-state { border-color: var(--line-strong); color: var(--muted); background: var(--surface); }
 .evidence-note { color: var(--ink); }
