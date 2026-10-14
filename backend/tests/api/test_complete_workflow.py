@@ -6,7 +6,7 @@ from app.main import create_app
 from nursing_notes.adapters import DeterministicNursingNoteAdapter
 
 
-def _import_note(client: TestClient, transcript: str, suffix: str) -> tuple[dict, dict]:
+def _import_note(client: TestClient, transcript: str, suffix: str, *, content: str | None = None) -> tuple[dict, dict]:
     source_response = client.post(
         "/api/v1/sources",
         json={
@@ -23,7 +23,7 @@ def _import_note(client: TestClient, transcript: str, suffix: str) -> tuple[dict
         json={
             "sourceId": source["source_id"],
             "sourceVersion": source["source_version"],
-            "content": transcript,
+            "content": content or transcript,
             "externalOrigin": {"system": "complete-workflow-test", "externalNoteId": suffix},
             "requestedBy": "integration-test",
             "facts": [],
@@ -171,6 +171,33 @@ def test_generated_note_flows_from_ai_generation_through_review_approval() -> No
     )
 
     assert approval.status_code == 201
+
+
+def test_review_context_exposes_validation_and_coverage_details() -> None:
+    app = create_app()
+    client = TestClient(app)
+    source_text = "Die Bewohnerin berichtet eine Temperatur von 37,2 C."
+    note_text = "Die Bewohnerin berichtet eine Temperatur von 39,2 C."
+    _, note = _import_note(client, source_text, "findings", content=note_text)
+
+    verification = _verify(client, note, "findings")
+    context = client.get(f"/api/v1/reviews/{note['noteId']}")
+
+    assert verification["status"] == "VALID"
+    assert context.status_code == 200
+    body = context.json()
+    findings = body["findings"]
+    origins = {finding["origin"] for finding in findings}
+
+    assert {"SPEC_004", "SPEC_005", "SPEC_006"}.issubset(origins)
+    validation_finding = next(finding for finding in findings if finding["origin"] == "SPEC_005")
+    assert validation_finding["ruleCode"].startswith("NUM-")
+    assert "Expected:" in validation_finding["explanation"]
+    assert "observed:" in validation_finding["explanation"]
+    coverage_finding = next(finding for finding in findings if finding["origin"] == "SPEC_006")
+    assert coverage_finding["evidence"]["availability"] == "AVAILABLE"
+    assert coverage_finding["evidence"]["excerpts"]
+    assert body["approvalEligible"] is False
 
 
 def test_complete_workflow_calls_real_components_in_order(monkeypatch) -> None:

@@ -43,6 +43,7 @@ from evidence_verification.repository import InMemoryVerificationRepository
 from evidence_verification.service import VerificationService
 from human_review.contracts import EvidenceDisplay, NoteSpan, ReviewFinding
 from human_review.ports import ReferenceOnlyVerificationPorts, UpstreamRun
+from human_review.policy import severity_for
 from nursing_notes.repository import NoteRepository
 from source_coverage.contracts import CoverageRunRequest
 from source_coverage.extraction import SourceFactExtractionResult, source_text_hash
@@ -233,6 +234,35 @@ class WorkflowVerificationPorts:
         status = "SUCCEEDED" if getattr(run, "status", None) == "SUCCEEDED" else "FAILED"
         return UpstreamRun(run_id=run.verification_run_id, status=status, source_id=source.source_id, source_version=source.source_version, note_id=note_id, note_revision=revision, claim_set_id=claim_set_id)
 
+    def _claim_span(self, claims, claim_id: str | None) -> NoteSpan | None:
+        if not claim_id:
+            return None
+        original_claim_id = claim_id.removeprefix("dve-")
+        claim = next((item for item in claims if item.id == claim_id or item.id == original_claim_id), None)
+        if claim is None:
+            return None
+        return NoteSpan(
+            startCodePoint=claim.statement_span.start_code_point,
+            endCodePointExclusive=claim.statement_span.end_code_point_exclusive,
+            text=claim.statement_span.text,
+        )
+
+    @staticmethod
+    def _source_evidence(source, spans, excerpts=()) -> EvidenceDisplay:
+        source_spans = tuple(
+            {
+                "sourceId": item.source_id,
+                "sourceVersion": item.source_version,
+                "start": item.start,
+                "end": item.end,
+            }
+            for item in spans
+        )
+        if not source_spans:
+            return EvidenceDisplay(availability="MISSING")
+        quoted = tuple(excerpts) or tuple(source.transcript_text[item["start"]:item["end"]] for item in source_spans)
+        return EvidenceDisplay(availability="AVAILABLE", spans=source_spans, excerpts=quoted)
+
     def _persist_evidence_findings(self, run, claims, source) -> None:
         if getattr(run, "status", None) != "SUCCEEDED":
             return
@@ -244,13 +274,7 @@ class WorkflowVerificationPorts:
             if finding_id in self.review_service.repository.findings:
                 continue
             claim = claims_by_id.get(finding.claim_id)
-            claim_span = None
-            if claim is not None:
-                claim_span = NoteSpan(
-                    startCodePoint=claim.statement_span.start_code_point,
-                    endCodePointExclusive=claim.statement_span.end_code_point_exclusive,
-                    text=claim.statement_span.text,
-                )
+            claim_span = self._claim_span(claims, finding.claim_id)
             if finding.source_spans:
                 spans = tuple({
                     "sourceId": item.source_id,
@@ -287,6 +311,77 @@ class WorkflowVerificationPorts:
                 createdAt=datetime.now(timezone.utc),
             ))
 
+    def _persist_validation_findings(self, run, claims, source) -> None:
+        for index, finding in enumerate(getattr(run, "findings", ()), start=1):
+            origin_finding_id = f"{run.validation_run_id}:{finding.rule_id}:{finding.source_fact_id or finding.claim_id or index}"
+            review_finding_id = f"review-{origin_finding_id}"
+            if review_finding_id in self.review_service.repository.findings:
+                continue
+            source_spans = ()
+            if finding.source_fact_id:
+                try:
+                    source_fact = self.validation_facts.get(finding.source_fact_id)
+                    source_spans = tuple(source_fact.evidence)
+                except KeyError:
+                    source_spans = ()
+            severity, rationale = severity_for(origin="SPEC_005", rule_code=finding.rule_id)
+            explanation = finding.message
+            if finding.expected_value is not None or finding.observed_value is not None:
+                explanation = f"{explanation} Expected: {finding.expected_value}; observed: {finding.observed_value}."
+            self.review_service.add_finding(ReviewFinding(
+                reviewFindingId=review_finding_id,
+                origin="SPEC_005",
+                originRunId=run.validation_run_id,
+                originFindingId=origin_finding_id,
+                noteId=run.note_id,
+                noteRevision=run.note_revision,
+                sourceId=run.source_id,
+                sourceVersion=run.source_version,
+                claimId=finding.claim_id.removeprefix("dve-") if finding.claim_id else None,
+                claimSpan=self._claim_span(claims, finding.claim_id),
+                upstreamStatus=getattr(finding.outcome, "value", finding.outcome),
+                ruleCode=finding.rule_id,
+                severity=severity,
+                severityPolicyVersion="REVIEW_SEVERITY-v1",
+                severityRationale=rationale,
+                explanation=explanation,
+                evidence=self._source_evidence(source, source_spans),
+                state="OPEN",
+                createdAt=datetime.now(timezone.utc),
+            ))
+
+    def _persist_coverage_findings(self, run, claims, source) -> None:
+        for finding in getattr(run, "findings", ()):
+            review_finding_id = f"review-{run.coverage_run_id}-{finding.coverage_finding_id}"
+            if review_finding_id in self.review_service.repository.findings:
+                continue
+            severity, rationale = severity_for(
+                origin="SPEC_006",
+                status=getattr(finding.status, "value", finding.status),
+                policy_key=finding.severity_policy_key,
+            )
+            self.review_service.add_finding(ReviewFinding(
+                reviewFindingId=review_finding_id,
+                origin="SPEC_006",
+                originRunId=run.coverage_run_id,
+                originFindingId=finding.coverage_finding_id,
+                noteId=run.note_id,
+                noteRevision=run.note_revision,
+                sourceId=run.source_id,
+                sourceVersion=run.source_version,
+                claimId=finding.matched_claim_ids[0] if finding.matched_claim_ids else None,
+                claimSpan=self._claim_span(claims, finding.matched_claim_ids[0] if finding.matched_claim_ids else None),
+                upstreamStatus=getattr(finding.status, "value", finding.status),
+                ruleCode=f"COVERAGE-{getattr(finding.status, 'value', finding.status)}",
+                severity=severity,
+                severityPolicyVersion="REVIEW_SEVERITY-v1",
+                severityRationale=rationale,
+                explanation=f"{getattr(finding.status, 'value', finding.status)}: {finding.suggestion}",
+                evidence=self._source_evidence(source, finding.source_spans, finding.source_quotes),
+                state="OPEN",
+                createdAt=datetime.now(timezone.utc),
+            ))
+
     def validation(self, note_id: str, revision: int, claim_set_id: str) -> UpstreamRun:
         note, source = self._source(note_id, revision)
         result = self.claim_service.repository.get_current_result(f"{note_id}:r{revision}")
@@ -302,6 +397,7 @@ class WorkflowVerificationPorts:
         self.validation_claims._items.update({item.claim_id: item for item in claims})
         self.validation_alignments._items.update({item.alignment_id: item for item in alignments})
         run = self.validation_service.execute(request)
+        self._persist_validation_findings(run, result.claims, source)
         return UpstreamRun(run_id=run.validation_run_id, status="SUCCEEDED", source_id=source.source_id, source_version=source.source_version, note_id=note_id, note_revision=revision, claim_set_id=claim_set_id)
 
     def coverage(self, note_id: str, revision: int, claim_set_id: str) -> UpstreamRun:
@@ -316,6 +412,7 @@ class WorkflowVerificationPorts:
             idempotencyKey=f"coverage:{note_id}:{revision}:{claim_set_id}",
         )
         run = self.coverage_service.execute(request)
+        self._persist_coverage_findings(run, self.claim_sets.get(claim_set_id).claims, source)
         status = "SUCCEEDED" if getattr(run, "status", None) == "SUCCEEDED" else "FAILED"
         unresolved = getattr(getattr(run, "runtime_counts", None), "unresolved_source_items", 0)
         return UpstreamRun(run_id=run.coverage_run_id, status=status, source_id=source.source_id, source_version=source.source_version, note_id=note_id, note_revision=revision, claim_set_id=claim_set_id, unresolved_source_items=unresolved)
