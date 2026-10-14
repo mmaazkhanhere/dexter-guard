@@ -18,6 +18,7 @@ button, textarea { font: inherit; }
 .metric-grid { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:18px; }
 .state-card { min-height:140px; padding:22px; border:1px solid #2b3a4a; border-radius:12px; background:rgba(20,29,40,.88); box-shadow:0 12px 30px rgba(0,0,0,.12); }
 .state-card h3 { margin:0 0 12px; font-size:15px; color:#c8d1de; }
+.state-card-description { margin:-4px 0 18px; color:#9baabd; font-size:13px; line-height:1.5; }
 .state-card.warning { border-color:#8e7040; }
 .state-card.error { border-color:#914c56; }
 .state-card textarea { width:100%; min-height:220px; resize:vertical; padding:12px; border:1px solid #3c4b5d; background:#0e141c; color:#e8edf5; border-radius:8px; }
@@ -25,6 +26,7 @@ button, textarea { font: inherit; }
 .state-card span { color:#9baabd; font-size:13px; }
 .state-card label { display:block; margin: 0 0 14px; color:#c8d1de; font-size:13px; }
 .state-card input, .state-card select { display:block; width:100%; margin-top:6px; padding:10px; border:1px solid #3c4b5d; border-radius:7px; background:#0e141c; color:#e8edf5; }
+.field-description { display:block; margin-top:6px; color:#9baabd; font-size:12px; font-weight:400; line-height:1.45; }
 .state-card button { border:0; border-radius:7px; padding:10px 14px; background:#67d7c8; color:#0c1719; font-weight:700; cursor:pointer; }
 .state-card button:disabled { opacity:.45; cursor:not-allowed; }
 .secondary-button { background:#26384b !important; color:#dce8f5 !important; margin-right:8px; }
@@ -88,6 +90,8 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-
 
 .state-card { border-color: var(--line); border-radius: 8px; background: var(--surface); box-shadow: 0 8px 24px rgba(17, 17, 17, .04); }
 .state-card h3, .state-card label { color: var(--ink); }
+.state-card-description { color: var(--muted); }
+.field-description { color: var(--muted); }
 .state-card.warning, .state-card.error { border-color: var(--ink); border-left-width: 4px; }
 .state-card textarea, .state-card input, .state-card select { border-color: var(--line-strong); background: var(--surface); color: var(--ink); border-radius: 5px; }
 .state-card textarea:focus, .state-card input:focus, .state-card select:focus { border-color: var(--ink); outline: 2px solid var(--ink); outline-offset: 1px; }

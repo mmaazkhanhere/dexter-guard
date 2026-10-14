@@ -16,6 +16,19 @@ function renderPage() {
 }
 
 describe("documentation workflow", () => {
+  it("explains what each documentation panel does and what to do next", () => {
+    renderPage();
+
+    expect(screen.getByRole("heading", { name: "1. Add the source transcript" })).toBeInTheDocument();
+    expect(screen.getByText(/submit it to create the immutable source record/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "2. Create the candidate note" })).toBeInTheDocument();
+    expect(screen.getByText(/open Evidence Verification to check the draft/i)).toBeInTheDocument();
+    expect(screen.getByText(/becomes the immutable evidence record/i)).toBeInTheDocument();
+    expect(screen.getByText(/synthetic resident identifier/i)).toBeInTheDocument();
+    expect(screen.getByText(/saved synthetic scenario/i)).toBeInTheDocument();
+    expect(screen.getByText(/remains editable until verification/i)).toBeInTheDocument();
+  });
+
   it("imports an external note without calling the generation endpoint", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const path = String(input);
