@@ -1,198 +1,149 @@
 # Dexter Guard
 
-Dexter Guard is an evidence-oriented reliability engine for synthetic German
-nursing documentation. It helps a reviewer determine whether a candidate note
-is faithful to its source transcript before the note is approved.
+An evidence-oriented reliability layer for synthetic German nursing documentation. Dexter Guard checks whether claims in a candidate note are supported by an immutable source transcript and keeps approval with a human reviewer.
 
-> Dexter Guard is a pre-approval quality gate, not an autonomous clinical
-> decision-maker. The repository uses synthetic data only and does not claim
-> clinical safety or regulatory certification.
+> A portfolio prototype and pre-approval quality gate—not a clinical decision-maker. It uses synthetic data only and makes no claim of clinical safety, certification, or production readiness.
 
-## The problem
+## 1. Project overview and problem
 
-Nursing notes generated from transcripts can sound fluent while still changing
-the meaning of the source. Common failures include:
+Fluent notes can still alter source meaning: changing a measurement, dropping negation or attribution, omitting an observation, or adding an unsupported fact. Dexter Guard combines evidence-linked claim verification with deterministic integrity checks and a fail-closed human review workflow.
 
-- turning uncertainty into certainty;
-- dropping negation or attribution, such as changing “the resident reports”
-  into an observed fact;
-- changing numbers, units, dates, or precision;
-- omitting material observations;
-- introducing unsupported clinical inferences; and
-- approving a revised note against stale verification results.
+The goal is to make verification outcomes inspectable: reviewers can trace findings to source spans, resolve or adjudicate issues, revise a note, and approve only an eligible current revision.
 
-These failures are difficult to catch with text similarity or a single model
-confidence score. A trustworthy workflow needs immutable source versions,
-exact evidence references, deterministic checks, explicit failure states, and a
-human reviewer who remains in control of approval.
+## 2. Live demo and screenshots
 
-## Purpose
+- **Live demo:** Not currently deployed. Run the local demo below.
+- **GitHub repository:** [mmaazkhanhere/dexter-guard](https://github.com/mmaazkhanhere/dexter-guard)
 
-Dexter Guard provides the reliability layer around note generation or import:
+> **Screenshot placeholder:** A populated capture showing an incorrect nursing claim, its source evidence, and the verification warning is not available in this repository. Add a real application capture here when available; no screenshot is fabricated.
 
-1. preserve the submitted German transcript as an immutable, versioned source;
-2. generate or import a candidate note with structured, source-linked facts;
-3. verify claims against exact source spans;
-4. run deterministic checks for numeric, unit, identity, span, and contract
-   integrity;
-5. measure source coverage and omissions;
-6. let a human resolve findings, create successor revisions, and approve only a
-   latest fully verified revision; and
-7. record evaluation and audit evidence without logging transcript or model
-   content unnecessarily.
+The existing [review-workspace image](docs/assets/review-workspace.png) shows an empty state, so it is not used as the product demonstration.
 
-## Architecture
+**Incorrect measurement example.** Source: “Um 14:00 Uhr betrug die Temperatur 37,4 Grad Celsius.” Candidate note: “Um 14:00 Uhr betrug die Temperatur 38,4 Grad Celsius.” The verifier can flag the changed value and link the finding to source evidence. This illustrates error detection only; it does not show that a corrected final note is better.
+
+## 3. Key capabilities
+
+- Import German transcripts as immutable, versioned sources and resolve exact evidence spans.
+- Generate or verify an existing candidate note while preserving structured claims and provenance.
+- Combine semantic evidence findings with deterministic checks for values, units, spans, versions, and contract integrity.
+- Report source coverage and potential omissions separately from claim verification.
+- Support note revisions, finding adjudication, explicit approval decisions, and audit history.
+- Run versioned synthetic evaluations with raw counts, denominators, failure accounting, and reproducible adapters.
+
+## 4. Technical architecture
 
 ```mermaid
 flowchart LR
-    User[Reviewer / evaluator] --> UI[React + Vite UI]
-    UI --> API[FastAPI /api/v1]
-
-    API --> Source[Source ingestion\nimmutable versions + spans]
-    API --> Notes[Note generation / import]
+    UI[React + Vite] --> API[FastAPI]
+    API --> Source[Source ingestion + versions]
+    API --> Notes[Generate / import notes]
     API --> Claims[Claim extraction]
-    API --> Evidence[Evidence verification]
+    API --> Verify[Evidence verification]
     API --> Rules[Deterministic validation]
     API --> Coverage[Source coverage]
     API --> Review[Human review + audit]
-    API --> Eval[Evaluation + observability]
-
-    Source --> Repo[Repository interfaces]
-    Notes --> Repo
-    Claims --> Adapters[Versioned model / fixture adapters]
-    Evidence --> Adapters
-    Eval --> Dataset[(Synthetic benchmark\n008-v1: 100 scenarios)]
-    Repo --> Storage[(Local persistence\nSQLite / in-memory boundary)]
-    Storage -. deployment boundary .-> Postgres[(PostgreSQL)]
-
-    Vercel[Vercel Services] -. hosts .-> UI
-    Vercel -. routes /api/* .-> API
+    API --> Eval[Evaluation]
+    Verify --> Providers[Offline heuristic / optional LLM adapter]
+    Rules --> Review
+    Coverage --> Review
+    Source --> Store[Repository interfaces]
+    Notes --> Store
+    Review --> Store
+    Store --> Local[In-memory / SQLite local]
+    Store -. configured deployment .-> PG[(PostgreSQL)]
 ```
 
-The backend owns source identity, versioning, contracts, verification, review
-policy, persistence, and evaluation metrics. The frontend displays those
-backend results; it does not recalculate denominators or make approval
-decisions. Evidence spans use zero-based, inclusive `start` and exclusive
-`end` offsets against the exact stored source version.
+The backend owns verification, persistence boundaries, metrics, and approval eligibility; the frontend presents those outcomes. Source identity is `(source_id, source_version)`. Spans use zero-based, inclusive-start/exclusive-end offsets against that exact version. The default semantic verifier is a local heuristic; an LLM verifier can be configured separately. Neither replaces deterministic validation or human approval.
 
-## Implemented features
+## 5. Evaluation results
 
-- **Immutable source ingestion:** accepts synthetic German (`de-DE`) transcripts,
-  assigns source IDs and versions, preserves historical revisions, and resolves
-  exact source spans.
-- **Candidate note workflow:** supports generated and externally imported draft
-  notes with structured facts, provenance, source anchors, and revision
-  metadata.
-- **Evidence verification:** classifies findings as `SUPPORTED`, `UNSUPPORTED`,
-  `CONTRADICTED`, or `UNCERTAIN`, validates quotations and spans, and preserves
-  typed provider and integrity failures.
-- **Offline semantic verification:** provides a deterministic local fallback for
-  German paraphrases and symptom-level negation. Mixed statements such as
-  `Schmerzen, aber keine Übelkeit` are evaluated per symptom rather than using
-  one sentence-wide polarity.
-- **Deterministic validation:** checks numeric values, units, precision,
-  required references, source versions, and contract invariants without needing
-  an LLM or network access.
-- **Source coverage:** compares documented material against annotated expected
-  facts and reports omissions separately from runtime extraction counts.
-- **Human review and audit:** supports editable successor revisions, finding
-  acknowledgement/dispute, explicit correction decisions, full-note
-  verification, approval eligibility, rejection rationale, and persisted audit
-  history.
-- **Resident attribution safeguards:** supports an explicit synthetic
-  resident-alias mapping, flags cross-resident or ambiguous claims, and blocks
-  approval until uncertain attribution is clarified.
-- **Evaluation and observability:** runs versioned synthetic benchmark cases,
-  validates split integrity, matches findings to expected errors, records raw
-  counts and denominators, supports paired comparisons, and exposes saved-run
-  inspection through the UI.
-- **Web application:** includes Documentation, Evidence Verification, Human
-  Review, and Evaluation workspaces with typed API access and generated
-  OpenAPI client types. Documentation & Verification uses one segmented-toggle
-  workspace with two mutually exclusive modes: **Generate and verify** creates
-  a note and verifies it; **Verify existing note** checks caregiver-supplied
-  note text without generating a replacement. Saved examples can populate
-  either workflow.
-- **Frontend safeguards:** validates resident IDs, transcripts, and note text
-  against backend-compatible rules before submission; shows field-specific
-  errors; disables invalid submissions; preserves transcript state through
-  Human Review navigation; and supports mobile and tablet widths without
-  horizontal page scrolling.
-- **Verification status messaging:** distinguishes “No findings were recorded”
-  from “All recorded findings have been resolved or adjudicated.” Success is
-  shown only after verification completes and `approvalEligible` is true;
-  loading, failed, unresolved, and ineligible states remain blocking.
-- **Deployment topology:** `vercel.json` routes `/api/*` to FastAPI and all
-  other paths to the Vite application through Vercel Services.
+These synthetic engineering measurements are not clinical validation. The 30-case curated result below is a fresh run of the actual offline verifier and is presented separately from saved-fixture replay.
 
-## Review interface
+**Curated actual-verifier experiment**
 
-The implemented review route keeps approval fail-closed: unsaved edits are not
-verified, saving creates an immutable successor revision, and approval requires
-a latest complete-note verification for the current revision.
+- Dataset: `synthetic-german-nursing-curated-heldout`, version `008-curated-v1`, 30 cases; content hash `11860b196febcf69c21e887a5a02fea4401e7cc4be4b280e19eca07dba6066e6`.
+- Evaluation adapter: `ReliabilityEngineEvaluationAdapter` (also exposed as `RealEvaluationAdapter`); the same source/note inputs were used in each arm, with expected annotations withheld from the verifier.
+- Verifier: `OfflineSemanticEvidenceProvider`, `offline-semantic-v1`, with heuristic claim extraction; **not a hosted LLM** and no network/provider call.
+- Configuration: paired baseline `reliability_enabled=false` versus validated `reliability_enabled=true`; `LIVE` execution mode, `HELD_OUT` split, 30 successful cases, 24 critical annotated errors. Latency is local and run-dependent.
 
-![Dexter Guard human review interface](docs/assets/review-workspace.png)
+| Measure | Baseline: reliability off | Validated: offline verifier |
+| --- | ---: | ---: |
+| Correctly matched errors | 0 / 24 | 9 / 24 |
+| Missed errors | 24 / 24 | 15 / 24 |
+| False-positive findings | 0 | 21 |
+| Critical-error recall (Wilson 95% CI) | 0 / 24 = 0%; [0.000, 0.138] | 9 / 24 = 37.5%; [0.212, 0.573] |
+| Actionable warnings per note | 0 / 30 = 0.000 | 28 / 30 = 0.933 |
+| Verification latency, p50 / p95 / mean | 2.49 / 3.66 / 2.85 ms (n=30) | 14.28 / 18.49 / 14.35 ms (n=30) |
 
-The screenshot is a local render of `/review` captured from the Vite app. It
-shows the safe empty state before a note is created in Documentation; a
-populated session adds the editable note, findings, suggestions, approval
-eligibility, and audit history panels.
+Strict matching matters: 12 predictions were linked to an annotated error but had an incorrect classification; three annotated errors had no valid matching finding. The validated arm’s 21 false positives comprise those 12 target-linked misclassifications, four unmatched warnings, and five duplicate predictions. There were no failed cases. A “correct match” is an exact finding-to-target match, not a claim that the final note is correct.
 
-## Local installation
+Examples from the measured validated run:
 
-### Prerequisites
+- **Detected:** `curated-numeric-temperatur` — source 37,4 °C versus note 38,4 °C; a `CONTRADICTED/OTHER` finding matched the expected error and source span.
+- **Missed:** `curated-omission-abfuehrmittel` — the expected missing-fact finding was not emitted; an unrelated claim was classified as `DISTORTED`.
+- **False positive / misclassification:** `curated-negation-schwindel` — a contradiction was emitted as `ATTRIBUTION` rather than expected `NEGATION`, so strict scoring records a mismatch and missed exact target.
 
-- Python 3.11 or newer
-- [`uv`](https://docs.astral.sh/uv/)
-- Node.js and npm
-- Playwright Chromium for browser end-to-end tests
+**Saved regression fixtures (separate result)**
 
-### Install dependencies
+Dataset `008-v1` contains 100 saved scenarios (60 development, 20 validation, 20 held-out). A fresh held-out replay of 20 cases using `DeterministicFixtureAdapter` produced 14 / 14 matched fixture findings, 0 false positives, 0 missed errors, and 5 / 5 critical recall (100%; Wilson 95% CI [0.566, 1.000]). This adapter replays predefined fixture outcomes; **100% is not actual verifier accuracy**.
 
-From the repository root:
+The curated annotations are synthetic and marked pending; the sample is small. Results measure automated finding behavior, not improved final-note quality, caregiver workload, or reviewer benefit. The runner and dataset manifest are available in [the curated benchmark tests](backend/tests/evaluation/test_curated_benchmark.py) and [the 100-case manifest](data/evaluation/008-v1/manifest.json). Reproduce the paired curated run with:
+
+```powershell
+uv run pytest backend/tests/evaluation/test_curated_benchmark.py -k "paired or actual_verifier"
+```
+
+The test reruns the evaluator; no immutable machine-specific latency report is committed, so latency values can vary between runs.
+
+## 6. Key engineering decisions and trade-offs
+
+| Decision | Why it helps | Trade-off |
+| --- | --- | --- |
+| Separate generation from verification | A fluent generator should not certify its own output; an independent verifier can challenge each claim. | Adds latency and overlapping providers can still make correlated errors. |
+| LLM semantics plus deterministic validation | Semantic checks can interpret paraphrases; deterministic rules provide predictable checks for numbers, spans, versions, and schemas. | The offline heuristic has limited language coverage; LLM output can vary or fail. |
+| Structured outputs and claim-level evidence | Makes findings inspectable and traceable to source evidence instead of relying on a note-level score. | Claim extraction and strict matching can miss or misclassify valid evidence. |
+| Immutable source versions and note revisions | Prevents evidence from silently drifting when a transcript or note changes. | Requires explicit version and stale-result handling. |
+| Human-in-the-loop approval | Keeps approval with an authorized person; verification completion is not documentation correctness. | Human review remains necessary and adds workflow effort. |
+| Versioned synthetic data and reproducible evaluation | Enables repeatable local tests without patient data or a hosted model. | Small synthetic results do not establish performance on real or broader language data. |
+
+## 7. Quickstart
+
+Prerequisites: Python 3.11+, [uv](https://docs.astral.sh/uv/), Node.js, and npm.
+
+From a fresh clone, at the repository root:
 
 ```powershell
 uv sync --group dev
-```
-
-In a second terminal:
-
-```powershell
-cd frontend
+Copy-Item backend/.env.example backend/.env
+Copy-Item frontend/.env.example frontend/.env
+Set-Location frontend
 npm ci
 ```
 
-### Configure environment
-
-Use `backend/.env.example` and `frontend/.env.example` as the variable-name
-references. For local frontend development:
-
-```text
-VITE_API_BASE_URL=/api/v1
-```
-
-Only browser-safe values may use the `VITE_` prefix. Database URLs, LLM keys,
-provider configuration, and other server-only secrets must not be exposed with
-`VITE_` or committed to Git.
-
-### Run locally
-
-Start the FastAPI service from the repository root:
+The example frontend configuration uses `VITE_API_BASE_URL=/api/v1`. Keep provider keys and database URLs server-side; never put secrets in `VITE_*` variables. In one terminal from the repository root, start the API:
 
 ```powershell
 uv run uvicorn app.main:app --env-file backend/.env --reload --port 8000
 ```
 
-Start the Vite frontend from `frontend/`:
+In another terminal:
 
 ```powershell
+Set-Location frontend
 npm run dev
 ```
 
-Open the URL printed by Vite, then use the Documentation workspace to submit a
-synthetic transcript and create or import a candidate note.
+Open the URL printed by Vite (normally `http://localhost:5173`). The **Verify Existing Note** workflow runs with the offline verifier and needs no LLM API key:
 
-### Test and quality checks
+1. Open Documentation & Verification and choose **Verify existing note**.
+2. Enter resident ID `synthetic-resident-demo`.
+3. Paste source: `Um 14:00 Uhr betrug die Temperatur 37,4 Grad Celsius.`
+4. Paste candidate note: `Um 14:00 Uhr betrug die Temperatur 38,4 Grad Celsius.`
+5. Run verification and inspect the warning and linked source evidence.
+
+Live AI note generation requires a configured provider in `backend/.env` (provider API key, model, and base URL). The offline verifier remains available without it. Use synthetic data only.
+
+## 8. Testing and reproducibility
 
 Backend, from the repository root:
 
@@ -206,228 +157,28 @@ Frontend, from `frontend/`:
 npm test
 npm run lint
 npm run check
-npm run test:e2e
 ```
 
-Regenerate typed API bindings after an OpenAPI contract change:
+Browser end-to-end tests are available with `npm run test:e2e` after installing Playwright Chromium. Regenerate API types after a contract change with `npm run api:generate`.
 
-```powershell
-npm run api:generate
-```
+The focused curated evaluation command above reruns the paired actual-verifier experiment using the existing evaluation runner. Saved fixtures and actual-verifier results remain separate. All examples and datasets are synthetic.
 
-Focused regression checks for the current verification and evaluation paths:
+## 9. Known limitations
 
-```powershell
-uv run pytest backend/tests/evaluation
-uv run pytest backend/tests/evidence_verification backend/tests/app/test_offline_semantic_evidence_provider.py
-cd frontend
-npm test -- --run tests/verification-results.test.tsx tests/documentation-two-mode-workspace.test.tsx
-```
-
-The current focused results are 32 evaluation tests passed, 75 evidence and
-offline-provider tests passed, and 14 frontend verification/documentation tests
-passed. These are engineering regression results, not clinical validation.
-
-## Sample input and output
-
-The following is a synthetic example of the source-ingestion boundary.
-
-### Input
-
-```json
-{
-  "resident_test_id": "synthetic-resident-demo",
-  "language": "de-DE",
-  "transcript_text": "Die Bewohnerin berichtet über leichten Schwindel. Die Pflegekraft beobachtet keinen Sturz."
-}
-```
-
-### Output
-
-```json
-{
-  "source_id": "source-01HZX7Q2K7",
-  "source_version": 1,
-  "resident_test_id": "synthetic-resident-demo",
-  "language": "de-DE",
-  "transcript_text": "Die Bewohnerin berichtet über leichten Schwindel. Die Pflegekraft beobachtet keinen Sturz.",
-  "created_at": "2026-10-14T10:00:00Z"
-}
-```
-
-The returned `(source_id, source_version)` is the immutable identity used by
-downstream notes, claims, findings, and audit records. A span such as
-`{"source_id":"source-01HZX7Q2K7","source_version":1,"start":24,"end":44}`
-must resolve against that exact stored transcript; it cannot silently resolve
-against a later revision.
-
-## Evaluation results
-
-The repository contains versioned synthetic evaluation artifacts. These results
-are engineering evidence, not clinical validation.
-
-| Artifact | Dataset / scope | Result | Interpretation |
-| --- | --- | ---: | --- |
-| Spec 008 held-out gate | 100 scenarios total; 60 development, 20 validation, 20 held-out | Critical-error recall **5/5 (100%)** | Passes the approved held-out target of ≥95% for the deterministic saved-fixture run. |
-| Spec 004 development report | 11 semantic claims | Exact classification **11/11 (100%)** | Deterministic fixture verifier; not held-out and not a production quality claim. |
-| Spec 004 development report | 6 eligible critical cases | Critical-error recall **6/6 (100%)** | All critical fixture cases were detected. |
-| Spec 004 development report | 2 predicted supported claims | Supported-claim false-positive rate **0/2 (0%)** | No false positive among supported predictions in the fixture. |
-| Spec 004 development report | 8 findings requiring grounding | Evidence grounding validity **8/8 (100%)** | All counted findings had valid source grounding. |
-| Spec 006 versioned handoff | 9 applicable annotated facts | Benchmark completeness **3/9 (33.33%)** | Demonstrates why completeness must remain a separate metric from extraction runtime counts. |
-| Spec 006 versioned handoff | 6 annotated omissions | Omission detection recall **6/6 (100%)** | All annotated omissions were flagged in that fixture. |
-| Spec 006 versioned handoff | 3 reviewed non-omissions | False omission warning rate **0/3 (0%)** | No false omission warnings in that fixture. |
-
-The Spec 008 benchmark manifest is
-[`data/evaluation/008-v1/manifest.json`](data/evaluation/008-v1/manifest.json).
-The detailed source reports are
-[`spec004-development-evaluation-v1.json`](specs/004-evidence-verification/evaluation/spec004-development-evaluation-v1.json)
-and
-[`spec006-development-evaluation-v1.json`](specs/006-source-coverage/evaluation/spec006-development-evaluation-v1.json).
-
-Claim-classification accuracy is calculated from actual verifier predictions,
-not from successful test execution or copied expected answers. Correct,
-incorrect, missing, and duplicate predictions are counted at claim level; a
-10/10, 6/10, and 0/10 prediction set reports 100%, 60%, and 0% accuracy.
-Finding-level false positives, duplicate warnings, and target-linked
-misclassifications are scored separately from classification accuracy.
-
-Additional engineering evidence recorded in the Spec 008 convergence notes:
-
-- the full repository suite reported **338 passed** on 2026-10-13;
-- the accepted benchmark is synthetic German data only;
-- cost was `UNAVAILABLE` for the saved fixture provider because no token or
-  pricing source was configured; and
-- reviewer-workload metrics were not available unless supplied by an observed
-  review run.
-
-Only critical-error recall has an approved numerical release target. Other
-metrics are reported for inspection and regression analysis rather than being
-given invented pass/fail thresholds.
-
-### Curated baseline-versus-validated experiment
-
-The separate `008-curated-v1` corpus contains 30 synthetic, held-out cases. The
-validated arm uses the local deterministic/offline German heuristic verifier
-(`ReliabilityEngineEvaluationAdapter`, no hosted LLM, network, or provider
-call). The paired experiment uses the same immutable source and candidate note
-in both arms:
-
-| Arm | Adapter/configuration | Reliability findings supplied to scoring | Interpretation |
-| --- | --- | --- | --- |
-| Baseline | `ReliabilityEngineEvaluationAdapter(reliability_enabled=false)` | None | Measures the no-reliability finding baseline. |
-| Validated | `ReliabilityEngineEvaluationAdapter(reliability_enabled=true)` | Actual verifier/validation/coverage output | Measures automated detection and classification on the same notes. |
-
-Measured run (dataset hash is checked by the runner; latency is in
-milliseconds):
-
-| Metric | Baseline (reliability disabled) | Validated (offline heuristic verifier) |
-| --- | ---: | ---: |
-| Raw detected errors (true positives) | 0 / 30 notes | 9 / 30 notes |
-| Raw missed errors (false negatives) | 24 / 30 notes | 15 / 30 notes |
-| Raw false positives | 0 / 30 notes | 21 / 30 notes |
-| Critical-error recall | 0 / 24; Wilson 95% CI 0.000–0.138 | 9 / 24; Wilson 95% CI 0.212–0.573 |
-| Actionable warnings per note | 0 / 30 = 0.000 | 28 / 30 = 0.933 |
-| Verification latency (p50 / p95 / mean) | 2.44 / 4.60 / 2.78 ms (n=30) | 14.35 / 19.74 / 14.59 ms (n=30) |
-
-Examples from the validated run (expected labels are benchmark annotations, not
-answers supplied to the verifier):
-
-- Detected error: `curated-numeric-temperatur` — the note changed 37,4 °C to
-  38,4 °C; the verifier emitted `CONTRADICTED/OTHER` against the exact claim
-  and source span.
-- Missed error: `curated-omission-abfuehrmittel` — the source action remains
-  missing from the note, but coverage classified an unrelated claim as
-  `DISTORTED` instead of emitting the expected missing-fact finding.
-- False positive/misclassification: `curated-negation-schwindel` — the
-  verifier found a contradiction but labelled it `ATTRIBUTION` rather than the
-  expected `NEGATION`; strict matching counts this as both a false positive and
-  a missed exact error.
-
-These examples illustrate the heuristic's current behavior; they are not
-evidence of hosted-LLM performance.
-
-The report keeps these measures separate for each arm: detected findings,
-missed findings, false positives, critical-error recall, supported-claim false-
-positive rate, claim-classification accuracy, warnings per note, and
-verification latency. Rate metrics include raw numerator/denominator and
-Wilson 95% intervals; latency includes observation count, p50, p95, and mean.
-The report also records dataset ID/version/hash, adapter, model/verifier
-configuration, and run IDs. Saved-fixture results are not merged into this
-comparison.
-
-Run the reproducible regression and paired experiment checks with:
-
-```powershell
-uv run pytest backend/tests/evaluation/test_curated_benchmark.py -k "paired or actual_verifier"
-```
-
-This experiment demonstrates only how the configured reliability pipeline's
-automated findings differ from a no-findings baseline on these synthetic notes.
-It does not demonstrate improved final-note quality, caregiver workload,
-clinical safety, or reviewer benefit: no observed review/correction study is
-part of this run. The curated annotations are still marked `PENDING`, the
-corpus is small, and local offline-verifier latency and classifications are not
-provider-general performance evidence.
-
-## Engineering trade-offs
-
-| Decision | Benefit | Cost / trade-off |
-| --- | --- | --- |
-| Exact source spans instead of copied evidence text | Keeps every finding anchored to authoritative source bytes/text and a version | Requires careful offset, Unicode, revision, and quotation validation. |
-| Deterministic rules plus isolated model adapters | Makes numeric, provenance, schema, and failure behavior reproducible | More interfaces and fixtures are required; semantic interpretation remains provider-dependent. |
-| Human approval gate instead of automatic approval | Keeps clinical-significant decisions with an authorized reviewer and fails closed on stale or incomplete verification | Adds review time and prevents fully unattended throughput. |
-| Synthetic benchmark and saved fixture provider | Protects privacy and makes CI repeatable without network access | Results do not establish clinical safety or predict live-provider performance. |
-| Repository interfaces with local persistence | Enables fast deterministic tests and a future PostgreSQL implementation without changing contracts | Deployment still needs durable PostgreSQL, pooling, migrations, backups, and retention policy. |
-| React/Vite frontend with FastAPI Services deployment | Gives one coherent local workflow and one-URL deployment topology | Frontend, backend, contract generation, and deployment gates must stay compatible. |
-
-## Known limitations
-
-- The proof of concept is synthetic-only. It must not be used with real patient
-  data or interpreted as a clinical safety validation.
-- A production LLM/provider configuration is not part of the committed
-  evaluation evidence. The development reports use deterministic fixture
-  adapters behind structured interfaces.
-- Candidate-evidence discovery is not a separate retrieval subsystem; short
-  synthetic transcripts are supplied in full to the evaluation pipeline.
-- Production authentication, authorization, retention, deletion, export
-  controls, encryption, and multi-user access management remain future work.
-- Deployed immutable sources, notes, runs, decisions, and audit history require
-  PostgreSQL configuration; local setup is not a production persistence model.
-- Observed reviewer workload, live-provider cost, and live model variability are
-  not represented in the saved fixture metrics.
-- The offline semantic verifier intentionally uses a small deterministic German
-  vocabulary and clause-local scope rules. It is a local fallback, not a
-  comprehensive German language-understanding system.
-- The repository’s convergence notes preserve reviewer-owned and deployment
-  gates; passing tests alone does not imply overall product or release
-  readiness.
-
-## Future improvements
-
-- Run the full benchmark with approved, versioned providers, prompts, models,
-  pricing, and timeout/retry configuration, then publish paired raw-count
-  reports with confidence intervals and failure examples.
-- Add a dedicated evidence-retrieval layer for longer transcripts while keeping
-  source-span validation authoritative.
-- Complete the production persistence boundary with PostgreSQL migrations,
-  serverless-safe pooling, backups, retention, access control, and tamper-evident
-  audit storage.
-- Add authentication and authorization for reviewer and evaluator actions.
-- Expand observed human-review metrics, including time-to-resolution, burden,
-  disagreement, correction acceptance, and final-note quality.
-- Improve the review workspace with richer source/draft/finding side-by-side
-  navigation, persistent case drill-down, and populated walkthrough assets.
-- Add independent requirements review and deployment smoke evidence to the
-  convergence record before making a release claim.
+- The offline verifier uses deterministic German heuristics and limited vocabulary/scope rules; as the curated results show, it misses errors and produces false positives.
+- The curated set has 30 cases, pending annotations, and no claim of independent human validation. Confidence intervals are wide.
+- Saved-fixture replay supports regression testing; it is not a measure of verifier performance.
+- No study measures final-note correctness after review, time saved, caregiver workload, or clinical outcomes.
+- Live-provider behavior, cost, and latency are not represented in the offline benchmark.
+- Authentication, authorization, production retention/deletion controls, and durable deployment operations are outside this prototype’s verified scope.
+- Do not use with real patient data or treat passing tests as clinical safety or regulatory evidence.
 
 ## Project documentation
 
-- [Constitution](.specify/memory/constitution.md)
 - [Architecture](docs/architecture.md)
-- [Spec 009 quickstart](specs/009-ui-implementation/quickstart.md)
+- [Constitution](.specify/memory/constitution.md)
 - [Spec 008 evaluation procedure](specs/008-evaluation-and-observability/converge.md)
 - [Vercel deployment decision](docs/deployment/spec-009-vercel-decision.md)
-- [Evidence-verification operations guide](docs/operations/evidence-verification.md)
 
 ## License
 
