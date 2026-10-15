@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NursingFact, NoteResponse, SourceDocument } from "../src/api/types";
-import { isDuplicateGeneratedNote, isExternalNoteValid, isTranscriptValid } from "../src/features/documentation/validation";
+import { isDuplicateGeneratedNote, isExternalNoteValid, isResidentIdValid, isTranscriptValid, residentIdValidationMessage } from "../src/features/documentation/validation";
 
 describe("documentation input validation", () => {
   it("requires meaningful German transcript text", () => {
@@ -11,6 +11,13 @@ describe("documentation input validation", () => {
   it("requires meaningful external note text", () => {
     expect(isExternalNoteValid("kurz")).toBe(false);
     expect(isExternalNoteValid("Bewohnerin berichtet guten Schlaf.")).toBe(true);
+  });
+
+  it("matches the backend synthetic resident ID shape and explains malformed values", () => {
+    expect(isResidentIdValid("synthetic-resident_01")).toBe(true);
+    expect(isResidentIdValid(" resident 01 ")).toBe(false);
+    expect(isResidentIdValid("-resident")).toBe(false);
+    expect(residentIdValidationMessage("resident 01")).toMatch(/only letters, numbers, dots, underscores, and hyphens/i);
   });
 
   it("detects an unchanged generated candidate without comparing generated IDs", () => {

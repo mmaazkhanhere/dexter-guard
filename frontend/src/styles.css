@@ -155,6 +155,7 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-
 .state-card h3, .state-card label { color: var(--ink); }
 .state-card-description { color: var(--muted); }
 .field-description { color: var(--muted); }
+.field-error { margin: -8px 0 14px; color: var(--ink); font-size: 13px; font-weight: 700; }
 .state-card.warning, .state-card.error { border-color: var(--ink); border-left-width: 4px; }
 .state-card textarea, .state-card input, .state-card select { border-color: var(--line-strong); background: var(--surface); color: var(--ink); border-radius: 5px; }
 .state-card textarea[readonly] { background: var(--surface-muted); }

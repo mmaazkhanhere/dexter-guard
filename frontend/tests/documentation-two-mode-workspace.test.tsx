@@ -23,6 +23,20 @@ function RouteLinks() {
 }
 
 describe("documentation two-mode workspace", () => {
+  it("blocks malformed resident IDs locally and identifies the field", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify([]), { status: 200 })));
+    const user = userEvent.setup();
+    renderWorkspace();
+
+    await user.type(screen.getByLabelText("German transcript"), "Die Bewohnerin ist ruhig.");
+    await user.clear(screen.getByLabelText("Synthetic resident identifier"));
+    await user.type(screen.getByLabelText("Synthetic resident identifier"), "resident 01");
+
+    expect(screen.getByLabelText("Synthetic resident identifier")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByText(/Use a synthetic resident ID/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Generate note & verify" })).toBeDisabled();
+  });
+
   it("uses one segmented toggle and renders only the selected workflow", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ code: "NOT_FOUND", message: "not found" }), { status: 404 })));
     const user = userEvent.setup();
