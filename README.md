@@ -29,6 +29,10 @@ The existing [review-workspace image](docs/assets/review-workspace.png) shows an
 - Report source coverage and potential omissions separately from claim verification.
 - Support note revisions, finding adjudication, explicit approval decisions, and audit history.
 - Run versioned synthetic evaluations with raw counts, denominators, failure accounting, and reproducible adapters.
+- Keep approval unavailable while a verified note has unsaved edits; saving creates a new revision that must be verified again.
+- Refresh audit history after every auditable review action, including saves, verification, finding decisions, approval, and rejection.
+- Provide a founder-guided synthetic demo that works without visitor-supplied API keys when the configured provider is unavailable.
+- Preload reproducible evaluation evidence and allow visitors to inspect individual cases: transcript, generated note, expected and actual findings, evidence spans, disagreement labels, benchmark version, and verifier metadata.
 
 ## 4. Technical architecture
 
@@ -149,6 +153,8 @@ Open the URL printed by Vite (normally `http://localhost:5173`). The **Verify Ex
 4. Paste candidate note: `Um 14:00 Uhr betrug die Temperatur 38,4 Grad Celsius.`
 5. Run verification and inspect the warning and linked source evidence.
 
+The **Founder Demo** walkthrough is also available from the application navigation. It uses synthetic, preloaded content and can be completed without entering an API key. The **Evaluation** workspace loads a saved benchmark run on a fresh local start; select a case under “Failing and inspected scenarios” to review the original transcript, candidate note, expected/actual findings, evidence offsets, disagreement reason, dataset version, and verifier configuration.
+
 Live AI note generation requires a configured provider in `backend/.env` (provider API key, model, and base URL). The offline verifier remains available without it. Use synthetic data only.
 
 ## 8. Testing and reproducibility
@@ -169,6 +175,14 @@ npm run check
 
 Browser end-to-end tests are available with `npm run test:e2e` after installing Playwright Chromium. Regenerate API types after a contract change with `npm run api:generate`.
 
+Focused checks for the latest review and evaluation workflows are:
+
+```powershell
+uv run pytest backend/tests/evaluation/test_api_report.py
+Set-Location frontend
+npm test -- --run tests/evaluation-workspace.test.tsx
+```
+
 The focused curated evaluation command above reruns the paired actual-verifier experiment using the existing evaluation runner. Saved fixtures and actual-verifier results remain separate. All examples and datasets are synthetic.
 
 ## 9. Known limitations
@@ -178,6 +192,7 @@ The focused curated evaluation command above reruns the paired actual-verifier e
 - Saved-fixture replay supports regression testing; it is not a measure of verifier performance.
 - No study measures final-note correctness after review, time saved, caregiver workload, or clinical outcomes.
 - Live-provider behavior, cost, and latency are not represented in the offline benchmark.
+- Evaluation case inspection currently resolves case content from the active versioned dataset; historical runs require that dataset version to remain available.
 - Authentication, authorization, production retention/deletion controls, and durable deployment operations are outside this prototype’s verified scope.
 - Do not use with real patient data or treat passing tests as clinical safety or regulatory evidence.
 
