@@ -22,9 +22,9 @@ Tasks are ordered by dependency and vertical slices. Checked tasks have implemen
 
 ## Phase 3 - Evidence vertical slice
 
-- [x] T010 Implement the side-by-side transcript/note/finding evidence viewer and backend status display. Evidence: `frontend/src/features/verification/VerificationPage.tsx`.
+- [x] T010 Implement the side-by-side transcript/note/finding evidence viewer and backend status display. Evidence: `frontend/src/features/verification/VerificationPage.tsx`, including explicit no-issue, review-required, failed, and load-error/retry states.
 - [x] T011 Implement Unicode-safe source spans, overlap handling, focus/scroll behavior, and non-color labels. Evidence: `frontend/src/features/verification/spans.ts`, `frontend/tests/spans.test.ts`, verification workspace focus behavior. Browser E2E evidence remains part of T022.
-- [x] T012 Add verification triggering and terminal failure handling. Evidence: review workspace full-verification mutation, backend-controlled status/error rendering, and approval guard.
+- [x] T012 Add verification triggering and terminal failure handling. Evidence: review workspace full-verification mutation, backend-controlled status/error rendering, load retry, unresolved-finding counts, and approval guard.
 
 ## Phase 4 - Human review vertical slice
 

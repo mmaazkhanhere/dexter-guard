@@ -241,6 +241,7 @@ The normative field definitions and persistence invariants are in `data-model.md
 | CLM-001 | `Bewohnerin ist wach.` | One atomic affirmed claim. |
 | CLM-002 | `Bewohnerin ist wach. Sie isst Frühstück.` | Two separately addressable claims. |
 | CLM-003 | `Bewohnerin ist wach und orientiert.` | Two independent claims with valid spans. |
+| CLM-003a | `Keine Schmerzen, aber keine Übelkeit.` | Two independent negated symptom claims, each with its own exact negation cue and valid span. |
 | CLM-004 | `Kein Schmerz angegeben.` | One claim with `NEGATED` polarity and the `Kein` cue/span. |
 | CLM-005 | `Möglicherweise leichte Übelkeit.` | One claim with non-certain certainty and exact cue. |
 | CLM-006 | `Der Bewohner berichtet über Schwindel.` | One symptom claim attributed to `CARE_RECIPIENT`, not caregiver observation. |

@@ -6,6 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useReview } from "../../api/hooks";
 import { useWorkspace } from "../../state/workspace";
 import type { Finding, NoteResponse, ReviewContext, SourceDocument } from "../../api/types";
+import { isFindingUnresolved } from "../review/findings";
 import { nonOverlappingSpans, projectSourceSpan, validSourceSpans } from "./spans";
 
 export function VerificationPage() {
@@ -15,7 +16,7 @@ export function VerificationPage() {
   return <>
     <WorkspaceHeader eyebrow="02 · EVIDENCE VERIFICATION" title="Inspect claims against source evidence" description="Review backend-returned claims, findings, classifications, severities, and immutable evidence spans." />
     {!note && <div className="empty-state">Create or import a note in Documentation first.</div>}
-    {note && <VerificationResults note={note} source={source} context={context} isLoading={review.isLoading || review.isFetching} />}
+    {note && <VerificationResults note={note} source={source} context={context} isLoading={review.isLoading || review.isFetching} loadError={review.error} onRetry={() => { void review.refetch(); }} />}
     {/*
       <StateCard title="Original German transcript"><EvidenceText text={context?.transcriptText ?? source?.transcript_text ?? ""} spans={selected?.evidence.spans ?? []} source={source} /></StateCard>
       <StateCard title="Candidate note"><p className="note-meta">Note {note.noteId} · revision {note.revision}</p><p className="evidence-note">{context?.candidateNote ?? note.content}</p></StateCard>
@@ -25,9 +26,9 @@ export function VerificationPage() {
   </>;
 }
 
-type VerificationResultsProps = { note: NoteResponse; source?: SourceDocument; context?: ReviewContext; isLoading?: boolean };
+type VerificationResultsProps = { note: NoteResponse; source?: SourceDocument; context?: ReviewContext; isLoading?: boolean; loadError?: unknown; onRetry?: () => void };
 
-export function VerificationResults({ note, source, context, isLoading = false }: VerificationResultsProps) {
+export function VerificationResults({ note, source, context, isLoading = false, loadError, onRetry }: VerificationResultsProps) {
   const [selected, setSelected] = useState<Finding>();
   useEffect(() => {
     if (selected) document.getElementById("selected-finding")?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
@@ -35,15 +36,20 @@ export function VerificationResults({ note, source, context, isLoading = false }
   const fullVerification = context?.fullVerification;
   const verification = fullVerification?.noteRevision === note.revision ? fullVerification : undefined;
   const findings = context?.findings ?? [];
-  const approvalEligible = verification?.status === "VALID" && context?.approvalEligible === true;
   const orderedFindings = [...findings].sort((left, right) => severityRank(left.severity) - severityRank(right.severity) || unresolvedRank(left.state) - unresolvedRank(right.state));
-  const unresolvedFindings = findings.filter((finding) => finding.state === "OPEN" || finding.state === "STALE").length;
+  const unresolved = findings.filter((finding) => isFindingUnresolved(finding, context?.decisions ?? []));
+  const unresolvedFindings = unresolved.length;
+  const approvalEligible = !loadError && verification?.status === "VALID" && context?.approvalEligible === true && unresolvedFindings === 0;
   const criticalFindings = findings.filter((finding) => finding.severity === "CRITICAL").length;
   const majorFindings = findings.filter((finding) => finding.severity === "MAJOR").length;
+  const unresolvedSeveritySummary = formatSeverityCounts(unresolved);
   const sourceText = context?.transcriptText ?? source?.transcript_text ?? "";
   return <>
     {isLoading && <div className="empty-state" role="status"><LoadingIndicator label="Checking the nursing note against the transcript …" /></div>}
-    {verification && <div className={verification.status === "VALID" ? (approvalEligible ? "status-banner" : "warning-banner") : "error-banner"} role="status">{verification.status !== "VALID" ? `Verification did not complete successfully. ${userFacingFailureMessage(verification.failureCode, verification.failureMessage)}` : approvalEligible ? "Verification completed with no blocking findings. The note is ready for human approval." : "Verification completed. Review the findings before approval; the note is not yet eligible for approval."}</div>}
+    {loadError && <div className="error-banner" role="alert"><strong>Verification results could not be loaded. Approval blocked.</strong><div className="button-row"><button type="button" className="secondary-button" onClick={onRetry} disabled={!onRetry || isLoading}>{isLoading ? "Retrying …" : "Retry loading results"}</button></div></div>}
+    {verification && !loadError && verification.status !== "VALID" && <div className="error-banner" role="alert"><strong>Verification failed. Approval blocked.</strong> {userFacingFailureMessage(verification.failureCode, verification.failureMessage)}</div>}
+    {verification && !loadError && verification.status === "VALID" && unresolvedFindings === 0 && <div className="status-banner" role="status"><strong>No issues detected.</strong> Human approval required.</div>}
+    {verification && !loadError && verification.status === "VALID" && unresolvedFindings > 0 && <div className="warning-banner" role="status"><strong>Review required.</strong> {unresolvedFindings} unresolved {unresolvedFindings === 1 ? "issue" : "issues"}: {unresolvedSeveritySummary}. Approval blocked until the issues are resolved or adjudicated.</div>}
     {verification && <section className="verification-overview" aria-label="Verification overview">
       <div className="verification-summary" aria-label="Finding summary">
         <div><span>Total findings</span><strong>{findings.length}</strong></div>
@@ -67,6 +73,14 @@ export function VerificationResults({ note, source, context, isLoading = false }
 
 function severityRank(severity: Finding["severity"]): number { return severity === "CRITICAL" ? 0 : severity === "MAJOR" ? 1 : 2; }
 function unresolvedRank(state: Finding["state"]): number { return state === "OPEN" || state === "STALE" ? 0 : 1; }
+function formatSeverityCounts(findings: Finding[]): string {
+  const counts = { CRITICAL: 0, MAJOR: 0, MINOR: 0 };
+  findings.forEach((finding) => { counts[finding.severity] += 1; });
+  return (["CRITICAL", "MAJOR", "MINOR"] as const)
+    .filter((severity) => counts[severity] > 0)
+    .map((severity) => `${counts[severity]} ${severity.toLowerCase()}`)
+    .join(", ");
+}
 function classificationLabel(status?: string | null): string {
   const normalized = status?.toUpperCase();
   if (normalized === "SUPPORTED") return "Supported";

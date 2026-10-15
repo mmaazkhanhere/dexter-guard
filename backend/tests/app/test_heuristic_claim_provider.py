@@ -73,3 +73,18 @@ def test_three_measurements_in_one_sentence_keep_three_values() -> None:
         "BEATS_PER_MINUTE",
         "MILLILITRE",
     ]
+
+
+def test_contrastive_negated_symptoms_keep_independent_negation_scopes() -> None:
+    note = "Keine Schmerzen, aber keine Übelkeit."
+
+    claims = HeuristicClaimProvider().extract(
+        note,
+        note_revision_id="note-1:r1",
+        resident_test_id="resident-1",
+    )["claims"]
+
+    assert [claim["claimText"] for claim in claims] == ["Keine Schmerzen", "keine Übelkeit."]
+    assert [claim["polarity"] for claim in claims] == ["NEGATED", "NEGATED"]
+    assert [claim["negationCue"]["text"] for claim in claims] == ["Keine", "keine"]
+    assert all(note[claim["statementSpan"]["startCodePoint"]:claim["statementSpan"]["endCodePointExclusive"]] == claim["claimText"] for claim in claims)

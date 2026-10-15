@@ -9,8 +9,8 @@ describe("documentation input validation", () => {
   });
 
   it("requires meaningful external note text", () => {
-    expect(isExternalNoteValid("kurz")).toBe(false);
-    expect(isExternalNoteValid("Bewohnerin berichtet guten Schlaf.")).toBe(true);
+    expect(isExternalNoteValid("   ")).toBe(false);
+    expect(isExternalNoteValid("kurz")).toBe(true);
   });
 
   it("matches the backend synthetic resident ID shape and explains malformed values", () => {

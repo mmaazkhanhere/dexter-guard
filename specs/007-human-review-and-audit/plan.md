@@ -96,7 +96,7 @@ No distributed transaction is introduced. Upstream immutable terminal run record
 
 Use positive integer revision sequence per `noteId` and a unique `(note_id, revision)` key. `expectedRevision` is compare-and-swap. The revision insert, latest-revision projection update, and audit append share one SQLite transaction.
 
-Approval uses a single SQLite `BEGIN IMMEDIATE` (or repository equivalent transaction) to read the latest revision and required aggregate, apply all eligibility predicates, insert one `NoteDisposition(APPROVED)`, and append one audit event. The transaction has a uniqueness constraint permitting at most one approval disposition for `(note_id, revision)`. A concurrently appended revision forces `STALE_REVISION` or an eligibility conflict; an approval never targets an old revision by accident.
+Approval uses a single SQLite `BEGIN IMMEDIATE` (or repository equivalent transaction) to read the latest revision and required aggregate, apply all eligibility predicates—including the absence of every `OPEN` or `STALE` finding regardless of severity—insert one `NoteDisposition(APPROVED)`, and append one audit event. The transaction has a uniqueness constraint permitting at most one approval disposition for `(note_id, revision)`. A concurrently appended revision forces `STALE_REVISION` or an eligibility conflict; an approval never targets an old revision by accident.
 
 There is no attempt to lock human editing while verification runs. Immutable runs are allowed to finish after an edit, but cannot be considered current because their bound `noteRevision` differs from latest.
 

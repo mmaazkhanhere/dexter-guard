@@ -7,6 +7,7 @@ import { WorkspaceHeader } from "../../components/shared/WorkspaceHeader";
 import { useWorkspace } from "../../state/workspace";
 import type { Finding } from "../../api/types";
 import { projectSourceSpan } from "../verification/spans";
+import { isFindingUnresolved } from "./findings";
 
 export function ReviewWorkspace() {
   const { note: noteMaybe, draftContent, setDraftContent, applyNoteRevision } = useWorkspace();
@@ -33,8 +34,9 @@ export function ReviewWorkspace() {
   const context = review.data;
   const currentVerification = context?.fullVerification?.noteRevision === note.revision ? context.fullVerification : undefined;
   const staleContext = Boolean(context && context.latestRevision > note.revision);
-  const approvalEligible = Boolean(context?.approvalEligible && currentVerification?.status === "VALID" && !verify.isPending && !save.isPending);
-  const firstError = save.error ?? verify.error ?? decide.error ?? approve.error ?? reject.error;
+  const unresolvedFindings = context?.findings.some((finding) => isFindingUnresolved(finding, context.decisions)) ?? false;
+  const approvalEligible = Boolean(context?.approvalEligible && currentVerification?.status === "VALID" && !unresolvedFindings && !review.error && !verify.isPending && !save.isPending);
+  const firstError = review.error ?? save.error ?? verify.error ?? decide.error ?? approve.error ?? reject.error;
   const selectedFinding = context?.findings.find((finding) => finding.reviewFindingId === selectedFindingId) ?? context?.findings[0];
 
   async function saveRevision() {
@@ -53,12 +55,9 @@ export function ReviewWorkspace() {
   async function fullVerify() {
     try {
       const result = await verify.mutateAsync({ noteId: note.noteId, expectedRevision: note.revision, reviewerLabel: reviewer });
-      const refreshed = await review.refetch();
-      const approvalEligibleAfterVerification = result.status === "VALID" && refreshed.data?.approvalEligible === true;
-      if (approvalEligibleAfterVerification) {
-        notify({ tone: "info", title: "Verification completed", message: "No blocking findings were returned. Human approval is still required." });
-      } else if (result.status === "VALID") {
-        notify({ tone: "info", title: "Verification completed", message: "Review the findings before approval. The note is not yet eligible for approval." });
+      void review.refetch();
+      if (result.status === "VALID") {
+        notify({ tone: "info", title: "Verification run recorded", message: "Inspect the current findings and approval eligibility before approval." });
       } else {
         notify({ tone: "error", title: "The note needs attention", message: `${userFacingFailureMessage(result.failureCode, result.failureMessage)} Approval remains unavailable until the issues are resolved.` });
       }
@@ -117,8 +116,8 @@ export function ReviewWorkspace() {
         <p className="muted">Unsaved edits are not verified. Saving creates an immutable successor and invalidates prior findings for approval.</p>
       </StateCard>
       <StateCard title="Approval eligibility" tone={approvalEligible ? "neutral" : "warning"}>
-        <div className="eligibility">{approvalEligible ? "Ready for approval" : "Not ready for approval"}</div>
-        <p>{currentVerification ? (currentVerification.status !== "VALID" ? "The verification did not complete successfully; the note still needs attention." : approvalEligible ? "Verification completed with no blocking findings. Human approval is still required." : "Verification completed, but findings still require review before approval.") : "A complete verification is required before approval."}</p>
+        <div className="eligibility">{approvalEligible ? "Human approval required" : "Approval blocked"}</div>
+        <p>{currentVerification ? (currentVerification.status !== "VALID" ? "Verification failed. Approval blocked." : approvalEligible ? "No issues detected. A successful verification process does not establish that the nursing note is correct or approved." : "Review required. Unresolved issues must be resolved or adjudicated before approval.") : "A complete verification is required before approval."}</p>
         {verify.isPending && <p className="muted">Verification is in progress; approval is disabled.</p>}
         {currentVerification?.failureMessage && <p className="muted">{userFacingFailureMessage(currentVerification.failureCode, currentVerification.failureMessage)}</p>}
         <div className="button-row"><button onClick={approveNote} disabled={!approvalEligible || approve.isPending}>{approve.isPending ? "Approving …" : "Approve"}</button><button className="danger-button" onClick={rejectNote} disabled={reject.isPending || reason.trim().length < 3}>Reject</button></div>

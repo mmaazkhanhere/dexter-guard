@@ -66,7 +66,7 @@ As a reviewer, I want to accept a source-grounded suggestion or manually correct
 
 As a reviewer, I want approval to be blocked until the latest complete note is validly verified and critical discrepancies are resolved, while still being able to reject an unsafe note when verification fails.
 
-**Independent test:** Direct API approval fails for a stale revision, missing/full-note-failed verification, invalid output, or unresolved critical finding; rejection succeeds with a reason.
+**Independent test:** Direct API approval fails for a stale revision, missing/full-note-failed verification, invalid output, or any unresolved finding; rejection succeeds with a reason.
 
 ### P2 — Record independent finding decisions
 
@@ -97,7 +97,7 @@ As a reviewer, I want optional proposed wording that remains visibly source-grou
 | FR-20 | Present optional suggested corrections only when they are source-grounded and explicitly accepted; acceptance creates a successor revision. Unsupported suggestions are unusable and cannot be applied. | Suggestion service | HR-004, HR-003 |
 | FR-21 | Trigger claim-level re-verification for feedback using the exact source and note revision. It may update review feedback but cannot satisfy final approval. | Claim re-verification orchestrator | HR-006 |
 | FR-22 | Trigger and retain a full-note verification of the latest complete revision, including the established evidence verification, deterministic validation, and coverage checks, each bound to that source version and revision. | Full-note verification orchestrator | HR-007, HR-016 |
-| FR-23 | Backend approval eligibility must block any approval with an unresolved critical discrepancy, including a critical operational/integrity finding. | Approval policy | HR-008, HR-014 |
+| FR-23 | Backend approval eligibility must block any approval with an unresolved finding of any severity, including operational/integrity findings. An `OPEN` or `STALE` immutable finding remains unresolved unless its latest allowed decision outcome is `RESOLVED` or `ADJUDICATED` under the documented policy. | Approval policy | HR-008, HR-013, HR-014 |
 | FR-24 | Record human approval, rejection, and documented adjudication. Approval is allowed only under the policy; rejection remains available even after verification failure. | Disposition service | HR-008, HR-009, HR-015 |
 | FR-25 | Preserve an append-only, traceable history of original candidate notes, revisions, runs/findings, reviewer decisions, suggestions, and dispositions with reviewer label, timestamp, references, and rationale where required. | Audit service/repository | HR-010, HR-017 |
 
@@ -148,7 +148,7 @@ The backend may approve only when, in one database transaction/compare-and-swap 
 1. the submitted revision is still the latest revision for the note;
 2. the source ID/version still equals that revision's immutable evidence source;
 3. the referenced full-note verification is `VALID`, complete, and binds to that exact revision and source;
-4. no `OPEN` or `STALE` critical finding remains for that revision, and no current critical operational verification finding exists;
+4. no unresolved finding of any severity remains for that revision—an immutable `OPEN` or `STALE` finding requires a latest allowed `RESOLVED` or `ADJUDICATED` decision outcome—and no current operational verification finding remains unresolved;
 5. all policy-required decision/adjudication records are complete; and
 6. no verification component is failed, invalid, or incomplete.
 
@@ -169,7 +169,7 @@ All scenarios use synthetic German nursing documentation and synthetic resident 
 | HR-005 | **Given** a reviewer manually changes a note, **when** the save uses the current expected revision, **then** old verification results become stale; **when** another update already created a successor, **then** the save returns `409 STALE_REVISION` and writes nothing. |
 | HR-006 | **Given** an edited claim, **when** claim-level re-verification completes successfully for that claim and revision, **then** feedback is updated but approval remains blocked until a valid full-note verification exists. |
 | HR-007 | **Given** revision 2 is the latest note after revision 1 was fully verified, **when** final verification is requested, **then** the orchestrator evaluates revision 2 with all required components and cannot use revision 1 runs. |
-| HR-008 | **Given** the latest revision has an open critical discrepancy, **when** an API client attempts approval directly, **then** the backend rejects it with `409 APPROVAL_PRECONDITION_FAILED` and records no approval. |
+| HR-008 | **Given** the latest revision has an `OPEN` or `STALE` finding of any severity without a latest allowed `RESOLVED` or `ADJUDICATED` decision outcome, **when** an API client attempts approval directly, **then** the backend rejects it with `409 APPROVAL_PRECONDITION_FAILED` and records no approval. |
 | HR-009 | **Given** full-note verification has failed, **when** a reviewer rejects the latest note with a reason, **then** rejection is recorded successfully and remains auditable. |
 | HR-010 | **Given** an original candidate, a corrected successor, review decisions, and verification runs, **when** audit history is requested, **then** it returns all immutable records in event order without replacing original content or prior decisions. |
 | HR-011 | **Given** a suggestion whose proposed text contains a fact unsupported by its declared source evidence, **when** it is received or selected, **then** it is marked `UNUSABLE`/rejected and cannot be applied. |
@@ -194,7 +194,7 @@ All scenarios use synthetic German nursing documentation and synthetic resident 
 ## Measurable success criteria
 
 - Every FR-15 and FR-17–FR-25 maps to at least one acceptance scenario, contract operation, and planned task.
-- 100% of approval test attempts with stale, failed, invalid, incomplete, source-mismatched, or critical-open verification inputs are rejected by the backend.
+- 100% of approval test attempts with stale, failed, invalid, incomplete, source-mismatched, or any `OPEN`/`STALE` finding inputs are rejected by the backend.
 - 100% of accepted edits/suggestions create a new immutable revision; historical revisions and decisions remain retrievable.
 - 100% of rendered evidence excerpts in acceptance tests are derived from valid spans for the exact immutable source version; invalid/missing spans show no misleading highlight.
 - Synthetic German acceptance fixtures cover HR-001 through HR-018, including direct API guard-bypass attempts and unresolved-source-item blocking.

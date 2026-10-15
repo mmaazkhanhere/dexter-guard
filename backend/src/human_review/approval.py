@@ -27,19 +27,23 @@ class ApprovalEligibilityPolicy:
             raise ReviewServiceError("APPROVAL_PRECONDITION_FAILED")
         if verification.coverage_unresolved_source_items:
             raise ReviewServiceError("APPROVAL_PRECONDITION_FAILED")
-        if any(f.severity == "CRITICAL" and f.state in {"OPEN", "STALE"} for f in findings if f.note_revision == latest_revision):
-            raise ReviewServiceError("APPROVAL_PRECONDITION_FAILED")
         if any(status.status != "SUCCEEDED" for status in verification.component_statuses):
             raise ReviewServiceError("APPROVAL_PRECONDITION_FAILED")
-        current_findings = [f for f in findings if f.note_revision == latest_revision]
+        current_findings = [f for f in findings if f.note_id == verification.note_id and f.note_revision == latest_revision]
+        current_decisions = [d for d in (decisions or []) if d.note_id == verification.note_id and d.note_revision == latest_revision]
+        latest_by_finding: dict[str, ReviewDecision] = {}
+        for decision in current_decisions:
+            latest_by_finding[decision.finding_id] = decision
+        for finding in current_findings:
+            if finding.state not in {"OPEN", "STALE"}:
+                continue
+            decision = latest_by_finding.get(finding.review_finding_id)
+            if decision is None or decision.outcome not in {"ADJUDICATED", "RESOLVED"}:
+                raise ReviewServiceError("APPROVAL_PRECONDITION_FAILED")
         if decisions is not None:
-            current_decisions = [d for d in decisions if d.note_revision == latest_revision]
             decided = {d.finding_id for d in current_decisions}
             if any(f.review_finding_id not in decided for f in current_findings):
                 raise ReviewServiceError("APPROVAL_PRECONDITION_FAILED")
-            latest_by_finding: dict[str, ReviewDecision] = {}
-            for decision in current_decisions:
-                latest_by_finding[decision.finding_id] = decision
             for finding in current_findings:
                 decision = latest_by_finding.get(finding.review_finding_id)
                 if decision is None:

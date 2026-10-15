@@ -73,7 +73,7 @@ def test_critical_finding_acknowledgement_does_not_clear_blocker():
         service.approve("note-1", expected_revision=1, full_verification=_valid_verification(), reviewer_label="r")
 
 
-def test_approval_requires_latest_valid_full_verification_and_no_critical_open_finding():
+def test_approval_requires_persisted_valid_verification_and_no_unresolved_finding():
     service = _service()
     service.seed_note("note-1", "source-1", 1, "Initial note")
     service.add_finding(_finding(severity="MAJOR"))
@@ -81,6 +81,8 @@ def test_approval_requires_latest_valid_full_verification_and_no_critical_open_f
     with pytest.raises(ReviewServiceError, match="APPROVAL_PRECONDITION_FAILED"):
         service.approve("note-1", expected_revision=1, full_verification=verification, reviewer_label="r")
     service.persist_verification(verification)
+    with pytest.raises(ReviewServiceError, match="APPROVAL_PRECONDITION_FAILED"):
+        service.approve("note-1", expected_revision=1, full_verification=verification, reviewer_label="r")
     service.record_decision("note-1", "finding-1", expected_revision=1, kind="ADJUDICATED", reviewer_label="r", rationale="reviewed non-critical finding")
     assert service.approve("note-1", expected_revision=1, full_verification=verification, reviewer_label="r").kind == "APPROVED"
 
@@ -94,3 +96,16 @@ def test_failed_verification_still_allows_rejection_and_audit_is_append_only():
     assert [event.event_type for event in events] == ["NOTE_CREATED", "NOTE_REJECTED"]
     with pytest.raises(ReviewServiceError, match="FINAL_DISPOSITION_IMMUTABLE"):
         service.save_revision("note-1", expected_revision=1, content="reopen", reviewer_label="r")
+
+
+def test_unresolved_finding_on_another_note_does_not_block_approval():
+    service = _service()
+    service.seed_note("note-1", "source-1", 1, "Initial note")
+    service.seed_note("note-2", "source-1", 1, "Other note")
+    foreign_finding = _finding(severity="MAJOR")
+    foreign_finding = foreign_finding.model_copy(update={"review_finding_id": "finding-note-2", "note_id": "note-2"})
+    service.add_finding(foreign_finding)
+    verification = _valid_verification()
+    service.persist_verification(verification)
+
+    assert service.approve("note-1", expected_revision=1, full_verification=verification, reviewer_label="r").kind == "APPROVED"

@@ -77,7 +77,7 @@ export function DocumentationVerificationPage() {
   async function verify(noteToVerify: NoteResponse): Promise<void> {
     const result = await fullVerification.mutateAsync({ noteId: noteToVerify.noteId, expectedRevision: noteToVerify.revision, reviewerLabel: "synthetic-reviewer" });
     if (result.status === "VALID") {
-      notify({ tone: "info", title: "Verification completed", message: "The verification run completed; this does not mean every statement is factually verified. Review findings before Human Review and approval." });
+      notify({ tone: "info", title: "Verification run recorded", message: "Inspect the current findings and approval eligibility before Human Review." });
     } else {
       notify({ tone: "error", title: "The note needs attention", message: `${userFacingFailureMessage(result.failureCode, result.failureMessage)} The note remains read-only until Human Review.` });
     }
@@ -192,7 +192,7 @@ export function DocumentationVerificationPage() {
       </StateCard></div>}
       {workspaceMode === "verification" && <div id="verification-mode" className="verification-results" role="tabpanel" aria-label="Verification">
         <div className="verification-results-header"><span className="eyebrow">03 · RESULTS</span><h3>Inspect verification results</h3><p>Select a finding to see the affected note text, explanation, severity, and source-bound evidence. Corrections and approval remain in Human Review.</p></div>
-        {note ? <VerificationResults note={note} source={source} context={review.data} isLoading={review.isLoading || review.isFetching || fullVerification.isPending} /> : <div className="empty-state">No candidate note is available yet. Return to Documentation to create or import a note, then switch back here to inspect its verification results.</div>}
+        {note ? <VerificationResults note={note} source={source} context={review.data} isLoading={review.isLoading || review.isFetching || fullVerification.isPending} loadError={review.error} onRetry={() => { void review.refetch(); }} /> : <div className="empty-state">No candidate note is available yet. Return to Documentation to create or import a note, then switch back here to inspect its verification results.</div>}
       </div>}
     </section>
   </>;

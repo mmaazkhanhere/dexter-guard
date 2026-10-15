@@ -317,6 +317,28 @@ def test_compound_vital_signs_preserve_pulse_for_numeric_validation() -> None:
     assert context.json()["approvalEligible"] is False
 
 
+def test_contrastive_negated_symptoms_are_verified_as_two_independent_claims() -> None:
+    app = create_app()
+    client = TestClient(app)
+    source_text = "Keine Schmerzen, aber keine Übelkeit."
+    note_text = "Schmerzen vorhanden, aber Übelkeit vorhanden."
+    _, note = _import_note(client, source_text, "contrastive-negation", content=note_text)
+
+    verification = _verify(client, note, "contrastive-negation")
+    context = client.get(f"/api/v1/reviews/{note['noteId']}")
+    extraction = app.state.workflow.claim_service.repository.get_current_result(f"{note['noteId']}:r1")
+
+    assert verification["status"] == "VALID"
+    assert extraction is not None
+    assert [claim.claim_text for claim in extraction.claims] == ["Schmerzen vorhanden", "Übelkeit vorhanden."]
+    findings = [finding for finding in context.json()["findings"] if finding["origin"] == "SPEC_004"]
+    assert len(findings) == 2
+    assert {finding["upstreamStatus"] for finding in findings} == {"CONTRADICTED"}
+    assert all("opposite polarity" in finding["explanation"] for finding in findings)
+    assert all(finding["evidence"]["availability"] == "AVAILABLE" for finding in findings)
+    assert context.json()["approvalEligible"] is False
+
+
 def test_insulin_negation_reversal_is_persisted_as_critical() -> None:
     class InsulinNegationVerifier:
         model_id = "test-verifier"

@@ -1,7 +1,7 @@
 import type { NoteResponse, NursingFact, SourceDocument } from "../../api/types";
 
 export const MIN_DOCUMENTATION_TEXT_LENGTH = 1;
-export const MIN_EXTERNAL_NOTE_LENGTH = 10;
+export const MIN_EXTERNAL_NOTE_LENGTH = 1;
 export const RESIDENT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 export function isTranscriptValid(value: string): boolean {

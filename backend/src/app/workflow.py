@@ -75,7 +75,7 @@ class HeuristicClaimProvider:
         r"(?P<value>\d+(?:[.,]\d+)?)\s*(?P<unit>\u00b0?C|grad\s+celsius|celsius|grad|mmHg|ml|mg|bpm|schl(?:\u00e4|ae)ge[n]?\s+pro\s+minute|l\b|g\b)",
         re.IGNORECASE,
     )
-    _coordinator = re.compile(r"\s+(?:und|sowie)\s+", re.IGNORECASE)
+    _coordinator = re.compile(r"(?:,\s*|\s+)(?P<word>und|sowie|aber)\s+", re.IGNORECASE)
     _predicate = re.compile(r"\b(?:ist|sind|war|waren|hat|haben|zeigt|zeigen|berichtet|klagt|wurde|wurden|erhielt|verabreicht|beträgt|liegt)\b", re.IGNORECASE)
     _atomic_continuation = re.compile(r"\b(?:wach|orientiert|ruhig|unruhig|schmerz|schwindel|übelkeit|uebelkeit|atemnot|husten|gewaschen|gelagert|unterstützt|unterstuetzt)\w*\b", re.IGNORECASE)
 
@@ -114,9 +114,10 @@ class HeuristicClaimProvider:
     def _atomic_segments(cls, statement: str, start: int) -> list[tuple[int, int, str]]:
         """Split only coordinated, independently checkable assertions.
 
-        Multiple measured values are always separate claims.  A limited set of
-        coordinated observation/action continuations is also split so the local
-        fallback meets the atomic-claim contract without inventing text.
+        Multiple measured values are always separate claims. A limited set of
+        coordinated observation/action continuations is also split. Contrastive
+        symptom or measurement clauses are split when each side is independently
+        checkable, preserving each clause's local negation scope.
         """
         separators = list(cls._coordinator.finditer(statement))
         if not separators:
@@ -141,7 +142,11 @@ class HeuristicClaimProvider:
             cls._predicate.search(part[2]) or cls._atomic_continuation.search(part[2])
             for part in parts[1:]
         )
-        return parts if measurement_count >= 2 or coordinated_assertions else [(start, start + len(statement), statement)]
+        contrastive_assertions = any(separator.group("word").casefold() == "aber" for separator in separators) and all(
+            cls._number.search(part[2]) or cls._atomic_continuation.search(part[2])
+            for part in parts
+        )
+        return parts if measurement_count >= 2 or coordinated_assertions or contrastive_assertions else [(start, start + len(statement), statement)]
 
     @classmethod
     def _claim(cls, note_text: str, start: int, end: int, statement: str, revision_id: str, resident_id: str, ordinal: int) -> dict[str, object]:

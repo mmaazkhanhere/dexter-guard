@@ -13,7 +13,25 @@ test("combined workflow saves, generates, and verifies before human review", asy
   await page.goto("/documentation");
   await page.getByLabel("Synthetic resident identifier").fill("synthetic-e2e-resident");
   await page.getByLabel("German transcript").fill("Die Bewohnerin berichtet guten Schlaf und trinkt ausreichend.");
-  await page.getByRole("button", { name: "Generate & Verify" }).click();
-  await expect(page.getByText(/Candidate note · note-e2e/)).toBeVisible();
+  await page.getByRole("button", { name: "Generate note & verify" }).click();
+  await expect(page.getByText("Review the note against its evidence")).toBeVisible();
   await expect(page.getByRole("button", { name: "Continue to Human Review" })).toBeVisible();
+});
+
+test("documentation has no horizontal page overflow on mobile and tablet widths", async ({ page }) => {
+  await page.route("**/api/v1/saved-examples", async (route) => route.fulfill({ json: [] }));
+
+  for (const width of [390, 768]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("/documentation");
+    await expect(page.getByLabel("German transcript")).toBeVisible();
+
+    const overflow = await page.evaluate(() => ({
+      documentWidth: document.documentElement.scrollWidth,
+      viewportWidth: document.documentElement.clientWidth,
+      bodyWidth: document.body.scrollWidth,
+    }));
+    expect(overflow.documentWidth, `document overflow at ${width}px`).toBeLessThanOrEqual(overflow.viewportWidth);
+    expect(overflow.bodyWidth, `body overflow at ${width}px`).toBeLessThanOrEqual(overflow.viewportWidth);
+  }
 });

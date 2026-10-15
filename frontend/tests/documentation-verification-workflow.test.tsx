@@ -38,8 +38,9 @@ describe("documentation and verification workflow", () => {
     await user.type(screen.getByLabelText("German transcript"), source.transcript_text);
     await user.click(screen.getByRole("button", { name: "Generate note & verify" }));
 
-    await waitFor(() => expect(screen.getByText("Verification completed")).toBeInTheDocument());
-    expect(screen.getByText("The verification run completed; this does not mean every statement is factually verified. Review findings before Human Review and approval.")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Verification run recorded")).toBeInTheDocument());
+    expect(screen.getByText("Inspect the current findings and approval eligibility before Human Review.")).toBeInTheDocument();
+    expect(screen.queryByText("Verification completed")).not.toBeInTheDocument();
     expect(screen.getByLabelText("German transcript")).toHaveAttribute("readonly");
     expect(screen.getByRole("button", { name: "Continue to Human Review" })).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "Verification" }));

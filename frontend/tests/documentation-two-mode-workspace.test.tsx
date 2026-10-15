@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
@@ -11,6 +11,11 @@ const source = { source_id: "source-navigation", source_version: 1, resident_tes
 const note = { noteId: "note-navigation", revision: 1, content: "Frau Müller klagt über Schmerzen.", status: "DRAFT", origin: "GENERATED", sourceId: source.source_id, sourceVersion: 1, validationRunId: "validation-1", facts: [], schemaVersion: "v1", rulesetVersion: "v1", sourceTextHash: "hash", normalizationPolicy: "v1", createdAt: "2026-01-01T00:00:00Z", createdBy: "synthetic-reviewer", generationRunId: "generation-1" } as const;
 const verification = { fullVerificationId: "full-navigation", noteId: note.noteId, noteRevision: 1, source: { sourceId: source.source_id, sourceVersion: 1 }, claimSetId: "claims-1", evidenceRunId: "evidence-1", deterministicValidationRunId: "validation-1", coverageRunId: "coverage-1", coverageUnresolvedSourceItems: 0, componentStatuses: [], status: "VALID", idempotencyKey: "verify-1", requestDigest: "digest", correlationId: "correlation", failureCode: null, failureMessage: null, createdAt: "2026-01-01T00:00:00Z", completedAt: "2026-01-01T00:00:00Z" } as const;
 const context = { contractVersion: "REVIEW-AUDIT-CONTRACT-v1", noteId: note.noteId, revision: 1, latestRevision: 1, noteStatus: "IN_REVIEW", source: { sourceId: source.source_id, sourceVersion: 1 }, transcriptText: source.transcript_text, candidateNote: note.content, findings: [], decisions: [], suggestions: [], fullVerification: verification, approvalEligible: false } as const;
+const unresolvedContext = {
+  ...context,
+  findings: [{ reviewFindingId: "finding-open", origin: "SPEC_005", noteId: note.noteId, noteRevision: note.revision, sourceId: source.source_id, sourceVersion: source.source_version, claimId: "claim-open", claimSpan: { startCodePoint: 0, endCodePointExclusive: 5 }, upstreamStatus: "UNSUPPORTED", ruleCode: "MISSING_SUPPORT", severity: "MAJOR", severityPolicyVersion: "REVIEW_SEVERITY-v2", severityRationale: "Synthetic unresolved finding.", explanation: "The note has an unresolved finding.", evidence: { availability: "MISSING", spans: [], excerpts: [] }, state: "OPEN", createdAt: "2026-01-01T00:00:00Z" }],
+  approvalEligible: true,
+} as const;
 
 function renderWorkspace() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -23,6 +28,24 @@ function RouteLinks() {
 }
 
 describe("documentation two-mode workspace", () => {
+  it("shows a field-specific message and disables generation when the transcript is missing", () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify([]), { status: 200 })));
+    renderWorkspace();
+
+    expect(screen.getByText(/Enter the original German caregiver transcript/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Generate note & verify" })).toBeDisabled();
+  });
+
+  it("enables generation for backend-valid source inputs", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify([]), { status: 200 })));
+    const user = userEvent.setup();
+    renderWorkspace();
+
+    await user.type(screen.getByLabelText("German transcript"), "Die Bewohnerin ist ruhig.");
+
+    expect(screen.getByRole("button", { name: "Generate note & verify" })).toBeEnabled();
+  });
+
   it("blocks malformed resident IDs locally and identifies the field", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify([]), { status: 200 })));
     const user = userEvent.setup();
@@ -53,6 +76,8 @@ describe("documentation two-mode workspace", () => {
 
     expect(screen.getByRole("tab", { name: "Verify Existing Note" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByLabelText("Existing AI-generated note")).toBeInTheDocument();
+    expect(screen.getByText(/Paste the existing AI-generated nursing note/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Verify Note" })).toBeDisabled();
     expect(screen.queryByLabelText("Example scenario")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Generate note & verify" })).not.toBeInTheDocument();
   });
@@ -83,5 +108,52 @@ describe("documentation two-mode workspace", () => {
     expect(screen.getByLabelText("Synthetic resident identifier")).toHaveValue(source.resident_test_id);
     expect(screen.getByLabelText("German transcript")).toHaveAttribute("readonly");
     expect(screen.getByText(new RegExp(`Locked source .*${source.source_id} .*v${source.source_version}`))).toBeInTheDocument();
+  });
+
+  it("does not announce verification success when refreshed findings are unresolved", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input);
+      if (path.endsWith("/saved-examples")) return new Response("[]", { status: 200 });
+      if (path.endsWith("/sources") && init?.method === "POST") return new Response(JSON.stringify(source), { status: 201 });
+      if (path.endsWith("/notes/generate") && init?.method === "POST") return new Response(JSON.stringify(note), { status: 201 });
+      if (path.endsWith(`/reviews/${note.noteId}/full-verifications`)) return new Response(JSON.stringify(verification), { status: 200 });
+      if (path.includes(`/reviews/${note.noteId}`)) return new Response(JSON.stringify(unresolvedContext), { status: 200 });
+      return new Response(JSON.stringify({ code: "NOT_FOUND", message: "test route not found" }), { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    renderWorkspace();
+
+    await user.type(screen.getByLabelText("German transcript"), source.transcript_text);
+    await user.clear(screen.getByLabelText("Synthetic resident identifier"));
+    await user.type(screen.getByLabelText("Synthetic resident identifier"), source.resident_test_id);
+    await user.click(screen.getByRole("button", { name: "Generate note & verify" }));
+
+    await waitFor(() => expect(screen.getByText("Verification run recorded")).toBeInTheDocument());
+    expect(screen.getByText("Inspect the current findings and approval eligibility before Human Review.")).toBeInTheDocument();
+    expect(screen.queryByText("Verification completed")).not.toBeInTheDocument();
+  });
+
+  it("does not announce verification success when refreshed results fail to load", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input);
+      if (path.endsWith("/saved-examples")) return new Response("[]", { status: 200 });
+      if (path.endsWith("/sources") && init?.method === "POST") return new Response(JSON.stringify(source), { status: 201 });
+      if (path.endsWith("/notes/generate") && init?.method === "POST") return new Response(JSON.stringify(note), { status: 201 });
+      if (path.endsWith(`/reviews/${note.noteId}/full-verifications`)) return new Response(JSON.stringify(verification), { status: 200 });
+      if (path.includes(`/reviews/${note.noteId}`)) return new Response(JSON.stringify({ code: "DEPENDENCY_UNAVAILABLE", message: "verification context unavailable" }), { status: 503 });
+      return new Response(JSON.stringify({ code: "NOT_FOUND", message: "test route not found" }), { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    renderWorkspace();
+
+    await user.type(screen.getByLabelText("German transcript"), source.transcript_text);
+    await user.clear(screen.getByLabelText("Synthetic resident identifier"));
+    await user.type(screen.getByLabelText("Synthetic resident identifier"), source.resident_test_id);
+    await user.click(screen.getByRole("button", { name: "Generate note & verify" }));
+
+    await waitFor(() => expect(screen.getAllByRole("alert").some((alert) => alert.textContent?.includes("Verification results could not be loaded"))).toBe(true));
+    expect(screen.queryByText("Verification completed")).not.toBeInTheDocument();
   });
 });

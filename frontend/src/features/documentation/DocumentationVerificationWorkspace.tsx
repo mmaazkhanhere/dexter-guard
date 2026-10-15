@@ -9,7 +9,14 @@ import { useToast } from "../../components/shared/Toaster";
 import { WorkspaceHeader } from "../../components/shared/WorkspaceHeader";
 import { VerificationResults } from "../verification/VerificationPage";
 import { useWorkspace } from "../../state/workspace";
-import { isExternalNoteValid, isResidentIdValid, isTranscriptValid } from "./validation";
+import {
+  existingNoteValidationMessage,
+  isExternalNoteValid,
+  isResidentIdValid,
+  isTranscriptValid,
+  residentIdValidationMessage,
+  transcriptValidationMessage,
+} from "./validation";
 
 type Mode = "generate" | "existing";
 
@@ -43,13 +50,11 @@ export function DocumentationVerificationWorkspace() {
 
   function updateTranscript(value: string) {
     setTranscript(value);
-    setTouched((current) => ({ ...current, transcript: true }));
     saveTranscript(value);
   }
 
   function updateResidentId(value: string) {
     setResidentId(value);
-    setTouched((current) => ({ ...current, resident: true }));
     saveResidentId(value);
   }
 
@@ -83,7 +88,7 @@ export function DocumentationVerificationWorkspace() {
   async function verify(candidate: NoteResponse) {
     const result = await fullVerification.mutateAsync({ noteId: candidate.noteId, expectedRevision: candidate.revision, reviewerLabel: "synthetic-reviewer" });
     if (result.status === "VALID") {
-      notify({ tone: "info", title: "Verification completed", message: "The verification run completed. This is not factual approval: inspect findings and source evidence before Human Review." });
+      notify({ tone: "info", title: "Verification run recorded", message: "Inspect the current findings and approval eligibility before Human Review." });
     } else {
       notify({ tone: "error", title: "Verification did not complete", message: `${userFacingFailureMessage(result.failureCode, result.failureMessage)} The note is not approval-eligible.` });
     }
@@ -134,10 +139,10 @@ export function DocumentationVerificationWorkspace() {
         <button role="tab" type="button" aria-selected={mode === "generate"} aria-controls="generate-and-verify-panel" className={mode === "generate" ? "selected" : ""} onClick={() => setMode("generate")}>Generate &amp; Verify</button>
         <button role="tab" type="button" aria-selected={mode === "existing"} aria-controls="verify-existing-note-panel" className={mode === "existing" ? "selected" : ""} onClick={() => setMode("existing")}>Verify Existing Note</button>
       </div>
-      {mode === "generate" ? <ModePanel id={panelId} mode="generate" transcript={transcript} residentId={residentId} sourceLocked={sourceLocked} transcriptError={touched.transcript ? transcriptValidationMessage(transcript) : undefined} residentError={touched.resident ? residentIdValidationMessage(residentId.trim()) : undefined} onTranscript={updateTranscript} onResident={updateResidentId} onEditSource={() => setEditingSource(true)} onCancelEdit={() => { updateTranscript(source?.transcript_text ?? transcript); updateResidentId(source?.resident_test_id ?? residentId); setEditingSource(false); }} source={source} scenarios={examples.data?.map((example) => ({ id: example.exampleId, title: example.title }))} selectedScenario={selectedExample} onScenarioChange={setSelectedExample} onLoadScenario={loadScenario} scenarioLoading={scenarioSource.isFetching} action={<button onClick={generateAndVerify} disabled={isWorking || !isTranscriptValid(transcript) || !isResidentIdValid(residentId.trim())}>{isWorking ? <LoadingIndicator label={busyLabel} /> : "Generate note & verify"}</button>} /> : <ModePanel id={panelId} mode="existing" transcript={transcript} residentId={residentId} sourceLocked={sourceLocked} transcriptError={touched.transcript ? transcriptValidationMessage(transcript) : undefined} residentError={touched.resident ? residentIdValidationMessage(residentId.trim()) : undefined} noteError={touched.note ? existingNoteValidationMessage(existingNote) : undefined} onTranscript={updateTranscript} onResident={updateResidentId} onEditSource={() => setEditingSource(true)} onCancelEdit={() => { updateTranscript(source?.transcript_text ?? transcript); updateResidentId(source?.resident_test_id ?? residentId); setEditingSource(false); }} source={source} existingNote={existingNote} onExistingNote={(value) => { setExistingNote(value); setTouched((current) => ({ ...current, note: true })); }} action={<button onClick={verifyExistingNote} disabled={isWorking || !isTranscriptValid(transcript) || !isResidentIdValid(residentId.trim()) || !isExternalNoteValid(existingNote)}>{isWorking ? <LoadingIndicator label={busyLabel} /> : "Verify Note"}</button>} />}
+      {mode === "generate" ? <ModePanel id={panelId} mode="generate" transcript={transcript} residentId={residentId} sourceLocked={sourceLocked} transcriptError={transcriptValidationMessage(transcript)} residentError={residentIdValidationMessage(residentId.trim())} onTranscript={updateTranscript} onResident={updateResidentId} onEditSource={() => setEditingSource(true)} onCancelEdit={() => { updateTranscript(source?.transcript_text ?? transcript); updateResidentId(source?.resident_test_id ?? residentId); setEditingSource(false); }} source={source} scenarios={examples.data?.map((example) => ({ id: example.exampleId, title: example.title }))} selectedScenario={selectedExample} onScenarioChange={setSelectedExample} onLoadScenario={loadScenario} scenarioLoading={scenarioSource.isFetching} action={<button onClick={generateAndVerify} disabled={isWorking || !isTranscriptValid(transcript) || !isResidentIdValid(residentId.trim())}>{isWorking ? <LoadingIndicator label={busyLabel} /> : "Generate note & verify"}</button>} /> : <ModePanel id={panelId} mode="existing" transcript={transcript} residentId={residentId} sourceLocked={sourceLocked} transcriptError={transcriptValidationMessage(transcript)} residentError={residentIdValidationMessage(residentId.trim())} noteError={existingNoteValidationMessage(existingNote)} onTranscript={updateTranscript} onResident={updateResidentId} onEditSource={() => setEditingSource(true)} onCancelEdit={() => { updateTranscript(source?.transcript_text ?? transcript); updateResidentId(source?.resident_test_id ?? residentId); setEditingSource(false); }} source={source} existingNote={existingNote} onExistingNote={setExistingNote} action={<button onClick={verifyExistingNote} disabled={isWorking || !isTranscriptValid(transcript) || !isResidentIdValid(residentId.trim()) || !isExternalNoteValid(existingNote)}>{isWorking ? <LoadingIndicator label={busyLabel} /> : "Verify Note"}</button>} />}
       {activeResult && <section className="verification-results" aria-label="Verification results">
         <div className="verification-results-header"><span className="eyebrow">VERIFICATION RESULTS</span><h3>Review the note against its evidence</h3><p>A completed run is not a factual pass. Select a finding to highlight the affected statement in the note and the supporting or contradicting source evidence.</p></div>
-        <VerificationResults note={activeResult} source={source} context={review.data} isLoading={review.isLoading || review.isFetching || fullVerification.isPending} />
+        <VerificationResults note={activeResult} source={source} context={review.data} isLoading={review.isLoading || review.isFetching || fullVerification.isPending} loadError={review.error} onRetry={() => { void review.refetch(); }} />
         <div className="button-row"><button className="secondary-button" onClick={() => navigate("/review")}>Continue to Human Review</button></div>
       </section>}
     </section>

@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { NoteResponse, ReviewContext, SourceDocument } from "../src/api/types";
 import { VerificationResults } from "../src/features/verification/VerificationPage";
 
@@ -32,5 +32,53 @@ describe("verification results presentation", () => {
     expect(screen.getAllByText(/The note says the resident reports pain/).length).toBeGreaterThan(0);
     expect(screen.getByText("Technical details")).toBeInTheDocument();
     expect(screen.getByText("Technical details").closest("details")).not.toHaveAttribute("open");
+  });
+
+  it("shows review required with unresolved issue count and severity", () => {
+    render(<VerificationResults note={note} source={source} context={{ ...context, approvalEligible: true } as ReviewContext} />);
+
+    expect(screen.getByText("Review required.").closest("div")).toHaveTextContent("2 unresolved issues: 1 critical, 1 major");
+    expect(screen.getByText("Review required.").closest("div")).toHaveClass("warning-banner");
+    expect(screen.getByText(/Approval eligibility: Not eligible/)).toBeInTheDocument();
+    expect(screen.queryByText("No issues detected.")).not.toBeInTheDocument();
+  });
+
+  it("shows no-issue completion without implying correctness or approval", () => {
+    const eligibleContext = { ...context, findings: [], approvalEligible: true } as ReviewContext;
+    render(<VerificationResults note={note} source={source} context={eligibleContext} />);
+
+    expect(screen.getByText("No issues detected.").closest("div")).toHaveTextContent("Human approval required.");
+    expect(screen.queryByText(/correct|passed|approved/i)).not.toBeInTheDocument();
+  });
+
+  it("does not count an appropriately adjudicated non-critical finding as unresolved", () => {
+    const decision = { reviewDecisionId: "decision-adjudicated", findingId: unsupported.reviewFindingId, noteId: note.noteId, noteRevision: 1, kind: "ADJUDICATED", outcome: "ADJUDICATED", reviewerLabel: "synthetic-reviewer", rationale: "Reviewed against the source.", successorRevision: null, suggestionId: null, idempotencyKey: "decision-key", recordedAt: "2026-01-01T00:00:00Z" } as const;
+    const adjudicatedContext = { ...context, findings: [unsupported], decisions: [decision], approvalEligible: true } as unknown as ReviewContext;
+    render(<VerificationResults note={note} source={source} context={adjudicatedContext} />);
+
+    expect(screen.getByText("Unresolved").parentElement).toHaveTextContent("0");
+    expect(screen.getByText("No issues detected.").closest("div")).toHaveTextContent("Human approval required.");
+    expect(screen.queryByText("Review required.")).not.toBeInTheDocument();
+  });
+
+  it("shows failed verification as approval-blocking", () => {
+    const failedVerification = { ...verification, status: "FAILED", failureCode: "PROVIDER_UNAVAILABLE", failureMessage: "provider unavailable" } as unknown as ReviewContext["fullVerification"];
+    render(<VerificationResults note={note} source={source} context={{ ...context, fullVerification: failedVerification } as ReviewContext} />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Verification failed. Approval blocked.");
+    expect(screen.queryByText("No issues detected.")).not.toBeInTheDocument();
+  });
+
+  it("does not show success when current verification results fail to load and retries", async () => {
+    const user = userEvent.setup();
+    const retry = vi.fn();
+    const eligibleContext = { ...context, findings: [], approvalEligible: true } as ReviewContext;
+    render(<VerificationResults note={note} source={source} context={eligibleContext} loadError={new Error("network unavailable")} onRetry={retry} />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Verification results could not be loaded. Approval blocked.");
+    expect(screen.getByText(/Approval eligibility: Not eligible/)).toBeInTheDocument();
+    expect(screen.queryByText("No issues detected.")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Retry loading results" }));
+    expect(retry).toHaveBeenCalledOnce();
   });
 });
