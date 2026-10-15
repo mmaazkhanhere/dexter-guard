@@ -50,6 +50,28 @@ def test_claim_classification_accuracy_uses_actual_verifier_predictions(tmp_path
     assert accuracy.value < 1
 
 
+def test_live_evaluation_without_predictions_is_not_a_successful_accuracy_score(tmp_path) -> None:
+    class NoPredictionAdapter(PipelineAdapter):
+        def evaluate(self, case, candidate):
+            return PipelineOutcome(
+                findings=(),
+                stage_runs=(StageRunReference(stage="EVIDENCE_VERIFICATION", upstreamRunId="verifier-run", status="SUCCEEDED"),),
+                latency_ms=1.0,
+                usage_and_cost=UsageAndCost(retryCount=0, costState="UNAVAILABLE"),
+            )
+
+    dataset = default_dataset()
+    runner = EvaluationRunner(dataset=dataset, adapter=NoPredictionAdapter(), repository=SQLiteEvaluationRepository(tmp_path / "runs.sqlite3"))
+    run = runner.execute(EvaluationRunRequest(subjectKind="BENCHMARK", datasetId=dataset.dataset_id, datasetVersion=dataset.dataset_version, datasetHash=dataset.content_hash, selectedSplit="VALIDATION", executionMode="LIVE", idempotencyKey="classification-no-predictions-1"))
+
+    accuracy = next(metric for metric in run.aggregate_metrics if metric.metric_id == "claim-classification-accuracy")
+    assert run.status is RunStatus.SUCCEEDED
+    assert accuracy.state.value == "NOT_APPLICABLE"
+    assert accuracy.numerator == 0
+    assert accuracy.denominator == 0
+    assert accuracy.value is None
+
+
 def test_runner_does_not_score_invalid_dataset_or_silently_use_all_splits(tmp_path) -> None:
     dataset = default_dataset()
     runner = EvaluationRunner(dataset=dataset, adapter=DeterministicFixtureAdapter(), repository=SQLiteEvaluationRepository(tmp_path / "runs.sqlite3"))
