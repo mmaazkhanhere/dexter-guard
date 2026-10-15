@@ -25,6 +25,29 @@ def test_matching_requires_actual_target_and_discrepancy_and_does_not_double_cou
     assert results[1].disposition in {MatchDisposition.DUPLICATE, MatchDisposition.UNMATCHED_WARNING}
 
 
+def test_matching_prefers_a_later_exact_finding_over_an_earlier_partial_one() -> None:
+    partial = ObservedFinding(
+        findingKey="a-partial", producer="SPEC_006", upstreamRunId="coverage", affectedClaimId="c1",
+        affectedSourceFactId=None, primaryStatusOrOutcome="DISTORTED", discrepancyOrRule="DISTORTED",
+        conflictingAttributeOrValue=None, sourceSpans=[], requiresCorrectionOrReview=True,
+    )
+    exact = partial.model_copy(update={
+        "finding_key": "z-exact", "producer": "SPEC_004", "primary_status_or_outcome": "CONTRADICTED",
+        "discrepancy_or_rule": "NEGATION",
+    })
+    error = {
+        "errorId": "e1", "candidateId": "cand", "affectedAnnotatedClaimId": "c1", "affectedSourceFactId": None,
+        "category": "NEGATION_CHANGE", "severity": "CRITICAL", "expectedPrimaryStatus": "CONTRADICTED",
+        "requiredDiscrepancyOrRule": "NEGATION", "conflictingAttribute": None, "expectedValue": None,
+        "sourceEvidenceSpans": [], "applicable": True,
+    }
+
+    results = match_findings((partial, exact), (error,))
+
+    assert any(item.finding_key == "z-exact" and item.disposition is MatchDisposition.MATCHED for item in results)
+    assert any(item.finding_key == "a-partial" and item.disposition is MatchDisposition.DUPLICATE for item in results)
+
+
 def test_unnecessary_uncertain_is_a_supported_claim_false_positive_and_wilson_is_defined() -> None:
     assert calculate_rate(1, 10, metric_id="supported-claim-fpr").value == 0.1
     interval = wilson_interval(95, 100)

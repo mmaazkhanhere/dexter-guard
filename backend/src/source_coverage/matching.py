@@ -20,6 +20,7 @@ from .contracts import (
     SemanticRelation,
     SemanticRelationKind,
     SourceFact,
+    SourceFactCategory,
     UnresolvedSourceItem,
 )
 
@@ -124,11 +125,18 @@ def _category_related(fact: SourceFact, claim: Claim) -> bool:
         "OBSERVATION": {ClaimCategory.OBSERVATION},
         "OTHER": {ClaimCategory.OTHER, ClaimCategory.OBSERVATION},
     }
-    if claim.category in categories[fact.category.value]:
+    if claim.category in categories[fact.category.value] and fact.category is not SourceFactCategory.CARE_ACTION:
         return True
     fact_topics = _normalized_topics(fact.fact_text)
     claim_topics = _normalized_topics(_claim_text(claim))
-    return len(fact_topics & claim_topics) >= 2
+    shared = fact_topics & claim_topics
+    if fact.category is SourceFactCategory.CARE_ACTION:
+        # A generic care-action category alone is not evidence that this
+        # particular action was documented.  It otherwise turns unrelated
+        # drinking or observation claims into partial coverage.
+        generic = {"bewohner", "bewohnerin", "pflege", "am", "im", "in", "der", "die", "das"}
+        return bool(shared - generic)
+    return len(shared) >= 2
 
 
 def _attribute_differences(fact: SourceFact, claim: Claim) -> tuple[tuple[MaterialAttribute, ...], tuple[MaterialAttribute, ...], tuple[MaterialAttribute, ...]]:

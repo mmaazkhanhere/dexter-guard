@@ -114,7 +114,11 @@ def calculate_metrics(case_results: Sequence[EvaluationCaseResult], *, supported
         calculate_rate(covered_facts, expected_facts, metric_id="completeness", scorable_count=expected_facts, unscorable_count=unscorable, failed_count=failed),
         calculate_rate(scenario_critical_detected, scenario_critical_total, metric_id="scenario-level-detection", scorable_count=scenario_critical_total, unscorable_count=unscorable, failed_count=failed),
     ]
-    warning_count = sum(len(result.observed_findings) for result in case_results)
+    warning_count = sum(
+        finding.requires_correction_or_review
+        for result in case_results
+        for finding in result.observed_findings
+    )
     metrics.append(CountMetric(metricId="review-burden-warnings", metricKind="COUNT_PER_NOTE", state=MetricState.SCORED if case_results else MetricState.NOT_APPLICABLE, scorableCount=len(case_results), unscorableCount=unscorable, failedCount=failed, aggregationMethod="sum-per-note", policyVersion="EVALUATION_METRICS-v1", count=warning_count, noteCount=len(case_results), valuePerNote=warning_count / len(case_results) if case_results else None, unit="WARNINGS", reason="zero notes" if not case_results else None))
     review_available = any(result.review_outcome is not None for result in case_results)
     for metric_id, unit, value in (

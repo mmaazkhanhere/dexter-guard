@@ -30,6 +30,22 @@ def _span(source_id: str, text: str, needle: str) -> SourceSpan:
     return SourceSpan(sourceId=source_id, sourceVersion=1, start=start, end=start + len(needle))
 
 
+def _verifier_discrepancy(category: ErrorCategory) -> str | None:
+    """Map benchmark categories to the SPEC_004 discrepancy vocabulary.
+
+    Categories remain the manually authored description of the error family;
+    the required value is the code an evidence verifier is contractually able
+    to emit.  Unsupported findings intentionally have neither discrepancy nor
+    affirmative source-evidence span.
+    """
+    return {
+        ErrorCategory.NUMERIC_MISMATCH: "OTHER",
+        ErrorCategory.NEGATION_CHANGE: "NEGATION",
+        ErrorCategory.ATTRIBUTION_CHANGE: "ATTRIBUTION",
+        ErrorCategory.UNSUPPORTED_FACT: None,
+    }.get(category, category.value)
+
+
 def _case(index: int) -> EvaluationCase:
     categories = (
         ("SUPPORTED", None, "Die Bewohnerin berichtet über guten Schlaf.", "Schlaf war gut.", EvidenceStatus.SUPPORTED, "FAITHFULLY_COVERED"),
@@ -202,8 +218,8 @@ def curated_held_out_dataset() -> BenchmarkDataset:
             claim = AnnotatedCandidateClaim(
                 annotatedClaimId=f"curated-claim-{index:03d}", claimId=f"curated-runtime-claim-{index:03d}",
                 statementReference=item.note_body, expectedPrimaryStatus=item.expected_status,
-                expectedDiscrepancies=(item.category.value,) if item.category else (),
-                expectedEvidenceSpans=(evidence_span,), scorable=True,
+                expectedDiscrepancies=(_verifier_discrepancy(item.category),) if item.category and _verifier_discrepancy(item.category) else (),
+                expectedEvidenceSpans=() if item.category is ErrorCategory.UNSUPPORTED_FACT else (evidence_span,), scorable=True,
             )
             claims = (claim,)
             if item.category is not None:
@@ -211,7 +227,8 @@ def curated_held_out_dataset() -> BenchmarkDataset:
                     errorId=f"curated-error-{index:03d}", candidateId=candidate_id,
                     affectedAnnotatedClaimId=claim.annotated_claim_id, affectedSourceFactId=None,
                     category=item.category, severity="CRITICAL", expectedPrimaryStatus=item.expected_status,
-                    requiredDiscrepancyOrRule=item.category.value, sourceEvidenceSpans=(evidence_span,),
+                    requiredDiscrepancyOrRule=_verifier_discrepancy(item.category),
+                    sourceEvidenceSpans=() if item.category is ErrorCategory.UNSUPPORTED_FACT else (evidence_span,),
                     applicable=True,
                 ),)
         else:

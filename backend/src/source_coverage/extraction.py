@@ -184,7 +184,10 @@ def _make_fact(source: SourceDocument, run_id: str, start: int, end: int, clause
     if category is SourceFactCategory.OBSERVATION and certainty is Certainty.UNCERTAIN:
         expectation, policy_key = expectation_for(SourceFactCategory.SYMPTOM, explicit_uncertainty=True)
     return SourceFact(
-        sourceFactId=f"{run_id}:fact-{start}-{end}", sourceFactExtractionRunId=run_id,
+        # A clause may legitimately yield more than one fact (for example a
+        # symptom and a mobility observation).  The category is part of the
+        # stable local identity so those facts do not collide.
+        sourceFactId=f"{run_id}:fact-{start}-{end}-{category.value}", sourceFactExtractionRunId=run_id,
         sourceId=source.source_id, sourceVersion=source.source_version, residentContext=_context(source),
         sourceTextHash=source_text_hash(source.transcript_text), normalizationPolicy=NORMALIZATION_POLICY,
         category=category, factText=clause, subject=_subject(clause),
@@ -263,7 +266,7 @@ class HeuristicGermanSourceFactExtractor:
                 facts.append(_make_fact(source, run_id, start, end, clause, SourceFactCategory.SYMPTOM))
             if re.search(r"\b(?:hilfe|unterstützung|unterstuetzung|rollator|transfer|gehen|laufen|aufstehen)\w*\b", lower):
                 facts.append(_make_fact(source, run_id, start, end, clause, SourceFactCategory.MOBILITY, mobility=clause))
-            if re.search(r"\b(?:gewaschen|geduscht|gelagert|verband gewechselt|medikament verabreicht|geholfen|versorgt)\b", lower):
+            if re.search(r"\b(?:gewaschen|geduscht|gelagert|verband gewechselt|medikament verabreicht|geholfen|versorgt|erhielt|angeboten|bot|festgestellt)\b", lower):
                 facts.append(_make_fact(source, run_id, start, end, clause, SourceFactCategory.CARE_ACTION, care_action=clause))
             if not facts or all(f.source_spans[0].start != start for f in facts):
                 if re.search(r"\b(?:wirkte|beobachtet|ruhig|schlief|aß|ass|trank)\w*\b", lower):

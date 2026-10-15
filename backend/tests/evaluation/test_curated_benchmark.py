@@ -77,6 +77,12 @@ def test_curated_actual_verifier_run_reports_separate_quality_metrics(tmp_path) 
     assert metrics["supported-claim-false-positive-rate"].denominator > 0
     assert metrics["claim-classification-accuracy"].denominator > 0
     assert any(result.observed_findings for result in actual_run.case_results)
+    warnings = metrics["review-burden-warnings"]
+    assert warnings.count == sum(
+        finding.requires_correction_or_review
+        for result in actual_run.case_results
+        for finding in result.observed_findings
+    )
 
 
 def test_curated_baseline_vs_validated_report_keeps_raw_metrics_and_configuration(tmp_path) -> None:

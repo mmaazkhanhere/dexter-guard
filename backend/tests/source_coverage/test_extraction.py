@@ -43,6 +43,16 @@ def test_unresolved_source_clause_is_source_linked_and_not_a_fact():
     assert result.unresolved_items[0].candidate_source_spans[0].start == 0
 
 
+def test_multiple_fact_categories_from_one_clause_receive_unique_ids():
+    result = HeuristicGermanSourceFactExtractor().extract(
+        source("Die Bewohnerin hatte Schwindel beim Aufstehen mit dem Rollator."),
+        extraction_run_id="extract-duplicate-id",
+    )
+
+    assert {fact.category.value for fact in result.facts} >= {"SYMPTOM", "MOBILITY"}
+    assert len({fact.source_fact_id for fact in result.facts}) == len(result.facts)
+
+
 def test_span_validation_uses_exact_unicode_codepoint_offsets():
     document = source("Ärger 😊 é")
     span = SourceSpan(sourceId="source-1", sourceVersion=1, start=0, end=len(document.transcript_text))

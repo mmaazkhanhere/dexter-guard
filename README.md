@@ -322,23 +322,26 @@ milliseconds):
 
 | Metric | Baseline (reliability disabled) | Validated (offline heuristic verifier) |
 | --- | ---: | ---: |
-| Raw detected errors (true positives) | 0 / 30 notes | 0 / 30 notes |
-| Raw missed errors (false negatives) | 23 / 30 notes | 23 / 30 notes |
-| Raw false positives | 0 / 30 notes | 31 / 30 notes |
-| Critical-error recall | 0 / 24; Wilson 95% CI 0.000–0.138 | 0 / 24; Wilson 95% CI 0.000–0.138 |
-| Warnings per note | 0 / 30 = 0.000 | 32 / 30 = 1.067 |
-| Verification latency (p50 / p95 / mean) | 3.37 / 5.62 / 3.67 ms (n=30) | 22.92 / 34.95 / 23.69 ms (n=30) |
+| Raw detected errors (true positives) | 0 / 30 notes | 9 / 30 notes |
+| Raw missed errors (false negatives) | 24 / 30 notes | 15 / 30 notes |
+| Raw false positives | 0 / 30 notes | 21 / 30 notes |
+| Critical-error recall | 0 / 24; Wilson 95% CI 0.000–0.138 | 9 / 24; Wilson 95% CI 0.212–0.573 |
+| Actionable warnings per note | 0 / 30 = 0.000 | 28 / 30 = 0.933 |
+| Verification latency (p50 / p95 / mean) | 2.44 / 4.60 / 2.78 ms (n=30) | 14.35 / 19.74 / 14.59 ms (n=30) |
 
 Examples from the validated run (expected labels are benchmark annotations, not
 answers supplied to the verifier):
 
-- Detected error: `curated-negation-husten` — the note asserted cough while
-  the source negated it; the verifier emitted `CONTRADICTED` with rule
-  `NEGATION`.
-- Missed error: `curated-negation-schwindel` — the source and note changed the
-  presence of dizziness, but the verifier emitted no finding.
-- False positive: `curated-paraphrase-fruehstueck` — a supported paraphrase was
-  flagged `UNCERTAIN/OTHER`.
+- Detected error: `curated-numeric-temperatur` — the note changed 37,4 °C to
+  38,4 °C; the verifier emitted `CONTRADICTED/OTHER` against the exact claim
+  and source span.
+- Missed error: `curated-omission-abfuehrmittel` — the source action remains
+  missing from the note, but coverage classified an unrelated claim as
+  `DISTORTED` instead of emitting the expected missing-fact finding.
+- False positive/misclassification: `curated-negation-schwindel` — the
+  verifier found a contradiction but labelled it `ATTRIBUTION` rather than the
+  expected `NEGATION`; strict matching counts this as both a false positive and
+  a missed exact error.
 
 These examples illustrate the heuristic's current behavior; they are not
 evidence of hosted-LLM performance.

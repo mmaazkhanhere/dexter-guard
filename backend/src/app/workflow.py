@@ -227,6 +227,7 @@ class OfflineSemanticEvidenceProvider:
     _sentences = re.compile(r"[^.!?\r\n]+(?:[.!?]|$)")
     _scopes = re.compile(r"(?:\s+(?:und|aber|doch|sowie)\s+|,\s+(?=[A-Za-zÄÖÜäöüß]))")
     _words = re.compile(r"[\wäöüÄÖÜß]+")
+    _numbers = re.compile(r"-?\d+(?:[,.]\d+)?")
     _stop_words = frozenset({"die", "der", "das", "den", "dem", "des", "ein", "eine", "einer", "einem", "und", "oder", "aber", "doch", "sowie", "ist", "sind", "hat", "haben", "wurde", "wird", "bei", "im", "in", "am", "an", "zu", "von", "mit", "für", "über", "unter", "auf", "aus", "die", "frau", "herr", "bewohnerin", "bewohner", "patient", "patientin"})
     _semantic_terms = {
         "schmerz": "pain", "schmerzen": "pain", "beschwerde": "pain", "beschwerden": "pain",
@@ -237,7 +238,29 @@ class OfflineSemanticEvidenceProvider:
         "fieber": "fever", "temperatur": "temperature", "trinkt": "drinks", "trank": "drinks", "wasser": "drinks",
         "schläft": "sleep", "geschlafen": "sleep", "schlief": "sleep", "ruhig": "calm", "entspannt": "calm",
         "schwindel": "dizziness", "übelkeit": "nausea", "uebelkeit": "nausea",
+        "übel": "nausea", "uebel": "nausea", "husten": "cough", "rötung": "redness", "roetung": "redness",
+        "unruhig": "restless", "blutdruck": "blood_pressure", "gewicht": "weight", "waage": "weight",
+        "trinkmenge": "intake", "getrunken": "intake", "urinmenge": "urine", "urin": "urine",
+        "strecke": "distance", "meter": "distance", "besuch": "visit", "besuchte": "visit",
+        "besucht": "visit", "nahm": "intake", "aß": "intake",
     }
+
+    _attribution_markers = re.compile(r"\b(?:bericht(?:et|ete)?|sagt(?:e)?|beobachtet(?:e)?|bat|bot)\b", re.IGNORECASE)
+
+    @staticmethod
+    def _attribution_role(text: str) -> str | None:
+        lowered = text.casefold()
+        if re.search(r"\b(?:sohn|tochter|angehörige|angehoerige)\b", lowered):
+            return "relative"
+        if re.search(r"\b(?:pflegekraft|pflege)\b", lowered):
+            return "caregiver"
+        if re.search(r"\b(?:bewohnerin|bewohner|patientin|patient)\b", lowered):
+            return "resident"
+        return None
+
+    @classmethod
+    def _numeric_values(cls, text: str) -> tuple[str, ...]:
+        return tuple(value.replace(",", ".") for value in cls._numbers.findall(text))
 
     def verify(self, *, claims, source_text: str, run_id: str, source_id: str | None = None, source_version: int | None = None):
         findings = []
@@ -266,7 +289,7 @@ class OfflineSemanticEvidenceProvider:
     def _classify(cls, claim_text: str, source_text: str) -> tuple[str, str, int | None, int | None, list[str]]:
         claim_tokens = cls._meaning_tokens(claim_text)
         best: tuple[set[str], int, int, str] | None = None
-        best_score: tuple[int, int] = (-1, -1)
+        best_score: tuple[int, int, int] = (-1, -1, -1)
         for match in cls._sentences.finditer(source_text):
             sentence = match.group(0)
             scope_start = 0
@@ -281,7 +304,8 @@ class OfflineSemanticEvidenceProvider:
                 scope_tokens = cls._meaning_tokens(scope)
                 overlap = claim_tokens & scope_tokens
                 semantic_overlap = len(overlap & set(cls._semantic_terms.values()))
-                score = (semantic_overlap, len(overlap))
+                numeric_match = int(bool(cls._numeric_values(claim_text)) and bool(cls._numeric_values(scope)))
+                score = (semantic_overlap, numeric_match, len(overlap))
                 if best is None or score > best_score:
                     best = (overlap, absolute_start, absolute_end, scope)
                     best_score = score
@@ -300,6 +324,18 @@ class OfflineSemanticEvidenceProvider:
         source_negated = "negated" in source_tokens
         if claim_negated != source_negated and overlap - {"negated"}:
             return "CONTRADICTED", "The source expresses the opposite polarity for the same subject matter.", start, end, ["NEGATION"]
+        claim_numbers = cls._numeric_values(claim_text)
+        source_numbers = cls._numeric_values(sentence)
+        if claim_numbers and source_numbers and claim_numbers != source_numbers and overlap:
+            return "CONTRADICTED", "The source gives a different numeric value for the same subject matter.", start, end, ["OTHER"]
+        claim_role = cls._attribution_role(claim_text)
+        source_role = cls._attribution_role(sentence)
+        if (
+            claim_role is not None and source_role is not None and claim_role != source_role
+            and (cls._attribution_markers.search(claim_text) or cls._attribution_markers.search(sentence))
+            and overlap
+        ):
+            return "CONTRADICTED", "The source attributes the statement to a different person.", start, end, ["ATTRIBUTION"]
         if "uncertain" in source_tokens and "uncertain" not in claim_tokens:
             return "UNCERTAIN", "The source qualifies this information, so the unqualified claim is not established.", start, end, ["CERTAINTY"]
         material_cues = {"reported", "observed", "uncertain", "negated"}
@@ -308,6 +344,8 @@ class OfflineSemanticEvidenceProvider:
         material_source_tokens = (source_tokens - material_cues) & semantic_values
         if material_claim_tokens and material_claim_tokens <= material_source_tokens:
             return "SUPPORTED", "The source supports the claim's meaning, including its material qualifiers.", start, end, []
+        if len(overlap) >= 2:
+            return "SUPPORTED", "The source supports the same material facts using a paraphrase.", start, end, []
         if overlap:
             return "UNCERTAIN", "The source is related but does not establish every material part of the claim.", start, end, ["OTHER"]
         return "UNSUPPORTED", "No source statement establishes the claim's meaning.", None, None, []

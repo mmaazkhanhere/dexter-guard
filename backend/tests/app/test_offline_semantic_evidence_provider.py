@@ -84,3 +84,21 @@ def test_mixed_positive_and_negative_symptoms_keep_negation_local(
     assert finding["status"] == expected_status
     if expected_discrepancy is not None:
         assert expected_discrepancy in finding["discrepancies"]
+
+
+@pytest.mark.parametrize(
+    ("transcript", "claim", "expected_status"),
+    [
+        ("Die Temperatur betrug 37,4 Grad Celsius.", "Die Temperatur betrug 38,4 Grad Celsius.", "CONTRADICTED"),
+        ("Die Bewohnerin trank eine Tasse Tee und aß die Hälfte des Brotes.", "Die Bewohnerin nahm eine Tasse Tee und die Hälfte der Mahlzeit zu sich.", "SUPPORTED"),
+    ],
+)
+def test_offline_fallback_handles_numeric_changes_and_supported_paraphrases(
+    transcript: str, claim: str, expected_status: str,
+) -> None:
+    finding = OfflineSemanticEvidenceProvider().verify(
+        claims=(_claim("claim-regression", claim),), source_text=transcript, run_id="run-regression",
+        source_id="source-1", source_version=1,
+    )["findings"][0]
+
+    assert finding["status"] == expected_status

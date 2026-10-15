@@ -12,20 +12,34 @@ def match_findings(
     normalized = tuple(error if isinstance(error, GroundTruthError) else GroundTruthError.model_validate(error) for error in errors)
     consumed: set[str] = set()
     output: list[FindingMatch] = []
-    for finding in sorted(findings, key=lambda item: item.finding_key):
+    deferred: list[ObservedFinding] = []
+    ordered = sorted(findings, key=lambda item: item.finding_key)
+
+    # A coverage finding can sort ahead of a verifier finding for the same
+    # target.  Consume exact matches first so output order never hides a fully
+    # correct finding behind a weaker target-linked result.
+    for finding in ordered:
         candidates = [error for error in normalized if error.error_id not in consumed and _target_matches(finding, error)]
-        if candidates:
-            ranked = sorted(candidates, key=lambda error: (-_specificity(finding, error), error.error_id))
-            error = ranked[0]
+        exact = [error for error in candidates if _fully_matches(finding, error)]
+        if exact:
+            error = sorted(exact, key=lambda item: (-_specificity(finding, item), item.error_id))[0]
             consumed.add(error.error_id)
-            if _fully_matches(finding, error):
-                output.append(FindingMatch(errorId=error.error_id, findingKey=finding.finding_key, disposition=MatchDisposition.MATCHED, reasonCode="EXACT_TARGET_DISCREPANCY", specificityScore=_specificity(finding, error)))
-            else:
-                output.append(FindingMatch(errorId=error.error_id, findingKey=finding.finding_key, disposition=MatchDisposition.TARGET_LINKED_MISCLASSIFICATION, reasonCode="TARGET_MATCH_BUT_DISCREPANCY_MISMATCH", specificityScore=_specificity(finding, error)))
+            output.append(FindingMatch(errorId=error.error_id, findingKey=finding.finding_key, disposition=MatchDisposition.MATCHED, reasonCode="EXACT_TARGET_DISCREPANCY", specificityScore=_specificity(finding, error)))
+        elif candidates:
+            deferred.append(finding)
         elif any(_target_matches(finding, error) for error in normalized):
             output.append(FindingMatch(errorId="UNMATCHED", findingKey=finding.finding_key, disposition=MatchDisposition.DUPLICATE, reasonCode="TARGET_ALREADY_CONSUMED", specificityScore=1))
         elif finding.requires_correction_or_review:
             output.append(FindingMatch(errorId="UNMATCHED", findingKey=finding.finding_key, disposition=MatchDisposition.UNMATCHED_WARNING, reasonCode="NO_GROUND_TRUTH_TARGET", specificityScore=0))
+
+    for finding in deferred:
+        candidates = [error for error in normalized if error.error_id not in consumed and _target_matches(finding, error)]
+        if candidates:
+            error = sorted(candidates, key=lambda item: (-_specificity(finding, item), item.error_id))[0]
+            consumed.add(error.error_id)
+            output.append(FindingMatch(errorId=error.error_id, findingKey=finding.finding_key, disposition=MatchDisposition.TARGET_LINKED_MISCLASSIFICATION, reasonCode="TARGET_MATCH_BUT_DISCREPANCY_MISMATCH", specificityScore=_specificity(finding, error)))
+        else:
+            output.append(FindingMatch(errorId="UNMATCHED", findingKey=finding.finding_key, disposition=MatchDisposition.DUPLICATE, reasonCode="TARGET_ALREADY_CONSUMED", specificityScore=1))
     for error in normalized:
         if error.applicable and error.error_id not in consumed:
             output.append(FindingMatch(errorId=error.error_id, findingKey=None, disposition=MatchDisposition.FALSE_NEGATIVE, reasonCode="NO_VALID_FINDING", specificityScore=None))

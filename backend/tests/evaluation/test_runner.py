@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from evaluation.adapters import DeterministicFixtureAdapter, PipelineAdapter, PipelineOutcome
-from evaluation.benchmark import default_dataset
+from evaluation.benchmark import curated_held_out_dataset, default_dataset
 from evaluation.contracts import EvaluationFailure, EvaluationRunRequest, ObservedFinding, RunStatus, StageRunReference, UsageAndCost
 from evaluation.repository import SQLiteEvaluationRepository
 from evaluation.runner import EvaluationRunner
@@ -104,4 +104,23 @@ def test_idempotent_replay_returns_original_terminal_run_and_failures_remain_vis
     assert first.evaluation_run_id == second.evaluation_run_id
     assert first.status is RunStatus.PARTIALLY_FAILED
     assert first.failure_summary.failure_codes == ("PROVIDER_TIMEOUT",)
+
+
+def test_adapter_exception_records_each_ground_truth_error_as_a_false_negative(tmp_path) -> None:
+    class RaisingAdapter(PipelineAdapter):
+        def evaluate(self, case, candidate):
+            raise RuntimeError("synthetic adapter failure")
+
+    dataset = curated_held_out_dataset()
+    run = EvaluationRunner(
+        dataset=dataset, adapter=RaisingAdapter(), repository=SQLiteEvaluationRepository(tmp_path / "runs.sqlite3"),
+    ).execute(EvaluationRunRequest(
+        subjectKind="BENCHMARK", datasetId=dataset.dataset_id, datasetVersion=dataset.dataset_version,
+        datasetHash=dataset.content_hash, selectedSplit="HELD_OUT", executionMode="LIVE", idempotencyKey="exception-fn",
+    ))
+
+    false_negatives = next(item for item in run.aggregate_metrics if item.metric_id == "finding-false-negatives")
+    expected_errors = sum(len(case.candidate_notes[0].error_instances) for case in dataset.scenarios)
+    assert false_negatives.count == expected_errors
+    assert all(result.match_results or not case.candidate_notes[0].error_instances for case, result in zip(dataset.scenarios, run.case_results))
 

@@ -114,7 +114,11 @@ class EvaluationRunner:
             return result, _claim_classification_results(outcome, candidate) if status is CaseStatus.SUCCEEDED else ()
         except Exception as error:
             from .contracts import EvaluationFailure
-            return EvaluationCaseResult(caseExecutionId=f"case-{uuid4().hex}", scenarioId=case.scenario_id, candidateId=candidate.candidate_id, sourceId=case.source.source_id, sourceVersion=case.source.source_version, sourceTextHash=case.source.source_text_hash, noteId=candidate.note_id, noteRevision=candidate.note_revision, noteBodyHash=candidate.note_body_hash, status=CaseStatus.FAILED, stageRuns=(), observedFindings=(), matchResults=(), completenessResults=(), reviewOutcome=None, latency=LatencyBreakdown(endToEndMilliseconds=(perf_counter() - started) * 1000), usageAndCost=UsageAndCost(retryCount=0, costState="UNAVAILABLE"), failure=EvaluationFailure(code="EVALUATION_ADAPTER_FAILURE", stage=None, retryable=False, message=str(error))), ()
+            matches = tuple(
+                FindingMatch(errorId=item.error_id, findingKey=None, disposition="FALSE_NEGATIVE", reasonCode="CASE_FAILED", specificityScore=None)
+                for item in candidate.error_instances
+            )
+            return EvaluationCaseResult(caseExecutionId=f"case-{uuid4().hex}", scenarioId=case.scenario_id, candidateId=candidate.candidate_id, sourceId=case.source.source_id, sourceVersion=case.source.source_version, sourceTextHash=case.source.source_text_hash, noteId=candidate.note_id, noteRevision=candidate.note_revision, noteBodyHash=candidate.note_body_hash, status=CaseStatus.FAILED, stageRuns=(), observedFindings=(), matchResults=matches, completenessResults=(), reviewOutcome=None, latency=LatencyBreakdown(endToEndMilliseconds=(perf_counter() - started) * 1000), usageAndCost=UsageAndCost(retryCount=0, costState="UNAVAILABLE"), failure=EvaluationFailure(code="EVALUATION_ADAPTER_FAILURE", stage=None, retryable=False, message=str(error))), ()
 
     def _configuration(self, request) -> RunConfiguration:
         is_live = request.execution_mode == "LIVE"
