@@ -225,8 +225,9 @@ class OfflineSemanticEvidenceProvider:
     prompt_hash = "sha256:evidence-verification-offline-semantic-v1"
 
     _sentences = re.compile(r"[^.!?\r\n]+(?:[.!?]|$)")
+    _scopes = re.compile(r"(?:\s+(?:und|aber|doch|sowie)\s+|,\s+(?=[A-Za-zÄÖÜäöüß]))")
     _words = re.compile(r"[\wäöüÄÖÜß]+")
-    _stop_words = frozenset({"die", "der", "das", "den", "dem", "des", "ein", "eine", "einer", "einem", "und", "oder", "ist", "sind", "hat", "haben", "wurde", "wird", "bei", "im", "in", "am", "an", "zu", "von", "mit", "für", "auf", "aus", "die", "frau", "herr", "bewohnerin", "bewohner", "patient", "patientin"})
+    _stop_words = frozenset({"die", "der", "das", "den", "dem", "des", "ein", "eine", "einer", "einem", "und", "oder", "aber", "doch", "sowie", "ist", "sind", "hat", "haben", "wurde", "wird", "bei", "im", "in", "am", "an", "zu", "von", "mit", "für", "über", "unter", "auf", "aus", "die", "frau", "herr", "bewohnerin", "bewohner", "patient", "patientin"})
     _semantic_terms = {
         "schmerz": "pain", "schmerzen": "pain", "beschwerde": "pain", "beschwerden": "pain",
         "verneint": "negated", "kein": "negated", "keine": "negated", "keinen": "negated", "ohne": "negated", "nicht": "negated",
@@ -265,12 +266,28 @@ class OfflineSemanticEvidenceProvider:
     def _classify(cls, claim_text: str, source_text: str) -> tuple[str, str, int | None, int | None, list[str]]:
         claim_tokens = cls._meaning_tokens(claim_text)
         best: tuple[set[str], int, int, str] | None = None
+        best_score: tuple[int, int] = (-1, -1)
         for match in cls._sentences.finditer(source_text):
             sentence = match.group(0)
-            sentence_tokens = cls._meaning_tokens(sentence)
-            overlap = claim_tokens & sentence_tokens
-            if best is None or len(overlap) > len(best[0]):
-                best = (overlap, match.start(), match.end(), sentence)
+            scope_start = 0
+            boundaries = list(cls._scopes.finditer(sentence))
+            for boundary in boundaries + [None]:
+                scope_end = boundary.start() if boundary is not None else len(sentence)
+                raw_scope = sentence[scope_start:scope_end]
+                scope = raw_scope.strip()
+                leading_trim = len(raw_scope) - len(raw_scope.lstrip())
+                absolute_start = match.start() + scope_start + leading_trim
+                absolute_end = absolute_start + len(scope)
+                scope_tokens = cls._meaning_tokens(scope)
+                overlap = claim_tokens & scope_tokens
+                semantic_overlap = len(overlap & set(cls._semantic_terms.values()))
+                score = (semantic_overlap, len(overlap))
+                if best is None or score > best_score:
+                    best = (overlap, absolute_start, absolute_end, scope)
+                    best_score = score
+                if boundary is None:
+                    break
+                scope_start = boundary.end()
         if best is None or not best[0]:
             return "UNSUPPORTED", "No source statement establishes the claim's meaning.", None, None, []
 
@@ -285,8 +302,10 @@ class OfflineSemanticEvidenceProvider:
             return "CONTRADICTED", "The source expresses the opposite polarity for the same subject matter.", start, end, ["NEGATION"]
         if "uncertain" in source_tokens and "uncertain" not in claim_tokens:
             return "UNCERTAIN", "The source qualifies this information, so the unqualified claim is not established.", start, end, ["CERTAINTY"]
-        material_claim_tokens = claim_tokens - {"reported", "observed", "uncertain", "negated"}
-        material_source_tokens = source_tokens - {"reported", "observed", "uncertain", "negated"}
+        material_cues = {"reported", "observed", "uncertain", "negated"}
+        semantic_values = set(cls._semantic_terms.values())
+        material_claim_tokens = (claim_tokens - material_cues) & semantic_values
+        material_source_tokens = (source_tokens - material_cues) & semantic_values
         if material_claim_tokens and material_claim_tokens <= material_source_tokens:
             return "SUPPORTED", "The source supports the claim's meaning, including its material qualifiers.", start, end, []
         if overlap:

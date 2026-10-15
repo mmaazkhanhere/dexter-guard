@@ -71,19 +71,21 @@ class EvaluationRunner:
         selected = [case for case in self.dataset.scenarios if case.split == request.selected_split]
         started = datetime.now(timezone.utc)
         results: list[EvaluationCaseResult] = []
+        claim_classification_results: list[bool] = []
         for case in selected:
             for candidate in case.candidate_notes:
-                results.append(self._execute_case(case, candidate))
+                result, classifications = self._execute_case(case, candidate)
+                results.append(result)
+                claim_classification_results.extend(classifications)
         critical_total = sum(sum(error.severity.value == "CRITICAL" for error in candidate.error_instances) for case in selected for candidate in case.candidate_notes)
         critical_detected = sum(sum(match.disposition.value == "MATCHED" and any(error.error_id == match.error_id and error.severity.value == "CRITICAL" for error in candidate.error_instances) for match in result.match_results) for case, result in zip((case for case in selected for _ in case.candidate_notes), results) for candidate in case.candidate_notes)
         scenario_total = sum(any(error.severity.value == "CRITICAL" for candidate in case.candidate_notes for error in candidate.error_instances) for case in selected)
         scenario_detected = sum(any(error.severity.value == "CRITICAL" for candidate in case.candidate_notes for error in candidate.error_instances) and all(any(match.error_id == error.error_id and match.disposition.value == "MATCHED" for match in result.match_results) for candidate in case.candidate_notes for error in candidate.error_instances if error.severity.value == "CRITICAL") for case, result in zip(selected, results))
         supported_claims = sum(sum(claim.expected_primary_status.value == "SUPPORTED" and claim.scorable for claim in candidate.annotated_claims) for case in selected for candidate in case.candidate_notes)
         false_positives = sum(sum(finding.requires_correction_or_review and any(claim.claim_id == finding.affected_claim_id and claim.expected_primary_status.value == "SUPPORTED" for claim in candidate.annotated_claims) for finding in result.observed_findings) for case, result in zip(selected, results) for candidate in case.candidate_notes)
-        annotated_claims = sum(sum(claim.scorable for claim in candidate.annotated_claims) for case in selected for candidate in case.candidate_notes)
         expected_facts = sum(sum(fact.expectation != "CONTEXTUAL" and (fact.applicable_to_candidate_ids == "ALL" or candidate.candidate_id in fact.applicable_to_candidate_ids) for fact in case.reference_facts) for case in selected for candidate in case.candidate_notes)
         covered_facts = sum(sum(score.faithfully_covered for score in result.completeness_results) for result in results)
-        metrics = calculate_metrics(results, supported_claims=supported_claims, supported_false_positives=false_positives, annotated_claims=annotated_claims, expected_facts=expected_facts, covered_facts=covered_facts, critical_errors=critical_total, detected_critical_errors=critical_detected, scenario_critical_total=scenario_total, scenario_critical_detected=scenario_detected)
+        metrics = calculate_metrics(results, supported_claims=supported_claims, supported_false_positives=false_positives, claim_classification_results=claim_classification_results, expected_facts=expected_facts, covered_facts=covered_facts, critical_errors=critical_total, detected_critical_errors=critical_detected, scenario_critical_total=scenario_total, scenario_critical_detected=scenario_detected)
         failed = sum(result.status in {CaseStatus.FAILED, CaseStatus.INVALID_OUTPUT} for result in results)
         unscorable = sum(result.status is CaseStatus.UNSCORABLE for result in results)
         status = RunStatus.PARTIALLY_FAILED if failed or unscorable else RunStatus.SUCCEEDED
@@ -99,7 +101,7 @@ class EvaluationRunner:
             self.repository.save_run(run)
         return run
 
-    def _execute_case(self, case, candidate) -> EvaluationCaseResult:
+    def _execute_case(self, case, candidate) -> tuple[EvaluationCaseResult, tuple[bool, ...]]:
         started = perf_counter()
         try:
             outcome = self.adapter.evaluate(case, candidate)
@@ -108,10 +110,11 @@ class EvaluationRunner:
             findings = _canonicalize_findings(outcome, case, candidate)
             matches = match_findings(findings, candidate.error_instances) if not failure else tuple(FindingMatch(errorId=error.error_id, findingKey=None, disposition="FALSE_NEGATIVE", reasonCode="CASE_FAILED", specificityScore=None) for error in candidate.error_instances)
             scores = _completeness_scores(outcome, findings, case, candidate)
-            return EvaluationCaseResult(caseExecutionId=f"case-{uuid4().hex}", scenarioId=case.scenario_id, candidateId=candidate.candidate_id, sourceId=case.source.source_id, sourceVersion=case.source.source_version, sourceTextHash=case.source.source_text_hash, noteId=candidate.note_id, noteRevision=candidate.note_revision, noteBodyHash=candidate.note_body_hash, status=status, stageRuns=outcome.stage_runs, observedFindings=findings, matchResults=matches, completenessResults=scores, reviewOutcome=None, latency=LatencyBreakdown(endToEndMilliseconds=outcome.latency_ms or (perf_counter() - started) * 1000, stageMilliseconds=outcome.stage_latency_ms or {}), usageAndCost=outcome.usage_and_cost, failure=failure)
+            result = EvaluationCaseResult(caseExecutionId=f"case-{uuid4().hex}", scenarioId=case.scenario_id, candidateId=candidate.candidate_id, sourceId=case.source.source_id, sourceVersion=case.source.source_version, sourceTextHash=case.source.source_text_hash, noteId=candidate.note_id, noteRevision=candidate.note_revision, noteBodyHash=candidate.note_body_hash, status=status, stageRuns=outcome.stage_runs, observedFindings=findings, matchResults=matches, completenessResults=scores, reviewOutcome=None, latency=LatencyBreakdown(endToEndMilliseconds=outcome.latency_ms or (perf_counter() - started) * 1000, stageMilliseconds=outcome.stage_latency_ms or {}), usageAndCost=outcome.usage_and_cost, failure=failure)
+            return result, _claim_classification_results(outcome, candidate) if status is CaseStatus.SUCCEEDED else ()
         except Exception as error:
             from .contracts import EvaluationFailure
-            return EvaluationCaseResult(caseExecutionId=f"case-{uuid4().hex}", scenarioId=case.scenario_id, candidateId=candidate.candidate_id, sourceId=case.source.source_id, sourceVersion=case.source.source_version, sourceTextHash=case.source.source_text_hash, noteId=candidate.note_id, noteRevision=candidate.note_revision, noteBodyHash=candidate.note_body_hash, status=CaseStatus.FAILED, stageRuns=(), observedFindings=(), matchResults=(), completenessResults=(), reviewOutcome=None, latency=LatencyBreakdown(endToEndMilliseconds=(perf_counter() - started) * 1000), usageAndCost=UsageAndCost(retryCount=0, costState="UNAVAILABLE"), failure=EvaluationFailure(code="EVALUATION_ADAPTER_FAILURE", stage=None, retryable=False, message=str(error)))
+            return EvaluationCaseResult(caseExecutionId=f"case-{uuid4().hex}", scenarioId=case.scenario_id, candidateId=candidate.candidate_id, sourceId=case.source.source_id, sourceVersion=case.source.source_version, sourceTextHash=case.source.source_text_hash, noteId=candidate.note_id, noteRevision=candidate.note_revision, noteBodyHash=candidate.note_body_hash, status=CaseStatus.FAILED, stageRuns=(), observedFindings=(), matchResults=(), completenessResults=(), reviewOutcome=None, latency=LatencyBreakdown(endToEndMilliseconds=(perf_counter() - started) * 1000), usageAndCost=UsageAndCost(retryCount=0, costState="UNAVAILABLE"), failure=EvaluationFailure(code="EVALUATION_ADAPTER_FAILURE", stage=None, retryable=False, message=str(error))), ()
 
     def _configuration(self, request) -> RunConfiguration:
         is_live = request.execution_mode == "LIVE"
@@ -164,6 +167,33 @@ def _canonicalize_findings(outcome: PipelineOutcome, case, candidate) -> tuple[O
             "affected_source_fact_id": fact_targets.get(finding.affected_source_fact_id, finding.affected_source_fact_id),
         }))
     return tuple(normalized)
+
+
+def _claim_classification_results(outcome: PipelineOutcome, candidate) -> tuple[bool, ...]:
+    """Compare completed SPEC_004 predictions with ground-truth claim labels.
+
+    Ground truth supplies only the label to score against.  The predicted status
+    always comes from an actual verifier finding.  Saved fixtures have no such
+    prediction stream and are therefore not scored for classification; within
+    an actual stream, a missing or duplicate prediction is incorrect.
+    """
+    if not outcome.claim_classification_predictions:
+        return ()
+    claim_targets = {
+        claim_id: candidate.annotated_claims[ordinal - 1].annotated_claim_id
+        for claim_id, ordinal in outcome.claim_id_ordinals
+        if 1 <= ordinal <= len(candidate.annotated_claims)
+    }
+    predictions: dict[str, list[str]] = {}
+    for claim_id, status in outcome.claim_classification_predictions:
+        if target := claim_targets.get(claim_id):
+            predictions.setdefault(target, []).append(status)
+    return tuple(
+        len(statuses := predictions.get(claim.annotated_claim_id, [])) == 1
+        and statuses[0] == claim.expected_primary_status.value
+        for claim in candidate.annotated_claims
+        if claim.scorable
+    )
 
 
 def _source_fact_targets(outcome: PipelineOutcome, case, span_key) -> dict[str, str]:

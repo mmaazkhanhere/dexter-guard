@@ -56,6 +56,8 @@ def test_real_adapter_runs_the_actual_four_stage_pipeline_without_fixture_predic
         "SOURCE_COVERAGE",
     ]
     assert all(run.status == "SUCCEEDED" for run in outcome.stage_runs)
+    assert outcome.claim_classification_predictions
+    assert all(status in {"SUPPORTED", "UNSUPPORTED", "CONTRADICTED", "UNCERTAIN"} for _, status in outcome.claim_classification_predictions)
     assert outcome.usage_and_cost.cost_state == "UNAVAILABLE"
     assert {
         "ADAPTER_SETUP",

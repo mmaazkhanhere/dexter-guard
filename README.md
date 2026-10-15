@@ -86,6 +86,10 @@ decisions. Evidence spans use zero-based, inclusive `start` and exclusive
 - **Evidence verification:** classifies findings as `SUPPORTED`, `UNSUPPORTED`,
   `CONTRADICTED`, or `UNCERTAIN`, validates quotations and spans, and preserves
   typed provider and integrity failures.
+- **Offline semantic verification:** provides a deterministic local fallback for
+  German paraphrases and symptom-level negation. Mixed statements such as
+  `Schmerzen, aber keine Übelkeit` are evaluated per symptom rather than using
+  one sentence-wide polarity.
 - **Deterministic validation:** checks numeric values, units, precision,
   required references, source versions, and contract invariants without needing
   an LLM or network access.
@@ -95,13 +99,29 @@ decisions. Evidence spans use zero-based, inclusive `start` and exclusive
   acknowledgement/dispute, explicit correction decisions, full-note
   verification, approval eligibility, rejection rationale, and persisted audit
   history.
+- **Resident attribution safeguards:** supports an explicit synthetic
+  resident-alias mapping, flags cross-resident or ambiguous claims, and blocks
+  approval until uncertain attribution is clarified.
 - **Evaluation and observability:** runs versioned synthetic benchmark cases,
   validates split integrity, matches findings to expected errors, records raw
   counts and denominators, supports paired comparisons, and exposes saved-run
   inspection through the UI.
 - **Web application:** includes Documentation, Evidence Verification, Human
   Review, and Evaluation workspaces with typed API access and generated
-  OpenAPI client types.
+  OpenAPI client types. Documentation & Verification uses one segmented-toggle
+  workspace with two mutually exclusive modes: **Generate and verify** creates
+  a note and verifies it; **Verify existing note** checks caregiver-supplied
+  note text without generating a replacement. Saved examples can populate
+  either workflow.
+- **Frontend safeguards:** validates resident IDs, transcripts, and note text
+  against backend-compatible rules before submission; shows field-specific
+  errors; disables invalid submissions; preserves transcript state through
+  Human Review navigation; and supports mobile and tablet widths without
+  horizontal page scrolling.
+- **Verification status messaging:** distinguishes “No findings were recorded”
+  from “All recorded findings have been resolved or adjudicated.” Success is
+  shown only after verification completes and `approvalEligible` is true;
+  loading, failed, unresolved, and ineligible states remain blocking.
 - **Deployment topology:** `vercel.json` routes `/api/*` to FastAPI and all
   other paths to the Vite application through Vercel Services.
 
@@ -195,6 +215,19 @@ Regenerate typed API bindings after an OpenAPI contract change:
 npm run api:generate
 ```
 
+Focused regression checks for the current verification and evaluation paths:
+
+```powershell
+uv run pytest backend/tests/evaluation
+uv run pytest backend/tests/evidence_verification backend/tests/app/test_offline_semantic_evidence_provider.py
+cd frontend
+npm test -- --run tests/verification-results.test.tsx tests/documentation-two-mode-workspace.test.tsx
+```
+
+The current focused results are 32 evaluation tests passed, 75 evidence and
+offline-provider tests passed, and 14 frontend verification/documentation tests
+passed. These are engineering regression results, not clinical validation.
+
 ## Sample input and output
 
 The following is a synthetic example of the source-ingestion boundary.
@@ -251,6 +284,13 @@ The detailed source reports are
 and
 [`spec006-development-evaluation-v1.json`](specs/006-source-coverage/evaluation/spec006-development-evaluation-v1.json).
 
+Claim-classification accuracy is calculated from actual verifier predictions,
+not from successful test execution or copied expected answers. Correct,
+incorrect, missing, and duplicate predictions are counted at claim level; a
+10/10, 6/10, and 0/10 prediction set reports 100%, 60%, and 0% accuracy.
+Finding-level false positives, duplicate warnings, and target-linked
+misclassifications are scored separately from classification accuracy.
+
 Additional engineering evidence recorded in the Spec 008 convergence notes:
 
 - the full repository suite reported **338 passed** on 2026-10-13;
@@ -290,6 +330,9 @@ given invented pass/fail thresholds.
   PostgreSQL configuration; local setup is not a production persistence model.
 - Observed reviewer workload, live-provider cost, and live model variability are
   not represented in the saved fixture metrics.
+- The offline semantic verifier intentionally uses a small deterministic German
+  vocabulary and clause-local scope rules. It is a local fallback, not a
+  comprehensive German language-understanding system.
 - The repository’s convergence notes preserve reviewer-owned and deployment
   gates; passing tests alone does not imply overall product or release
   readiness.

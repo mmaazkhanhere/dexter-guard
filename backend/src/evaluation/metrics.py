@@ -94,7 +94,7 @@ def _count_metric(metric_id: str, count: int, unit: str, case_results: Sequence[
     )
 
 
-def calculate_metrics(case_results: Sequence[EvaluationCaseResult], *, supported_claims: int = 0, supported_false_positives: int = 0, annotated_claims: int = 0, expected_facts: int = 0, covered_facts: int = 0, critical_errors: int = 0, detected_critical_errors: int = 0, scenario_critical_total: int = 0, scenario_critical_detected: int = 0) -> tuple[RateMetric | CountMetric | DistributionMetric, ...]:
+def calculate_metrics(case_results: Sequence[EvaluationCaseResult], *, supported_claims: int = 0, supported_false_positives: int = 0, claim_classification_results: Sequence[bool] = (), expected_facts: int = 0, covered_facts: int = 0, critical_errors: int = 0, detected_critical_errors: int = 0, scenario_critical_total: int = 0, scenario_critical_detected: int = 0) -> tuple[RateMetric | CountMetric | DistributionMetric, ...]:
     failed = sum(result.status in {CaseStatus.FAILED, CaseStatus.INVALID_OUTPUT} for result in case_results)
     unscorable = sum(result.status is CaseStatus.UNSCORABLE for result in case_results)
     true_positives, false_positives, false_negatives = finding_confusion_counts(case_results)
@@ -110,7 +110,7 @@ def calculate_metrics(case_results: Sequence[EvaluationCaseResult], *, supported
         calculate_rate(0, 0, metric_id="finding-accuracy", scorable_count=0, unscorable_count=unscorable, failed_count=failed),
         calculate_rate(detected_critical_errors, critical_errors, metric_id="critical-error-recall", scorable_count=critical_errors, unscorable_count=unscorable, failed_count=failed),
         calculate_rate(supported_false_positives, supported_claims, metric_id="supported-claim-false-positive-rate", scorable_count=supported_claims, unscorable_count=unscorable, failed_count=failed),
-        calculate_rate(min(sum(result.status is CaseStatus.SUCCEEDED for result in case_results), annotated_claims), annotated_claims, metric_id="claim-classification-accuracy", scorable_count=annotated_claims, unscorable_count=unscorable, failed_count=failed),
+        calculate_rate(sum(claim_classification_results), len(claim_classification_results), metric_id="claim-classification-accuracy", scorable_count=len(claim_classification_results), unscorable_count=unscorable, failed_count=failed),
         calculate_rate(covered_facts, expected_facts, metric_id="completeness", scorable_count=expected_facts, unscorable_count=unscorable, failed_count=failed),
         calculate_rate(scenario_critical_detected, scenario_critical_total, metric_id="scenario-level-detection", scorable_count=scenario_critical_total, unscorable_count=unscorable, failed_count=failed),
     ]

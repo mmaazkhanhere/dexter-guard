@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from evaluation.contracts import FindingMatch, MatchDisposition, ObservedFinding
 from evaluation.matching import match_findings
-from evaluation.metrics import calculate_rate, wilson_interval
+from evaluation.metrics import calculate_metrics, calculate_rate, wilson_interval
 
 
 def test_matching_requires_actual_target_and_discrepancy_and_does_not_double_count() -> None:
@@ -24,4 +24,13 @@ def test_unnecessary_uncertain_is_a_supported_claim_false_positive_and_wilson_is
     assert calculate_rate(1, 10, metric_id="supported-claim-fpr").value == 0.1
     interval = wilson_interval(95, 100)
     assert interval.lower < 0.95 < interval.upper
+
+
+def test_claim_classification_accuracy_counts_wrong_predictions() -> None:
+    metrics = calculate_metrics((), claim_classification_results=(True, False))
+
+    accuracy = next(metric for metric in metrics if metric.metric_id == "claim-classification-accuracy")
+    assert accuracy.numerator == 1
+    assert accuracy.denominator == 2
+    assert accuracy.value == 0.5
 

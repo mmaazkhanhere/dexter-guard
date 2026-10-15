@@ -39,17 +39,19 @@ export function VerificationResults({ note, source, context, isLoading = false, 
   const orderedFindings = [...findings].sort((left, right) => severityRank(left.severity) - severityRank(right.severity) || unresolvedRank(left.state) - unresolvedRank(right.state));
   const unresolved = findings.filter((finding) => isFindingUnresolved(finding, context?.decisions ?? []));
   const unresolvedFindings = unresolved.length;
-  const approvalEligible = !loadError && verification?.status === "VALID" && context?.approvalEligible === true && unresolvedFindings === 0;
+  const approvalEligible = !isLoading && !loadError && verification?.status === "VALID" && context?.approvalEligible === true && unresolvedFindings === 0;
   const criticalFindings = findings.filter((finding) => finding.severity === "CRITICAL").length;
   const majorFindings = findings.filter((finding) => finding.severity === "MAJOR").length;
   const unresolvedSeveritySummary = formatSeverityCounts(unresolved);
   const sourceText = context?.transcriptText ?? source?.transcript_text ?? "";
+  const verificationReady = Boolean(verification && !loadError && !isLoading && verification.status === "VALID");
   return <>
     {isLoading && <div className="empty-state" role="status"><LoadingIndicator label="Checking the nursing note against the transcript …" /></div>}
     {loadError && <div className="error-banner" role="alert"><strong>Verification results could not be loaded. Approval blocked.</strong><div className="button-row"><button type="button" className="secondary-button" onClick={onRetry} disabled={!onRetry || isLoading}>{isLoading ? "Retrying …" : "Retry loading results"}</button></div></div>}
     {verification && !loadError && verification.status !== "VALID" && <div className="error-banner" role="alert"><strong>Verification failed. Approval blocked.</strong> {userFacingFailureMessage(verification.failureCode, verification.failureMessage)}</div>}
-    {verification && !loadError && verification.status === "VALID" && unresolvedFindings === 0 && <div className="status-banner" role="status"><strong>No issues detected.</strong> Human approval required.</div>}
-    {verification && !loadError && verification.status === "VALID" && unresolvedFindings > 0 && <div className="warning-banner" role="status"><strong>Review required.</strong> {unresolvedFindings} unresolved {unresolvedFindings === 1 ? "issue" : "issues"}: {unresolvedSeveritySummary}. Approval blocked until the issues are resolved or adjudicated.</div>}
+    {verificationReady && approvalEligible && <div className="status-banner" role="status"><strong>{findings.length === 0 ? "No findings were recorded." : "All recorded findings have been resolved or adjudicated."}</strong> Human approval required.</div>}
+    {verificationReady && !approvalEligible && unresolvedFindings === 0 && <div className="warning-banner" role="status"><strong>Review required.</strong> Verification completed, but approval eligibility is not confirmed. Inspect the recorded findings and complete Human Review.</div>}
+    {verificationReady && unresolvedFindings > 0 && <div className="warning-banner" role="status"><strong>Review required.</strong> {unresolvedFindings} unresolved {unresolvedFindings === 1 ? "issue" : "issues"}: {unresolvedSeveritySummary}. Approval blocked until the issues are resolved or adjudicated.</div>}
     {verification && <section className="verification-overview" aria-label="Verification overview">
       <div className="verification-summary" aria-label="Finding summary">
         <div><span>Total findings</span><strong>{findings.length}</strong></div>

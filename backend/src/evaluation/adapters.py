@@ -29,6 +29,10 @@ class PipelineOutcome:
     # passed to the engine.
     claim_id_ordinals: tuple[tuple[str, int], ...] = ()
     source_fact_spans: tuple[tuple[str, tuple[SourceSpan, ...]], ...] = ()
+    # Actual primary statuses emitted by the evidence verifier.  Saved expected
+    # findings are deliberately not copied here, so they cannot inflate claim
+    # classification accuracy.
+    claim_classification_predictions: tuple[tuple[str, str], ...] = ()
 
 
 class PipelineAdapter:
@@ -195,6 +199,7 @@ class ReliabilityEngineEvaluationAdapter(PipelineAdapter):
         stage_runs.append(StageRunReference(stage="SOURCE_COVERAGE", upstreamRunId=coverage.run_id, status=coverage.status))
 
         findings: list[ObservedFinding] = []
+        claim_classification_predictions: list[tuple[str, str]] = []
         collection_started = perf_counter()
         claim_id_ordinals: list[tuple[str, int]] = []
         source_fact_spans: list[tuple[str, tuple[SourceSpan, ...]]] = []
@@ -213,6 +218,7 @@ class ReliabilityEngineEvaluationAdapter(PipelineAdapter):
         evidence_run = workflow.evidence_service.repository.get(evidence.run_id)
         if evidence_run is not None and hasattr(evidence_run, "findings"):
             for index, finding in enumerate(evidence_run.findings):
+                claim_classification_predictions.append((finding.claim_id, finding.status.value))
                 discrepancy = ",".join(item.value for item in finding.discrepancies) or None
                 findings.append(ObservedFinding(
                     findingKey=f"{evidence.run_id}:{index}",
@@ -270,6 +276,7 @@ class ReliabilityEngineEvaluationAdapter(PipelineAdapter):
             stage_latency_ms=stage_latency,
             claim_id_ordinals=tuple(claim_id_ordinals),
             source_fact_spans=tuple(source_fact_spans),
+            claim_classification_predictions=tuple(claim_classification_predictions),
         )
 
     @staticmethod

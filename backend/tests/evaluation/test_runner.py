@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from evaluation.adapters import DeterministicFixtureAdapter, PipelineAdapter, PipelineOutcome
 from evaluation.benchmark import default_dataset
-from evaluation.contracts import EvaluationFailure, EvaluationRunRequest, RunStatus, StageRunReference, UsageAndCost
+from evaluation.contracts import EvaluationFailure, EvaluationRunRequest, ObservedFinding, RunStatus, StageRunReference, UsageAndCost
 from evaluation.repository import SQLiteEvaluationRepository
 from evaluation.runner import EvaluationRunner
 
@@ -15,10 +15,39 @@ def test_headless_runner_scores_selected_split_and_records_real_metrics(tmp_path
     assert run.status is RunStatus.SUCCEEDED
     assert len(run.case_results) == 20
     recall = next(metric for metric in run.aggregate_metrics if metric.metric_id == "critical-error-recall")
-    assert recall.numerator == recall.denominator
     assert recall.denominator > 0
+    classification_accuracy = next(metric for metric in run.aggregate_metrics if metric.metric_id == "claim-classification-accuracy")
+    assert classification_accuracy.state.value == "NOT_APPLICABLE"
+    assert classification_accuracy.denominator == 0
     assert run.selected_split.value == "HELD_OUT"
     assert repo.get_run(run.evaluation_run_id) == run
+
+
+def test_claim_classification_accuracy_uses_actual_verifier_predictions(tmp_path) -> None:
+    class AlwaysSupportedAdapter(PipelineAdapter):
+        def evaluate(self, case, candidate):
+            return PipelineOutcome(
+                findings=(ObservedFinding(
+                    findingKey="prediction-1", producer="SPEC_004", upstreamRunId="verifier-run",
+                    affectedClaimId="runtime-claim-1", affectedSourceFactId=None,
+                    primaryStatusOrOutcome="SUPPORTED", discrepancyOrRule=None,
+                    conflictingAttributeOrValue=None, sourceSpans=(), requiresCorrectionOrReview=False,
+                ),),
+                stage_runs=(StageRunReference(stage="EVIDENCE_VERIFICATION", upstreamRunId="verifier-run", status="SUCCEEDED"),),
+                latency_ms=1.0,
+                usage_and_cost=UsageAndCost(retryCount=0, costState="UNAVAILABLE"),
+                claim_id_ordinals=(("runtime-claim-1", 1),),
+                claim_classification_predictions=(("runtime-claim-1", "SUPPORTED"),),
+            )
+
+    dataset = default_dataset()
+    runner = EvaluationRunner(dataset=dataset, adapter=AlwaysSupportedAdapter(), repository=SQLiteEvaluationRepository(tmp_path / "runs.sqlite3"))
+    run = runner.execute(EvaluationRunRequest(subjectKind="BENCHMARK", datasetId=dataset.dataset_id, datasetVersion=dataset.dataset_version, datasetHash=dataset.content_hash, selectedSplit="VALIDATION", executionMode="MOCKED_PROVIDER", idempotencyKey="classification-accuracy-1"))
+
+    accuracy = next(metric for metric in run.aggregate_metrics if metric.metric_id == "claim-classification-accuracy")
+    assert all(result.status.value == "SUCCEEDED" for result in run.case_results)
+    assert 0 < accuracy.numerator < accuracy.denominator
+    assert accuracy.value < 1
 
 
 def test_runner_does_not_score_invalid_dataset_or_silently_use_all_splits(tmp_path) -> None:
