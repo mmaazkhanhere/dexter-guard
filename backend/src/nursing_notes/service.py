@@ -77,6 +77,8 @@ class NursingNoteService:
                 NoteErrorCode.EMPTY_MODEL_OUTPUT,
             }:
                 self.metrics.increment("generation_rejections")
+                if "result" in locals():
+                    error.details = {"candidate": result.model_dump(mode="json"), "quarantined": True}
             raise
         note_id = f"note-{self._id_factory()}"
         facts = self._persisted_facts(

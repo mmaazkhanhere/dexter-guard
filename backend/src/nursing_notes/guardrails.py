@@ -24,7 +24,7 @@ _CAREGIVER_OBSERVATION = re.compile(r"\b(?:pflegekraft|beobachtet)\b", re.IGNORE
 _TOKEN = re.compile(r"[\wÄÖÜäöüß]+", re.UNICODE)
 _MEASUREMENT = re.compile(r"\d+(?:[.,]\d+)?\s*(?:°C|mmHg|kg|cm|ml|bpm|g|l|%)", re.IGNORECASE)
 _TEMPORAL = re.compile(
-    r"\b(?:heute|gestern|morgen|seit\s+\w+|vor\s+\w+|nach\s+\w+|nachts|morgens|abends|aktuell|derzeit|momentan)\b",
+    r"\b(?:heute|gestern|morgen|seit\s+\w+|vor\s+\w+|nach\s+\w+|nachts|morgens|abends|aktuell|derzeit|momentan|(?:bis|um|ab)\s+\d{1,2}(?::\d{2})?\s*uhr)\b",
     re.IGNORECASE,
 )
 _MULTI_SENTENCE = re.compile(r"[.!?].*[.!?]|[\r\n;]", re.DOTALL)
@@ -36,6 +36,16 @@ def _reject(message: str, field: str | None = None) -> None:
 
 def _tokens(value: str) -> set[str]:
     return {token.casefold() for token in _TOKEN.findall(value) if len(token) > 2}
+
+
+def _canonical_temporal(value: str) -> str:
+    """Normalize equivalent clock spellings while preserving bis/um/ab meaning."""
+    normalized = re.sub(r"\s+", " ", value.casefold()).strip()
+    return re.sub(r"(\b(?:bis|um|ab)\s+\d{1,2}):00\s*uhr\b", r"\1 uhr", normalized)
+
+
+def _temporal_supported(qualifier: str | None, text: str) -> bool:
+    return qualifier is None or _canonical_temporal(qualifier) in _canonical_temporal(text)
 
 
 class GenerationGuardrails:
@@ -70,7 +80,7 @@ class GenerationGuardrails:
             return fact
         text = source.transcript_text
         excerpt = text[anchor.start : anchor.end]
-        temporal_missing = qualifier is not None and qualifier.casefold() not in excerpt.casefold()
+        temporal_missing = not _temporal_supported(qualifier, excerpt)
         attribution_missing = (
             attribution == "RESIDENT_REPORTED"
             and _RESIDENT_REPORT.search(excerpt) is None
@@ -85,7 +95,7 @@ class GenerationGuardrails:
             sentence_start = match.start()
             sentence_end = match.end()
             sentence = text[sentence_start:sentence_end]
-            temporal_supported = qualifier is None or qualifier.casefold() in sentence.casefold()
+            temporal_supported = _temporal_supported(qualifier, sentence)
             attribution_supported = (
                 attribution != "RESIDENT_REPORTED" or _RESIDENT_REPORT.search(sentence) is not None
             ) and (
@@ -178,10 +188,10 @@ class GenerationGuardrails:
         temporal_matches = [match.group(0) for match in _TEMPORAL.finditer(excerpt)]
         if temporal_matches:
             qualifier = fact.temporal_qualifier or ""
-            if any(match.casefold() not in qualifier.casefold() for match in temporal_matches):
+            if any(not _temporal_supported(match, qualifier) for match in temporal_matches):
                 _reject("Source temporal information was not preserved.", f"facts.{index}.temporalQualifier")
         elif fact.temporal_qualifier is not None:
-            _reject("A temporal qualifier is not supported by the source anchor.", f"facts.{index}.temporalQualifier")
+            _reject("The generated note adds a time detail that is not stated in the transcript.", f"facts.{index}.temporalQualifier")
 
         if _RESIDENT_REPORT.search(excerpt):
             if fact.attribution != "RESIDENT_REPORTED":

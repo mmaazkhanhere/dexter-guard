@@ -23,19 +23,23 @@ class NoteErrorPayload(BaseModel):
     code: StrictStr
     message: StrictStr
     field: StrictStr | None = None
+    details: dict[str, Any] | None = None
 
 
 class NoteError(Exception):
     """A typed failure that is safe to expose at the API boundary."""
 
-    def __init__(self, code: NoteErrorCode | str, message: str, field: str | None = None) -> None:
+    def __init__(self, code: NoteErrorCode | str, message: str, field: str | None = None, details: dict[str, Any] | None = None) -> None:
         self.code = NoteErrorCode(code)
         self.message = message
         self.field = field
+        self.details = details
         super().__init__(message)
 
     def payload(self) -> NoteErrorPayload:
         values: dict[str, Any] = {"code": self.code.value, "message": self.message}
         if self.field is not None:
             values["field"] = self.field
+        if self.details is not None:
+            values["details"] = self.details
         return NoteErrorPayload.model_validate(values)

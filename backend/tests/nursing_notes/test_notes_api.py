@@ -29,7 +29,7 @@ def test_gen_001_valid_german_transcript_returns_editable_professional_draft(not
         json={"sourceId": source["source_id"], "sourceVersion": 1, "requestedBy": "synthetic-tester"},
     )
 
-    assert response.status_code == 201
+    assert response.status_code == 201, response.text
     body = response.json()
     assert "Pflegedokumentation" in body["content"]
     assert body["origin"] == "GENERATED"
@@ -236,6 +236,18 @@ def test_temporal_qualifier_expands_a_narrow_anchor_within_one_source_sentence(n
     assert response.status_code == 201
     assert response.json()["facts"][0]["sourceAnchor"]["start"] == 0
     assert response.json()["facts"][0]["sourceAnchor"]["end"] == len(text)
+
+
+def test_fluid_intake_clock_spelling_bis_10_and_bis_10_00_are_equivalent(note_context):
+    client = note_context["client"]
+    text = "Bis 10:00 Uhr trinkt die Bewohnerin insgesamt 500 ml Wasser und Tee."
+    source = create_source(client, text)
+    source_model = note_context["source_service"].get_source_version(source["source_id"], 1)
+    candidate = fact(source_model, "insgesamt 500 ml Wasser und Tee.", fact_type="MEASUREMENT", temporalQualifier="bis 10 Uhr", numericValue="500", unit="ml")
+    note_context["adapter"].factory = result_factory(candidate)
+    response = client.post("/api/v1/notes/generate", json={"sourceId": source["source_id"], "sourceVersion": 1, "requestedBy": "tester"})
+    assert response.status_code == 201, response.text
+    assert response.json()["facts"][0]["temporalQualifier"] == "bis 10 Uhr"
 
 
 def test_fact_anchor_cannot_span_multiple_source_sentences(note_context):

@@ -1,8 +1,8 @@
 export type ApiErrorKind = "validation" | "not-found" | "conflict" | "unavailable" | "timeout" | "malformed" | "network" | "unknown";
 export class ApiError extends Error {
-  readonly kind: ApiErrorKind; readonly code: string; readonly status: number; readonly field?: string; readonly retryable: boolean; readonly technicalMessage: string;
-  constructor(message: string, options: { kind: ApiErrorKind; code: string; status?: number; field?: string; retryable?: boolean; technicalMessage?: string }) {
-    super(message); this.name = "ApiError"; this.kind = options.kind; this.code = options.code; this.status = options.status ?? 0; this.field = options.field; this.retryable = options.retryable ?? false; this.technicalMessage = options.technicalMessage ?? message;
+  readonly kind: ApiErrorKind; readonly code: string; readonly status: number; readonly field?: string; readonly details?: Record<string, unknown>; readonly retryable: boolean; readonly technicalMessage: string;
+  constructor(message: string, options: { kind: ApiErrorKind; code: string; status?: number; field?: string; details?: Record<string, unknown>; retryable?: boolean; technicalMessage?: string }) {
+    super(message); this.name = "ApiError"; this.kind = options.kind; this.code = options.code; this.status = options.status ?? 0; this.field = options.field; this.details = options.details; this.retryable = options.retryable ?? false; this.technicalMessage = options.technicalMessage ?? message;
   }
 }
 export function userFacingApiMessage(code: string, message: string, field?: string, kind?: ApiErrorKind): string {
@@ -30,5 +30,6 @@ export function apiErrorFromPayload(payload: unknown, status: number): ApiError 
   const message = typeof body.message === "string" ? body.message : "Die Anfrage konnte nicht verarbeitet werden.";
   const kind: ApiErrorKind = status === 404 ? "not-found" : status === 409 ? "conflict" : status === 408 || status === 504 ? "timeout" : status === 422 || status === 400 ? "validation" : status >= 500 ? "unavailable" : "unknown";
   const field = typeof body.field === "string" ? body.field : undefined;
-  return new ApiError(userFacingApiMessage(code, message, field, kind), { kind, code, status, field, technicalMessage: message, retryable: kind === "timeout" || kind === "unavailable" });
+  const details = typeof body.details === "object" && body.details !== null ? body.details as Record<string, unknown> : undefined;
+  return new ApiError(userFacingApiMessage(code, message, field, kind), { kind, code, status, field, details, technicalMessage: message, retryable: kind === "timeout" || kind === "unavailable" });
 }

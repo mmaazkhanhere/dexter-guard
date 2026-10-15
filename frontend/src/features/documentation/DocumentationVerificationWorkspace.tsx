@@ -38,7 +38,7 @@ export function verificationModeCopy(provider?: Health["verificationProvider"]) 
 export function DocumentationVerificationWorkspace() {
   const navigate = useNavigate();
   const { notify } = useToast();
-  const { source, note, transcript: savedTranscript, residentId: savedResidentId, demo, setSource, setNote, setTranscript: saveTranscript, setResidentId: saveResidentId, applyNoteRevision, setDraftContent } = useWorkspace();
+  const { source, note, transcript: savedTranscript, residentId: savedResidentId, demo, setSource, setNote, setTranscript: saveTranscript, setResidentId: saveResidentId, setDraftContent } = useWorkspace();
   const createSource = useCreateSource();
   const generate = useGenerateNote();
   const importNote = useImportNote();
@@ -53,6 +53,7 @@ export function DocumentationVerificationWorkspace() {
   const [selectedExample, setSelectedExample] = useState("");
   const [editingSource, setEditingSource] = useState(false);
   const [generatedIdentity, setGeneratedIdentity] = useState<{ sourceId: string; sourceVersion: number }>();
+  const [quarantinedDraft, setQuarantinedDraft] = useState<{ content: string; failure: string }>();
   const selectedScenario = examples.data?.find((example) => example.exampleId === selectedExample);
   const scenarioSource = useSource(selectedScenario?.sourceId, selectedScenario?.sourceVersion);
   const error = createSource.error ?? generate.error ?? importNote.error ?? fullVerification.error;
@@ -128,12 +129,24 @@ export function DocumentationVerificationWorkspace() {
         return;
       }
       const generated = await generate.mutateAsync({ sourceId: activeSource.source_id, sourceVersion: activeSource.source_version, requestedBy: "synthetic-reviewer" });
-      applyNoteRevision(generated);
+      setQuarantinedDraft(undefined);
+      setNote(generated);
       setDraftContent(generated.content);
       setGeneratedIdentity({ sourceId: activeSource.source_id, sourceVersion: activeSource.source_version });
       await verify(generated);
     } catch (failure) {
       const detail = safeMutationError(failure);
+      const candidate = detail.details?.candidate as { content?: unknown } | undefined;
+      if (typeof candidate?.content === "string") {
+        const temporalQualifierRejected = detail.code === "GENERATION_REJECTED"
+          && (detail.field?.endsWith("temporalQualifier") || /temporal|time|qualifier/i.test(detail.technicalMessage));
+        const caregiverMessage = temporalQualifierRejected
+          ? "Draft blocked: it adds a time detail that is not stated in the caregiver transcript. To pass, remove or rewrite that time phrase so it matches the transcript exactly, then submit the corrected draft for verification."
+          : detail.code === "GENERATION_REJECTED"
+            ? "Draft blocked: it contains information that the caregiver transcript does not support. To pass, compare both texts and correct every changed number, negation, time detail, observation, and resident attribution before verifying again."
+            : detail.message;
+        setQuarantinedDraft({ content: candidate.content, failure: caregiverMessage });
+      }
       notify({ tone: "error", title: "Generate & Verify could not finish", message: `${detail.message} No factual success or approval was recorded.` });
     }
   }
@@ -143,7 +156,7 @@ export function DocumentationVerificationWorkspace() {
       const activeSource = await ensureSource();
       if (!activeSource || !isExternalNoteValid(existingNote)) return;
       const imported = await importNote.mutateAsync({ sourceId: activeSource.source_id, sourceVersion: activeSource.source_version, content: existingNote, externalOrigin: { system: "synthetic-external-demo", externalNoteId: `external-${Date.now()}` }, requestedBy: "synthetic-reviewer", facts: [] });
-      applyNoteRevision(imported);
+      setNote(imported);
       setDraftContent(imported.content);
       await verify(imported);
     } catch (failure) {
@@ -161,7 +174,10 @@ export function DocumentationVerificationWorkspace() {
     {demo && <section className="guided-demo" aria-label="Guided demo progress"><span className="eyebrow">GUIDED DEMO · STEP {demoStep}</span><h3>{demo.steps.find((step) => step.id === demoStep)?.title}</h3><p>{demo.steps.find((step) => step.id === demoStep)?.instruction}</p><ol>{demo.steps.map((step) => <li className={step.id === demoStep ? "current" : ""} key={step.id}>{step.title}</li>)}</ol>{(demoStep === "VERIFY" || demoStep === "REVERIFY") && <div className="button-row"><button onClick={() => note && void verify(note)} disabled={isWorking}>{demoStep === "REVERIFY" ? "Re-verify corrected revision" : "Run guided verification"}</button></div>}{(demoStep === "CORRECT" || demoStep === "APPROVE") && <div className="button-row"><button className="secondary-button" onClick={() => navigate("/review")}>{demoStep === "APPROVE" ? "Continue to human approval" : "Inspect and correct findings"}</button></div>}</section>}
     <section className="verification-mode" role="status" aria-label="Verification mode"><strong>Verification mode: {verificationMode.label}</strong><p>{health.isError ? "Verification configuration could not be loaded. The result screen will still show whether each verification run completed." : verificationMode.detail}</p></section>
     {error && <div className="error-banner" role="alert">{safeMutationError(error).message}</div>}
-    <section className="documentation-verification-section" aria-label="Documentation and verification workflow">
+    <div className={`documentation-workflow-grid${quarantinedDraft ? " has-quarantined-draft" : ""}`}>
+      {quarantinedDraft && <StateCard title="Original caregiver transcript" description="This locked source is the authority used to review the generated draft."><p className="evidence-note">{source?.transcript_text ?? transcript}</p>{source && <span className="identity-pill">Locked source · {source.source_id} · v{source.source_version}</span>}</StateCard>}
+      {quarantinedDraft && <StateCard title="AI Generated Draft" description="This draft failed source validation. It is not saved, verified, or eligible for approval."><div className="error-banner" role="alert"><strong>Why this draft is blocked</strong><p>{quarantinedDraft.failure}</p><p>Approval is blocked to prevent unsupported information from becoming part of the official nursing note.</p></div><label>Candidate draft<textarea aria-label="AI Generated Draft" value={quarantinedDraft.content} onChange={(event) => { setQuarantinedDraft({ ...quarantinedDraft, content: event.target.value }); setExistingNote(event.target.value); }} /></label><button type="button" className="secondary-button" onClick={() => { setExistingNote(quarantinedDraft.content); setQuarantinedDraft(undefined); setMode("existing"); }}>Review and verify this draft</button><p className="muted">To pass verification, correct the draft against the transcript, then submit it again through Verify Existing Note. Editing here does not save or verify it.</p></StateCard>}
+      {!quarantinedDraft && <section className="documentation-verification-section" aria-label="Documentation and verification workflow">
       <div className="segmented primary-mode-switch" role="tablist" aria-label="Nursing note workflow">
         <button role="tab" type="button" aria-selected={mode === "generate"} aria-controls="generate-and-verify-panel" className={mode === "generate" ? "selected" : ""} onClick={() => setMode("generate")}>Generate &amp; Verify</button>
         <button role="tab" type="button" aria-selected={mode === "existing"} aria-controls="verify-existing-note-panel" className={mode === "existing" ? "selected" : ""} onClick={() => setMode("existing")}>Verify Existing Note</button>
@@ -172,7 +188,8 @@ export function DocumentationVerificationWorkspace() {
         <VerificationResults note={activeResult} source={source} context={review.data} isLoading={review.isLoading || review.isFetching || fullVerification.isPending} loadError={review.error} onRetry={() => { void review.refetch(); }} />
         <div className="button-row"><button className="secondary-button" onClick={() => navigate("/review")}>Continue to Human Review</button></div>
       </section>}
-    </section>
+      </section>}
+    </div>
   </>;
 }
 
