@@ -56,6 +56,8 @@ The feature includes a headless runner and a lightweight diagnostics report/dash
 5. A dataset validator shall reject duplicate IDs, invalid/mismatched spans, ambiguous denominator membership, missing required annotation provenance, unversioned policy references, invalid candidate/source lineage, and cases that violate the synthetic-only restriction.
 6. A scenario may include multiple candidate notes only when each has its own stable candidate, claim, error, and expected-fact references.
 
+7. The existing 100-scenario `008-v1` fixture shall remain the regression benchmark. A separate 30-scenario `008-curated-v1` companion corpus may be used only as a held-out, actual-verifier evaluation: it contains no development or validation cases, is reported under its own dataset identity, and its annotations remain `PENDING` until independent review is actually recorded. Its metrics must never be merged with saved-fixture results.
+
 Resident-context mixing is an optional extension, not a minimum benchmark category. It may be enabled only when an existing upstream synthetic-context provenance contract is available. Such fixtures use one resident per transcript and a deliberately mismatched context/reference; they test provenance binding only and never require identifying or disambiguating multiple residents from transcript language. Optional extension cases must not be required for the core benchmark acceptance or release gate.
 
 ### FR-27 — Protected Held-Out Dataset

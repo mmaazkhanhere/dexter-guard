@@ -4,6 +4,7 @@ import hashlib
 from dataclasses import dataclass
 
 from .contracts import BenchmarkDataset, DatasetSplit, EvaluationCase
+from .benchmark import CURATED_DATASET_ID, CURATED_DATASET_VERSION, CURATED_REQUIRED_TAGS
 
 
 class DatasetValidationError(ValueError):
@@ -24,13 +25,17 @@ def _digest(value: str) -> str:
 def validate_dataset(dataset: BenchmarkDataset, selected_split: DatasetSplit | None = None) -> DatasetValidationReport:
     if dataset.status.value != "ACCEPTED":
         raise DatasetValidationError("dataset status is not ACCEPTED")
-    if len(dataset.scenarios) < 100 or dataset.scenario_count != len(dataset.scenarios):
-        raise DatasetValidationError("accepted dataset must contain at least 100 scenarios")
+    is_curated_companion = dataset.dataset_id == CURATED_DATASET_ID
+    if is_curated_companion and dataset.dataset_version != CURATED_DATASET_VERSION:
+        raise DatasetValidationError("curated companion dataset version is not recognised")
+    minimum_scenarios = 30 if is_curated_companion else 100
+    if len(dataset.scenarios) < minimum_scenarios or dataset.scenario_count != len(dataset.scenarios):
+        raise DatasetValidationError(f"accepted dataset must contain at least {minimum_scenarios} scenarios")
     scenario_ids: set[str] = set()
     family_splits: dict[str, DatasetSplit] = {}
     source_hashes: dict[str, DatasetSplit] = {}
     candidate_hashes: dict[str, DatasetSplit] = {}
-    required_tags = {
+    required_tags = CURATED_REQUIRED_TAGS if is_curated_companion else {
         "SUPPORTED", "UNSUPPORTED_FACT", "EXPLICIT_CONTRADICTION", "NUMERIC_MISMATCH", "UNIT_MISMATCH",
         "NEGATION_CHANGE", "CERTAINTY_CHANGE", "ATTRIBUTION_CHANGE", "CLINICAL_INFERENCE",
         "IMPORTANT_OMISSION", "MULTIPLE_ERRORS", "AMBIGUOUS_SOURCE", "HARMLESS_PARAPHRASE",
@@ -58,6 +63,8 @@ def validate_dataset(dataset: BenchmarkDataset, selected_split: DatasetSplit | N
         raise DatasetValidationError(f"required category coverage missing: {sorted(missing)}")
     if dataset.content_hash != _digest(dataset.canonical_content()):
         raise DatasetValidationError("dataset contentHash does not match canonical content")
+    if is_curated_companion and any(case.split is not DatasetSplit.HELD_OUT for case in dataset.scenarios):
+        raise DatasetValidationError("curated companion cases must remain held out")
     if selected_split is not None and not any(case.split is selected_split for case in dataset.scenarios):
         raise DatasetValidationError("selected split has no cases")
     return DatasetValidationReport(True, len(dataset.scenarios), selected_split)
