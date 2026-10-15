@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from uuid import uuid4
 
-from .contracts import ComparisonStatus, EvaluationCaseResult, ReviewDataKind, RunComparison
+from .contracts import ComparisonStatus, EvaluationCaseResult, EvaluationRun, ReviewDataKind, RunComparison
 
 
 def compare_paired_cases(
@@ -68,4 +68,44 @@ def compare_regression(
     else:
         disposition = "PASS"
     return {"disposition": disposition, "deltas": deltas, "raw": raw, "criticalTarget": critical_target, "uncertainty": "Wilson intervals are persisted on MetricResult; no unapproved threshold is inferred."}
+
+
+def paired_metric_report(baseline: EvaluationRun, validated: EvaluationRun) -> dict[str, object]:
+    """Return an auditable raw-count comparison without inferring improvement."""
+    metric_ids = (
+        "finding-true-positives", "finding-false-negatives", "finding-false-positives",
+        "critical-error-recall", "supported-claim-false-positive-rate",
+        "claim-classification-accuracy", "review-burden-warnings", "verification-latency",
+    )
+
+    def selected(run: EvaluationRun) -> dict[str, object]:
+        by_id = {metric.metric_id: metric for metric in run.aggregate_metrics}
+        return {
+            metric_id: by_id[metric_id].model_dump(by_alias=True, exclude_none=False)
+            for metric_id in metric_ids
+            if metric_id in by_id
+        }
+
+    return {
+        "comparison": "BASELINE_VS_VALIDATED",
+        "interpretation": "Automated finding comparison only; no final-note or caregiver outcome is inferred.",
+        "baseline": {
+            "evaluationRunId": baseline.evaluation_run_id,
+            "datasetId": baseline.dataset_id,
+            "datasetVersion": baseline.dataset_version,
+            "adapter": "ReliabilityEngineEvaluationAdapter(reliability_enabled=false)",
+            "verifier": None,
+            "configuration": baseline.configuration.model_dump(by_alias=True, exclude_none=False),
+            "metrics": selected(baseline),
+        },
+        "validated": {
+            "evaluationRunId": validated.evaluation_run_id,
+            "datasetId": validated.dataset_id,
+            "datasetVersion": validated.dataset_version,
+            "adapter": "ReliabilityEngineEvaluationAdapter(reliability_enabled=true)",
+            "verifier": validated.configuration.model_dump(by_alias=True, exclude_none=False).get("modelId"),
+            "configuration": validated.configuration.model_dump(by_alias=True, exclude_none=False),
+            "metrics": selected(validated),
+        },
+    }
 

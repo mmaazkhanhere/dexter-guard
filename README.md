@@ -304,6 +304,40 @@ Only critical-error recall has an approved numerical release target. Other
 metrics are reported for inspection and regression analysis rather than being
 given invented pass/fail thresholds.
 
+### Curated baseline-versus-validated experiment
+
+The separate `008-curated-v1` corpus contains 30 synthetic, held-out cases.
+The paired experiment uses the same immutable source and candidate note in both
+arms:
+
+| Arm | Adapter/configuration | Reliability findings supplied to scoring | Interpretation |
+| --- | --- | --- | --- |
+| Baseline | `ReliabilityEngineEvaluationAdapter(reliability_enabled=false)` | None | Measures the no-reliability finding baseline. |
+| Validated | `ReliabilityEngineEvaluationAdapter(reliability_enabled=true)` | Actual verifier/validation/coverage output | Measures automated detection and classification on the same notes. |
+
+The report keeps these measures separate for each arm: detected findings,
+missed findings, false positives, critical-error recall, supported-claim false-
+positive rate, claim-classification accuracy, warnings per note, and
+verification latency. Rate metrics include raw numerator/denominator and
+Wilson 95% intervals; latency includes observation count, p50, p95, and mean.
+The report also records dataset ID/version/hash, adapter, model/verifier
+configuration, and run IDs. Saved-fixture results are not merged into this
+comparison.
+
+Run the reproducible regression and paired experiment checks with:
+
+```powershell
+uv run pytest backend/tests/evaluation/test_curated_benchmark.py -k "paired or actual_verifier"
+```
+
+This experiment demonstrates only how the configured reliability pipeline's
+automated findings differ from a no-findings baseline on these synthetic notes.
+It does not demonstrate improved final-note quality, caregiver workload,
+clinical safety, or reviewer benefit: no observed review/correction study is
+part of this run. The curated annotations are still marked `PENDING`, the
+corpus is small, and local offline-verifier latency and classifications are not
+provider-general performance evidence.
+
 ## Engineering trade-offs
 
 | Decision | Benefit | Cost / trade-off |

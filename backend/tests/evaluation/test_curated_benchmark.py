@@ -6,6 +6,7 @@ import pytest
 
 from evaluation.adapters import DeterministicFixtureAdapter, RealEvaluationAdapter
 from evaluation.benchmark import CURATED_REQUIRED_TAGS, curated_held_out_dataset, default_dataset
+from evaluation.comparison import compare_paired_cases, paired_metric_report
 from evaluation.contracts import DatasetSplit, EvaluationRunRequest
 from evaluation.dataset import DatasetValidationError, validate_dataset
 from evaluation.repository import SQLiteEvaluationRepository
@@ -76,3 +77,31 @@ def test_curated_actual_verifier_run_reports_separate_quality_metrics(tmp_path) 
     assert metrics["supported-claim-false-positive-rate"].denominator > 0
     assert metrics["claim-classification-accuracy"].denominator > 0
     assert any(result.observed_findings for result in actual_run.case_results)
+
+
+def test_curated_baseline_vs_validated_report_keeps_raw_metrics_and_configuration(tmp_path) -> None:
+    dataset = curated_held_out_dataset()
+    repository = SQLiteEvaluationRepository(tmp_path / "paired.sqlite3")
+    baseline = EvaluationRunner(
+        dataset=dataset, adapter=RealEvaluationAdapter(reliability_enabled=False), repository=repository,
+    ).execute(_request(dataset, key="curated-baseline", mode="LIVE"))
+    validated = EvaluationRunner(
+        dataset=dataset, adapter=RealEvaluationAdapter(), repository=repository,
+    ).execute(_request(dataset, key="curated-validated", mode="LIVE"))
+
+    comparison = compare_paired_cases(
+        baseline.evaluation_run_id, validated.evaluation_run_id,
+        baseline.case_results, validated.case_results,
+    )
+    report = paired_metric_report(baseline, validated)
+    assert comparison.status.value == "VALID"
+    assert len(comparison.pair_results) == 30
+    assert set(report["validated"]["metrics"]) >= {
+        "finding-true-positives", "finding-false-negatives", "finding-false-positives",
+        "critical-error-recall", "supported-claim-false-positive-rate",
+        "claim-classification-accuracy", "review-burden-warnings", "verification-latency",
+    }
+    assert report["baseline"]["metrics"]["finding-true-positives"]["count"] == 0
+    assert report["validated"]["configuration"]["fixtureMode"] == "LIVE"
+    assert report["validated"]["datasetVersion"] == "008-curated-v1"
+    assert report["validated"]["metrics"]["critical-error-recall"]["confidenceInterval"]["method"] == "WILSON_95"

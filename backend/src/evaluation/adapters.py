@@ -94,10 +94,12 @@ class ReliabilityEngineEvaluationAdapter(PipelineAdapter):
         evidence_verifier: object | None = None,
         claim_provider: object | None = None,
         coverage_matcher: object | None = None,
+        reliability_enabled: bool = True,
     ) -> None:
         self._evidence_verifier = evidence_verifier
         self._claim_provider = claim_provider
         self._coverage_matcher = coverage_matcher
+        self._reliability_enabled = reliability_enabled
         self._engine = engine or self._run_isolated_pipeline
 
     def evaluate(self, case: EvaluationCase, candidate: EvaluationCandidate) -> PipelineOutcome:
@@ -185,6 +187,18 @@ class ReliabilityEngineEvaluationAdapter(PipelineAdapter):
                 started, stage_runs, "CLAIM_EXTRACTION", "CLAIM_EXTRACTION_FAILED", stage_latency,
             )
 
+        extraction_result = workflow.claim_service.repository.get_current_result(f"{note.note_id}:r{note.revision}")
+        claim_id_ordinals = tuple(
+            (claim.id, ordinal)
+            for ordinal, claim in enumerate(getattr(extraction_result, "claims", ()), start=1)
+        )
+        if not self._reliability_enabled:
+            return PipelineOutcome(
+                findings=(), stage_runs=tuple(stage_runs), latency_ms=(perf_counter() - started) * 1000,
+                usage_and_cost=UsageAndCost(retryCount=0, costState="UNAVAILABLE"),
+                stage_latency_ms=stage_latency, claim_id_ordinals=claim_id_ordinals,
+            )
+
         stage_started = perf_counter()
         evidence = workflow.ports.evidence(note.note_id, note.revision, extraction.claim_set_id)
         stage_latency["EVIDENCE_VERIFICATION"] = (perf_counter() - stage_started) * 1000
@@ -201,12 +215,8 @@ class ReliabilityEngineEvaluationAdapter(PipelineAdapter):
         findings: list[ObservedFinding] = []
         claim_classification_predictions: list[tuple[str, str]] = []
         collection_started = perf_counter()
-        claim_id_ordinals: list[tuple[str, int]] = []
+        claim_id_ordinals = list(claim_id_ordinals)
         source_fact_spans: list[tuple[str, tuple[SourceSpan, ...]]] = []
-
-        extraction_result = workflow.claim_service.repository.get_current_result(f"{note.note_id}:r{note.revision}")
-        for ordinal, claim in enumerate(getattr(extraction_result, "claims", ()), start=1):
-            claim_id_ordinals.append((claim.id, ordinal))
 
         extraction_facts = workflow.extraction_repository.get(f"source-facts-{extraction.claim_set_id}")
         for fact in extraction_facts.facts:
