@@ -306,14 +306,42 @@ given invented pass/fail thresholds.
 
 ### Curated baseline-versus-validated experiment
 
-The separate `008-curated-v1` corpus contains 30 synthetic, held-out cases.
-The paired experiment uses the same immutable source and candidate note in both
-arms:
+The separate `008-curated-v1` corpus contains 30 synthetic, held-out cases. The
+validated arm uses the local deterministic/offline German heuristic verifier
+(`ReliabilityEngineEvaluationAdapter`, no hosted LLM, network, or provider
+call). The paired experiment uses the same immutable source and candidate note
+in both arms:
 
 | Arm | Adapter/configuration | Reliability findings supplied to scoring | Interpretation |
 | --- | --- | --- | --- |
 | Baseline | `ReliabilityEngineEvaluationAdapter(reliability_enabled=false)` | None | Measures the no-reliability finding baseline. |
 | Validated | `ReliabilityEngineEvaluationAdapter(reliability_enabled=true)` | Actual verifier/validation/coverage output | Measures automated detection and classification on the same notes. |
+
+Measured run (dataset hash is checked by the runner; latency is in
+milliseconds):
+
+| Metric | Baseline (reliability disabled) | Validated (offline heuristic verifier) |
+| --- | ---: | ---: |
+| Raw detected errors (true positives) | 0 / 30 notes | 0 / 30 notes |
+| Raw missed errors (false negatives) | 23 / 30 notes | 23 / 30 notes |
+| Raw false positives | 0 / 30 notes | 31 / 30 notes |
+| Critical-error recall | 0 / 24; Wilson 95% CI 0.000–0.138 | 0 / 24; Wilson 95% CI 0.000–0.138 |
+| Warnings per note | 0 / 30 = 0.000 | 32 / 30 = 1.067 |
+| Verification latency (p50 / p95 / mean) | 3.37 / 5.62 / 3.67 ms (n=30) | 22.92 / 34.95 / 23.69 ms (n=30) |
+
+Examples from the validated run (expected labels are benchmark annotations, not
+answers supplied to the verifier):
+
+- Detected error: `curated-negation-husten` — the note asserted cough while
+  the source negated it; the verifier emitted `CONTRADICTED` with rule
+  `NEGATION`.
+- Missed error: `curated-negation-schwindel` — the source and note changed the
+  presence of dizziness, but the verifier emitted no finding.
+- False positive: `curated-paraphrase-fruehstueck` — a supported paraphrase was
+  flagged `UNCERTAIN/OTHER`.
+
+These examples illustrate the heuristic's current behavior; they are not
+evidence of hosted-LLM performance.
 
 The report keeps these measures separate for each arm: detected findings,
 missed findings, false positives, critical-error recall, supported-claim false-
