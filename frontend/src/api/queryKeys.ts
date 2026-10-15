@@ -7,4 +7,5 @@ export const queryKeys = {
   audit: (id: string) => ["audit", id] as const,
   evaluations: ["evaluation-runs"] as const,
   evaluation: (id: string) => ["evaluation-run", id] as const,
+  evaluationCase: (runId: string, caseId: string) => ["evaluation-case", runId, caseId] as const,
 };

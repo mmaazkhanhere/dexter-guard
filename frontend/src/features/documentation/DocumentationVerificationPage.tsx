@@ -159,7 +159,8 @@ export function DocumentationVerificationPage() {
   }
 
   const processing = createSource.isPending || generate.isPending || importNote.isPending || fullVerification.isPending;
-  const providerLabel = (provider: "LIVE_AI" | "OFFLINE_DEMO" | undefined) => provider === "LIVE_AI" ? "Live AI provider" : provider === "OFFLINE_DEMO" ? "Offline demo" : "Status unavailable";
+  const providerLabel = (provider: "LIVE_AI" | "OFFLINE_DEMO" | "UNAVAILABLE" | undefined) => provider === "LIVE_AI" ? "Live AI provider" : provider === "OFFLINE_DEMO" ? "Offline demo" : "Status unavailable";
+  const generationReadiness = health.data?.generation;
   return <>
     <WorkspaceHeader eyebrow="01 · DOCUMENTATION & VERIFICATION" title="Create or verify a source-bound nursing note" description="Start with a synthetic German transcript, then either generate a new note or verify an existing AI-generated note before Human Review." />
     {error && <div className="error-banner" role="alert">{safeMutationError(error).message}</div>}
@@ -170,7 +171,8 @@ export function DocumentationVerificationPage() {
       </div>
       <p className="workspace-mode-description">Switch between the documentation workspace and the verification workspace. Only the selected workspace is shown.</p>
       {workspaceMode === "documentation" && <div id="documentation-mode"><StateCard title="Documentation" description="Enter and correct the transcript, then generate or import the source-bound nursing note.">
-        <div className="provider-status" role="status" aria-label="Provider status"><span>Generation: <strong>{providerLabel(health.data?.generationProvider)}</strong></span><span>Verification: <strong>{providerLabel(health.data?.verificationProvider)}</strong></span></div>
+        <div className="provider-status" role="status" aria-label="Provider status"><span>Generation: <strong>{providerLabel(health.data?.generationProvider)}</strong></span><span>LLM: <strong>{generationReadiness?.available ? `Loaded${generationReadiness.model ? ` (${generationReadiness.model})` : ""}` : "Unavailable"}</strong></span><span>Verification: <strong>{providerLabel(health.data?.verificationProvider)}</strong></span></div>
+        {!generationReadiness?.available && <p className="field-description" role="status">Live note generation is unavailable because the LLM configuration is not loaded.</p>}
         <div className="workflow-step">
           <h4>1. Enter and check the transcript</h4>
           <p className="workflow-step-description">Enter a synthetic transcript or load an example. Correct speech-to-text mistakes here before generating the note.</p>

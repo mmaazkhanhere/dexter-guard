@@ -231,6 +231,7 @@ class OfflineSemanticEvidenceProvider:
     _stop_words = frozenset({"die", "der", "das", "den", "dem", "des", "ein", "eine", "einer", "einem", "und", "oder", "aber", "doch", "sowie", "ist", "sind", "hat", "haben", "wurde", "wird", "bei", "im", "in", "am", "an", "zu", "von", "mit", "für", "über", "unter", "auf", "aus", "die", "frau", "herr", "bewohnerin", "bewohner", "patient", "patientin"})
     _semantic_terms = {
         "schmerz": "pain", "schmerzen": "pain", "beschwerde": "pain", "beschwerden": "pain",
+        "brustschmerz": "pain", "brustschmerzen": "pain",
         "verneint": "negated", "kein": "negated", "keine": "negated", "keinen": "negated", "ohne": "negated", "nicht": "negated",
         "möglich": "uncertain", "möglicherweise": "uncertain", "vielleicht": "uncertain", "unklar": "uncertain",
         "berichtet": "reported", "gibt": "reported", "an": "reported", "sagt": "reported", "klagt": "reported",
@@ -287,6 +288,64 @@ class OfflineSemanticEvidenceProvider:
 
     @classmethod
     def _classify(cls, claim_text: str, source_text: str) -> tuple[str, str, int | None, int | None, list[str]]:
+        """Classify every material assertion in a claim before aggregating it.
+
+        Claim extraction normally supplies atomic claims, but the offline fallback
+        must remain safe when a compound claim reaches it directly.  A supported
+        sub-assertion cannot make the whole claim supported when another
+        conjunction-delimited assertion is unsupported or uncertain.
+        """
+        parts = [part.strip() for part in cls._scopes.split(claim_text) if part.strip()]
+        if len(parts) <= 1:
+            return cls._classify_single(claim_text, source_text)
+
+        results = [cls._classify_single(part, source_text) for part in parts]
+        statuses = [result[0] for result in results]
+        whole_result = cls._classify_single(claim_text, source_text)
+        material_parts = [
+            status in {"UNSUPPORTED", "CONTRADICTED"}
+            and bool(cls._meaning_tokens(part) & set(cls._semantic_terms.values()))
+            for part, status in zip(parts, statuses)
+        ]
+        if whole_result[0] == "SUPPORTED" and not any(material_parts):
+            return whole_result
+        span = next((result[2:4] for result in results if result[2] is not None), (None, None))
+        discrepancies = sorted({item for result in results for item in result[4]})
+
+        if "CONTRADICTED" in statuses:
+            return (
+                "CONTRADICTED",
+                "At least one material assertion conflicts with the source.",
+                span[0],
+                span[1],
+                discrepancies or ["OTHER"],
+            )
+        if all(status == "SUPPORTED" for status in statuses):
+            return (
+                "SUPPORTED",
+                "The source supports each material assertion in the claim.",
+                span[0],
+                span[1],
+                discrepancies,
+            )
+        if any(status in {"SUPPORTED", "UNCERTAIN"} for status in statuses):
+            return (
+                "UNCERTAIN",
+                "The source supports only part of the compound claim; every material assertion is not established.",
+                span[0],
+                span[1],
+                discrepancies or ["OTHER"],
+            )
+        return (
+            "UNSUPPORTED",
+            "No source statement establishes all material assertions in the claim.",
+            None,
+            None,
+            discrepancies,
+        )
+
+    @classmethod
+    def _classify_single(cls, claim_text: str, source_text: str) -> tuple[str, str, int | None, int | None, list[str]]:
         claim_tokens = cls._meaning_tokens(claim_text)
         best: tuple[set[str], int, int, str] | None = None
         best_score: tuple[int, int, int] = (-1, -1, -1)

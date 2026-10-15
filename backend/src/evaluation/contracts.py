@@ -250,6 +250,7 @@ class RunConfiguration(Contract):
     pricing_assumptions_version: StrictStr | None = Field(default=None, alias="pricingAssumptionsVersion")
     matching_policy_version: Literal["EVALUATION_MATCHING-v1"] = Field(alias="matchingPolicyVersion")
     random_seed: StrictInt | None = Field(default=None, alias="randomSeed")
+    annotation_review_status: Literal["PENDING", "INDEPENDENTLY_REVIEWED", "MIXED", "UNKNOWN"] = Field(default="UNKNOWN", alias="annotationReviewStatus")
 
 
 class DemoInputReference(Contract):

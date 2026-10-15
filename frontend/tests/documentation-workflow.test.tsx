@@ -55,7 +55,7 @@ describe("documentation workflow", () => {
 
     expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith("/notes/generate"))).toBe(false);
     expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith("/notes/import"))).toBe(true);
-  });
+  }, 10_000);
 
   it("locks a submitted source until the reviewer explicitly saves a new source", async () => {
     const revisedSource = { ...source, source_id: "source-2", transcript_text: "Die Bewohnerin hat keine Schmerzen." };

@@ -100,6 +100,8 @@ As a reviewer, I want optional proposed wording that remains visibly source-grou
 | FR-23 | Backend approval eligibility must block any approval with an unresolved finding of any severity, including operational/integrity findings. An `OPEN` or `STALE` immutable finding remains unresolved unless its latest allowed decision outcome is `RESOLVED` or `ADJUDICATED` under the documented policy. | Approval policy | HR-008, HR-013, HR-014 |
 | FR-24 | Record human approval, rejection, and documented adjudication. Approval is allowed only under the policy; rejection remains available even after verification failure. | Disposition service | HR-008, HR-009, HR-015 |
 | FR-25 | Preserve an append-only, traceable history of original candidate notes, revisions, runs/findings, reviewer decisions, suggestions, and dispositions with reviewer label, timestamp, references, and rationale where required. | Audit service/repository | HR-010, HR-017 |
+| FR-26 | The review interface must treat any editor content that differs from the current persisted revision as unverified and unsaved: approval and full verification are unavailable until the edit is saved as a successor revision, and the interface explains the required save-and-verify transition. | Review presentation | HR-020 |
+| FR-27 | After every successful auditable review action, the active audit-history view must refresh from the backend and show the newest event without navigation or a browser refresh; failed or stale actions must not fabricate an audit event. | Review presentation / audit projection | HR-021 |
 
 ## Business rules and review lifecycle
 
@@ -156,6 +158,8 @@ A successful Spec 006 run containing any unresolved source item (`unresolvedSour
 
 The transaction writes the approval disposition and audit event only if the checks and latest-revision predicate still hold. A concurrent edit therefore makes approval fail with `409 STALE_REVISION`/`APPROVAL_PRECONDITION_FAILED`, not approve an earlier revision. Rejection requires only the current revision reference, reviewer label, and reason; it remains possible after verification failure.
 
+The review interface must independently require a clean editor state before enabling approval. If displayed editor content differs from the current persisted revision, the editor is unverified; approval and full verification remain unavailable, and the reviewer is told to save a successor revision and verify that revision. This presentation guard complements, and does not replace, the backend's stale-revision and approval-precondition checks.
+
 ## Acceptance scenarios
 
 All scenarios use synthetic German nursing documentation and synthetic resident IDs only.
@@ -181,6 +185,8 @@ All scenarios use synthetic German nursing documentation and synthetic resident 
 | HR-017 | **Given** a full-note verification succeeds, **when** the note is edited afterward, **then** its status returns to `AWAITING_FULL_VERIFICATION` and a new full-note verification is required before approval. |
 | HR-018 | **Given** a successful Spec 006 run contains an unresolved source item, **when** approval is attempted, **then** the backend blocks approval regardless of runtime completeness or finding acknowledgement/adjudication. |
 | HR-019 | **Given** source evidence states that insulin was not administered and the note states that it was administered, **when** Spec 004 reports a negation discrepancy, **then** Spec 007 preserves that upstream result and assigns `CRITICAL` under `REVIEW_SEVERITY-v2`, regardless of evidence status or detection confidence. |
+| HR-020 | **Given** the current persisted revision has a valid full-note verification and no unresolved findings, **when** the reviewer changes any editor content without saving, **then** approval and full verification are disabled immediately and the interface explains that the edit must be saved as a new revision and verified before approval; after saving, the successor remains approval-blocked until its own verification succeeds. |
+| HR-021 | **Given** the audit panel is open for a note, **when** saving a revision, verifying, deciding a finding or correction, approving, or rejecting succeeds, **then** the newest backend audit event appears automatically; if the action fails or is rejected as stale, no success event is shown. |
 
 ## Edge cases and failure behaviour
 
@@ -193,11 +199,12 @@ All scenarios use synthetic German nursing documentation and synthetic resident 
 
 ## Measurable success criteria
 
-- Every FR-15 and FR-17–FR-25 maps to at least one acceptance scenario, contract operation, and planned task.
+- Every FR-15 and FR-17–FR-27 maps to at least one acceptance scenario, contract operation, and planned task.
 - 100% of approval test attempts with stale, failed, invalid, incomplete, source-mismatched, or any `OPEN`/`STALE` finding inputs are rejected by the backend.
 - 100% of accepted edits/suggestions create a new immutable revision; historical revisions and decisions remain retrievable.
+- 100% of verified notes with unsaved editor changes have approval and full verification unavailable until the changes are saved and the successor revision is verified.
 - 100% of rendered evidence excerpts in acceptance tests are derived from valid spans for the exact immutable source version; invalid/missing spans show no misleading highlight.
-- Synthetic German acceptance fixtures cover HR-001 through HR-018, including direct API guard-bypass attempts and unresolved-source-item blocking.
+- Synthetic German acceptance fixtures cover HR-001 through HR-021, including direct API guard-bypass attempts, unresolved-source-item blocking, the dirty-editor approval transition, and audit refresh after reviewer actions.
 
 ## Assumptions and resolved integration decisions
 

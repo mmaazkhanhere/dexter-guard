@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 
 const navigation = [
+  ["/", "Guided Demo"],
   ["/documentation", "Documentation & Verification"],
   ["/review", "Human Review"],
   ["/evaluation", "Evaluation"],
@@ -18,7 +19,7 @@ export function AppLayout() {
       </header>
       <nav className="sidebar" aria-label="Primary navigation">
         {navigation.map(([to, label]) => (
-          <NavLink key={to} to={to} className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+          <NavLink key={to} to={to} end={to === "/"} className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
             {label}
           </NavLink>
         ))}

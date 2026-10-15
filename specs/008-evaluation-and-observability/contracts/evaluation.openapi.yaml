@@ -130,7 +130,7 @@ components:
     RunConfiguration:
       type: object
       additionalProperties: false
-      required: [codeVersion, environmentId, modelProvider, modelId, modelVersion, promptVersionsAndHashes, inferenceParameters, ruleVersionsAndRulesetVersions, upstreamContractVersions, fixtureMode, pricingAssumptionsVersion, matchingPolicyVersion, randomSeed]
+      required: [codeVersion, environmentId, modelProvider, modelId, modelVersion, promptVersionsAndHashes, inferenceParameters, ruleVersionsAndRulesetVersions, upstreamContractVersions, fixtureMode, pricingAssumptionsVersion, matchingPolicyVersion, randomSeed, annotationReviewStatus]
       properties:
         codeVersion: { type: string, minLength: 1 }
         environmentId: { type: string, minLength: 1 }
@@ -145,6 +145,7 @@ components:
         pricingAssumptionsVersion: { type: [string, 'null'] }
         matchingPolicyVersion: { type: string, const: EVALUATION_MATCHING-v1 }
         randomSeed: { type: [integer, 'null'] }
+        annotationReviewStatus: { type: string, enum: [PENDING, INDEPENDENTLY_REVIEWED, MIXED, UNKNOWN] }
     VersionedValue:
       type: object
       additionalProperties: false

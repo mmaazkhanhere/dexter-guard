@@ -55,6 +55,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/demo-scenarios/founder-walkthrough/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create the synthetic first-time founder walkthrough */
+        post: operations["startFounderDemo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/notes/generate": {
         parameters: {
             query?: never;
@@ -379,6 +396,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/evaluation-runs/{evaluationRunId}/cases/{caseExecutionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Inspect one evaluation case */
+        get: operations["getEvaluationCase"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/evaluation-runs/{evaluationRunId}/export": {
         parameters: {
             query?: never;
@@ -417,6 +451,42 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        EvaluationCaseInspection: {
+            evaluationRunId: string;
+            caseExecutionId: string;
+            scenarioId: string;
+            status: string;
+            benchmark?: {
+                [key: string]: unknown;
+            };
+            source: {
+                [key: string]: unknown;
+            };
+            candidate: {
+                [key: string]: unknown;
+            };
+            expectedFindings: {
+                [key: string]: unknown;
+            }[];
+            actualFindings: {
+                [key: string]: unknown;
+            }[];
+            disagreements: {
+                [key: string]: unknown;
+            }[];
+            latency?: {
+                [key: string]: unknown;
+            };
+            usageAndCost?: {
+                [key: string]: unknown;
+            };
+            failure?: {
+                [key: string]: unknown;
+            } | null;
+            configuration: {
+                [key: string]: unknown;
+            };
+        };
         ApiError: {
             code: string;
             message: string;
@@ -436,18 +506,56 @@ export interface components {
             /** @constant */
             syntheticOnly: true;
         };
+        DemoStep: {
+            /** @enum {string} */
+            id: "INSPECT" | "VERIFY" | "CORRECT" | "REVERIFY" | "APPROVE";
+            title: string;
+            instruction: string;
+        };
+        FounderDemoScenario: {
+            /** @constant */
+            scenarioId: "founder-walkthrough-v1";
+            /** @constant */
+            scenarioVersion: "v1";
+            /** @constant */
+            syntheticOnly: true;
+            source: components["schemas"]["SourceDocument"];
+            note: components["schemas"]["NoteResponse"];
+            correctedNote: string;
+            steps: components["schemas"]["DemoStep"][];
+        };
         Health: {
             /** @enum {string} */
             status: "ok" | "degraded";
             /** @enum {string} */
             database: "ready" | "unavailable";
             /** @enum {string} */
-            generationProvider: "LIVE_AI" | "OFFLINE_DEMO";
+            generationProvider: "LIVE_AI" | "OFFLINE_DEMO" | "UNAVAILABLE";
             /** @enum {string} */
             verificationProvider: "LIVE_AI" | "OFFLINE_DEMO";
+            generation: {
+                /** @enum {string} */
+                mode: "live" | "unavailable";
+                provider: string | null;
+                model: string | null;
+                configured: boolean;
+                available: boolean;
+                reason: string | null;
+            };
+            verification: {
+                configured: boolean;
+                available: boolean;
+            };
         };
         /** @description Exactly one synthetic resident test identifier. */
         ResidentTestId: string;
+        /**
+         * @description Explicit synthetic-only mapping from resident test IDs to transcript aliases. It is authoritative only for attribution checks and is never inferred from names, pronouns, or transcript order.
+         * @default {}
+         */
+        ResidentAliases: {
+            [key: string]: string[];
+        };
         /**
          * @description German language/locale supported by this proof of concept.
          * @enum {string}
@@ -457,6 +565,7 @@ export interface components {
         TranscriptText: string;
         CreateSourceRequest: {
             resident_test_id: components["schemas"]["ResidentTestId"];
+            resident_aliases?: components["schemas"]["ResidentAliases"];
             language: components["schemas"]["Language"];
             transcript_text: components["schemas"]["TranscriptText"];
         };
@@ -466,6 +575,7 @@ export interface components {
             /** @description Immutable version number within source_id. */
             source_version: number;
             resident_test_id: components["schemas"]["ResidentTestId"];
+            resident_aliases?: components["schemas"]["ResidentAliases"];
             language: components["schemas"]["Language"];
             transcript_text: components["schemas"]["TranscriptText"];
             /**
@@ -473,13 +583,6 @@ export interface components {
              * @description Time at which this immutable source version was accepted.
              */
             created_at: string;
-        };
-        SourceReference: {
-            sourceId: string;
-            sourceVersion: number;
-        };
-        GenerateRequest: components["schemas"]["SourceReference"] & {
-            requestedBy: string;
         };
         ExternalOrigin: {
             system: string;
@@ -539,6 +642,13 @@ export interface components {
             createdAt: string;
             createdBy: string;
             facts: components["schemas"]["NursingFact"][];
+        };
+        SourceReference: {
+            sourceId: string;
+            sourceVersion: number;
+        };
+        GenerateRequest: components["schemas"]["SourceReference"] & {
+            requestedBy: string;
         };
         CandidateNursingFact: {
             /** @enum {string} */
@@ -1062,6 +1172,8 @@ export interface components {
             /** @constant */
             matchingPolicyVersion: "EVALUATION_MATCHING-v1";
             randomSeed: number | null;
+            /** @enum {string} */
+            annotationReviewStatus: "PENDING" | "INDEPENDENTLY_REVIEWED" | "MIXED" | "UNKNOWN";
         };
         DemoInputReference: {
             sourceId: string;
@@ -1314,6 +1426,7 @@ export interface components {
         FindingId: string;
         VerificationRunId: string;
         EvaluationRunId: string;
+        CaseExecutionId: string;
     };
     requestBodies: never;
     headers: never;
@@ -1386,6 +1499,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SavedExample"][];
+                };
+            };
+            503: components["responses"]["ApiError"];
+        };
+    };
+    startFounderDemo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Persisted synthetic source and deliberately flawed imported note */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FounderDemoScenario"];
                 };
             };
             503: components["responses"]["ApiError"];
@@ -1891,6 +2025,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EvaluationRun"];
+                };
+            };
+            404: components["responses"]["ApiError"];
+        };
+    };
+    getEvaluationCase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                evaluationRunId: components["parameters"]["EvaluationRunId"];
+                caseExecutionId: components["parameters"]["CaseExecutionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Case inspection details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvaluationCaseInspection"];
                 };
             };
             404: components["responses"]["ApiError"];

@@ -61,6 +61,19 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/SavedExample" }
         "503": { $ref: "#/components/responses/ApiError" }
+  /api/v1/demo-scenarios/founder-walkthrough/start:
+    post:
+      operationId: startFounderDemo
+      x-owning-spec: "010"
+      x-integration-status: proposed
+      summary: Create the synthetic first-time founder walkthrough
+      responses:
+        "201":
+          description: Persisted synthetic source and deliberately flawed imported note
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FounderDemoScenario" }
+        "503": { $ref: "#/components/responses/ApiError" }
   /api/v1/notes/generate:
     post:
       operationId: generateNursingNote
@@ -424,6 +437,21 @@ paths:
               schema:
                 $ref: ../../008-evaluation-and-observability/contracts/evaluation.openapi.yaml#/components/schemas/EvaluationRun
         "404": { $ref: "#/components/responses/ApiError" }
+  /api/v1/evaluation-runs/{evaluationRunId}/cases/{caseExecutionId}:
+    get:
+      operationId: getEvaluationCase
+      x-owning-spec: "008"
+      summary: Inspect one evaluation case
+      parameters:
+        - { $ref: "#/components/parameters/EvaluationRunId" }
+        - { $ref: "#/components/parameters/CaseExecutionId" }
+      responses:
+        "200":
+          description: Case inspection details
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EvaluationCaseInspection" }
+        "404": { $ref: "#/components/responses/ApiError" }
   /api/v1/evaluation-runs/{evaluationRunId}/export:
     get:
       operationId: exportEvaluationRun
@@ -456,6 +484,7 @@ components:
     FindingId: { name: findingId, in: path, required: true, schema: { type: string, minLength: 1 } }
     VerificationRunId: { name: verificationRunId, in: path, required: true, schema: { type: string, minLength: 1 } }
     EvaluationRunId: { name: evaluationRunId, in: path, required: true, schema: { type: string, minLength: 1 } }
+    CaseExecutionId: { name: caseExecutionId, in: path, required: true, schema: { type: string, minLength: 1 } }
   responses:
     ApiError:
       description: Stable typed failure; never a successful run
@@ -463,6 +492,24 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/ApiError" }
   schemas:
+    EvaluationCaseInspection:
+      type: object
+      required: [evaluationRunId, caseExecutionId, scenarioId, status, source, candidate, expectedFindings, actualFindings, disagreements, configuration]
+      properties:
+        evaluationRunId: { type: string }
+        caseExecutionId: { type: string }
+        scenarioId: { type: string }
+        status: { type: string }
+        benchmark: { type: object, additionalProperties: true }
+        source: { type: object, additionalProperties: true }
+        candidate: { type: object, additionalProperties: true }
+        expectedFindings: { type: array, items: { type: object, additionalProperties: true } }
+        actualFindings: { type: array, items: { type: object, additionalProperties: true } }
+        disagreements: { type: array, items: { type: object, additionalProperties: true } }
+        latency: { type: object, additionalProperties: true }
+        usageAndCost: { type: object, additionalProperties: true }
+        failure: { type: object, nullable: true, additionalProperties: true }
+        configuration: { type: object, additionalProperties: true }
     ApiError:
       type: object
       required: [code, message]
@@ -484,12 +531,49 @@ components:
         evaluationRunId: { type: [string, "null"] }
         candidateNote: { type: string }
         syntheticOnly: { type: boolean, const: true }
+    DemoStep:
+      type: object
+      required: [id, title, instruction]
+      properties:
+        id: { type: string, enum: [INSPECT, VERIFY, CORRECT, REVERIFY, APPROVE] }
+        title: { type: string }
+        instruction: { type: string }
+    FounderDemoScenario:
+      type: object
+      required: [scenarioId, scenarioVersion, syntheticOnly, source, note, correctedNote, steps]
+      properties:
+        scenarioId: { type: string, const: founder-walkthrough-v1 }
+        scenarioVersion: { type: string, const: v1 }
+        syntheticOnly: { type: boolean, const: true }
+        source: { $ref: ../../001-source-and-note-ingestion/contracts/source-api.yaml#/components/schemas/SourceDocument }
+        note: { $ref: ../../002-nursing-note-generation/contracts/notes-api.yaml#/components/schemas/NoteResponse }
+        correctedNote: { type: string, minLength: 1 }
+        steps:
+          type: array
+          minItems: 5
+          items: { $ref: "#/components/schemas/DemoStep" }
     Health:
       type: object
-      required: [status, database, generationProvider, verificationProvider]
+      required: [status, database, generationProvider, verificationProvider, generation, verification]
       properties:
         status: { type: string, enum: [ok, degraded] }
         database: { type: string, enum: [ready, unavailable] }
-        generationProvider: { type: string, enum: [LIVE_AI, OFFLINE_DEMO] }
+        generationProvider: { type: string, enum: [LIVE_AI, OFFLINE_DEMO, UNAVAILABLE] }
         verificationProvider: { type: string, enum: [LIVE_AI, OFFLINE_DEMO] }
+        generation:
+          type: object
+          required: [mode, provider, model, configured, available, reason]
+          properties:
+            mode: { type: string, enum: [live, unavailable] }
+            provider: { type: [string, "null"] }
+            model: { type: [string, "null"] }
+            configured: { type: boolean }
+            available: { type: boolean }
+            reason: { type: [string, "null"] }
+        verification:
+          type: object
+          required: [configured, available]
+          properties:
+            configured: { type: boolean }
+            available: { type: boolean }
 

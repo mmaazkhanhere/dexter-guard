@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import inspect
+import re
 from collections.abc import Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from datetime import datetime, timezone
@@ -186,7 +187,7 @@ class VerificationService:
             )
 
         try:
-            findings = self._normalize_findings(response, request, source.transcript_text)
+            findings = self._normalize_findings(response, request, source.transcript_text, claims)
             completed_at = self._clock()
             run = VerificationRunSucceeded(
                 verificationRunId=run_id,
@@ -378,6 +379,7 @@ class VerificationService:
         response: VerifierResponse,
         request: VerificationRunRequest,
         source_text: str,
+        resolved_claims: Sequence[object] = (),
     ) -> tuple[EvidenceFinding, ...]:
         expected_ids = {claim.claim_id for claim in request.claims}
         candidates = list(response.findings)
@@ -386,22 +388,45 @@ class VerificationService:
             self.metrics.increment("coverage_failures")
             raise MalformedVerifierOutputError("Verifier findings must cover exactly the submitted claim IDs.")
         normalized: list[EvidenceFinding] = []
+        claims_by_id = {claim.claim_id: claim for claim in request.claims}
+        claims_by_id.update({str(getattr(claim, "id")): claim for claim in resolved_claims})
         for candidate in candidates:
             spans = tuple(candidate.source_spans)
             quotes = self._quotes_for(candidate, spans, source_text)
+            status = candidate.status
+            discrepancies = candidate.discrepancies
+            explanation = candidate.explanation
+            claim_text = str(getattr(claims_by_id[candidate.claim_id], "claim_text", ""))
+            if status is EvidenceStatus.SUPPORTED and self._has_compound_assertion(claim_text):
+                status = EvidenceStatus.UNCERTAIN
+                discrepancies = tuple(dict.fromkeys((*discrepancies, "OTHER")))
+                explanation = (
+                    "The verifier marked a compound claim as supported without separate subclaim evidence; "
+                    "the result is conservatively uncertain."
+                )
             finding = EvidenceFinding(
                 claimId=candidate.claim_id,
-                status=candidate.status,
-                explanation=candidate.explanation,
+                status=status,
+                explanation=explanation,
                 sourceSpans=spans,
                 evidenceQuotes=quotes,
-                discrepancies=candidate.discrepancies,
+                discrepancies=discrepancies,
                 policyVersion=ANNOTATION_POLICY_VERSION,
                 verifierFinding={"status": candidate.status, "explanation": candidate.explanation},
-                deterministicRuleFindings=[{"code": "CONTRACT", "outcome": "PASS"}],
+                deterministicRuleFindings=[
+                    {"code": "COMPOUND_ASSERTION_GUARD", "outcome": "WARNING"}
+                    if status is not candidate.status
+                    else {"code": "CONTRACT", "outcome": "PASS"}
+                ],
             )
             normalized.append(finding)
         return tuple(normalized)
+
+    @staticmethod
+    def _has_compound_assertion(claim_text: str) -> bool:
+        """Detect common German assertion boundaries for conservative fallback."""
+
+        return bool(re.search(r"\s+(?:und|aber|doch|sowie)\s+|,\s+(?=[A-Za-zÄÖÜäöüß])", claim_text, re.IGNORECASE))
 
     def _quotes_for(self, candidate: VerifierCandidateFinding, spans: tuple[object, ...], source_text: str) -> tuple[dict[str, object], ...]:
         supplied = list(candidate.evidence_quotes)

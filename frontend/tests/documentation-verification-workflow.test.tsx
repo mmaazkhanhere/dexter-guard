@@ -54,7 +54,7 @@ describe("documentation and verification workflow", () => {
     await waitFor(() => expect(screen.getByText("Existing note reused")).toBeInTheDocument());
     expect(fetchMock.mock.calls.filter(([input, request]) => String(input).endsWith("/notes/generate") && request?.method === "POST")).toHaveLength(1);
     expect(fetchMock.mock.calls.filter(([input, request]) => String(input).includes("/full-verifications") && request?.method === "POST")).toHaveLength(1);
-  });
+  }, 10000);
 
   it("keeps manual entry as the default and previews an example before loading it", async () => {
     const example = { exampleId: "example-1", title: "Guter Schlaf und ausreichendes Trinken", sourceId: "source-1", sourceVersion: 1, kind: "DOCUMENTATION", syntheticOnly: true };

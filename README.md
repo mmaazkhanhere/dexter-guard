@@ -85,7 +85,15 @@ Examples from the measured validated run:
 
 **Saved regression fixtures (separate result)**
 
-Dataset `008-v1` contains 100 saved scenarios (60 development, 20 validation, 20 held-out). A fresh held-out replay of 20 cases using `DeterministicFixtureAdapter` produced 14 / 14 matched fixture findings, 0 false positives, 0 missed errors, and 5 / 5 critical recall (100%; Wilson 95% CI [0.566, 1.000]). This adapter replays predefined fixture outcomes; **100% is not actual verifier accuracy**.
+Dataset `008-v1` contains 100 saved scenarios (60 development, 20 validation, 20 held-out). A fresh held-out replay of 20 cases using `DeterministicFixtureAdapter` produced 14 / 14 matched fixture findings, 0 false positives, 0 missed errors, and 5 / 5 critical recall (100%; Wilson 95% CI [0.566, 1.000]). This is **fixture evidence only, not verifier accuracy**.
+
+To measure the configured verifier, run the live evaluation with the same server-side `VERIFICATION_LLM_*` (or shared `LLM_*`) settings used by the demo:
+
+```powershell
+uv run python -m evaluation.cli --split HELD_OUT --database data/evaluation-live.sqlite3 --idempotency-key live-heldout-v1
+```
+
+The command fails closed when no verifier is configured; it never substitutes the offline pipeline. The JSON report labels the result `LIVE_MODEL` and includes exact claim classifications, critical recall, false positives, missed cases, latency, token usage, provider failures, and estimated cost when pricing variables are configured. Fixture and live-model results must not be combined or interpreted interchangeably.
 
 The curated annotations are synthetic and marked pending; the sample is small. Results measure automated finding behavior, not improved final-note quality, caregiver workload, or reviewer benefit. The runner and dataset manifest are available in [the curated benchmark tests](backend/tests/evaluation/test_curated_benchmark.py) and [the 100-case manifest](data/evaluation/008-v1/manifest.json). Reproduce the paired curated run with:
 

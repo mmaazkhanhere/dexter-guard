@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { safeMutationError, useApprove, useAudit, useFindingDecision, useFullVerification, useReject, useReview, useSaveRevision } from "../../api/hooks";
 import { userFacingFailureMessage } from "../../api/errors";
 import { StateCard } from "../../components/shared/StateCard";
@@ -10,7 +10,7 @@ import { projectSourceSpan } from "../verification/spans";
 import { isFindingUnresolved } from "./findings";
 
 export function ReviewWorkspace() {
-  const { note: noteMaybe, draftContent, setDraftContent, applyNoteRevision } = useWorkspace();
+  const { note: noteMaybe, draftContent, demo, setDraftContent, applyNoteRevision } = useWorkspace();
   const { notify } = useToast();
   const note = noteMaybe!;
   const review = useReview(noteMaybe?.noteId, noteMaybe?.revision);
@@ -24,6 +24,8 @@ export function ReviewWorkspace() {
   const [reviewer, setReviewer] = useState("synthetic-reviewer");
   const [reason, setReason] = useState("");
   const [selectedFindingId, setSelectedFindingId] = useState<string>();
+  const latestRevisionRef = useRef(noteMaybe?.revision);
+  latestRevisionRef.current = noteMaybe?.revision;
 
   useEffect(() => {
     setContent(draftContent ?? review.data?.candidateNote ?? noteMaybe?.content ?? "");
@@ -33,11 +35,19 @@ export function ReviewWorkspace() {
 
   const context = review.data;
   const currentVerification = context?.fullVerification?.noteRevision === note.revision ? context.fullVerification : undefined;
+  const hasUnsavedChanges = content !== note.content;
   const staleContext = Boolean(context && context.latestRevision > note.revision);
   const unresolvedFindings = context?.findings.some((finding) => isFindingUnresolved(finding, context.decisions)) ?? false;
-  const approvalEligible = Boolean(context?.approvalEligible && currentVerification?.status === "VALID" && !unresolvedFindings && !review.error && !verify.isPending && !save.isPending);
+  const approvalEligible = Boolean(context?.approvalEligible && currentVerification?.status === "VALID" && !hasUnsavedChanges && !unresolvedFindings && !review.error && !verify.isPending && !save.isPending);
   const firstError = review.error ?? save.error ?? verify.error ?? decide.error ?? approve.error ?? reject.error;
   const selectedFinding = context?.findings.find((finding) => finding.reviewFindingId === selectedFindingId) ?? context?.findings[0];
+  const demoStep = context?.noteStatus === "APPROVED"
+    ? "COMPLETE"
+    : context?.approvalEligible && currentVerification?.status === "VALID"
+      ? "APPROVE"
+      : note.content === demo?.correctedNote
+        ? "REVERIFY"
+        : "CORRECT";
 
   async function saveRevision() {
     if (!content.trim() || content === note.content) return;
@@ -53,8 +63,14 @@ export function ReviewWorkspace() {
   }
 
   async function fullVerify() {
+    if (hasUnsavedChanges) {
+      notify({ tone: "error", title: "Save the note before verification", message: "Full verification only runs against the exact saved note revision. Save your edits as a successor revision first." });
+      return;
+    }
+    const verificationRevision = note.revision;
     try {
       const result = await verify.mutateAsync({ noteId: note.noteId, expectedRevision: note.revision, reviewerLabel: reviewer });
+      if (latestRevisionRef.current !== verificationRevision) return;
       void review.refetch();
       if (result.status === "VALID") {
         notify({ tone: "info", title: "Verification run recorded", message: "Inspect the current findings and approval eligibility before approval." });
@@ -84,7 +100,7 @@ export function ReviewWorkspace() {
   }
 
   async function approveNote() {
-    if (!currentVerification) return;
+    if (!currentVerification || hasUnsavedChanges || !approvalEligible) return;
     try {
       await approve.mutateAsync({ noteId: note.noteId, expectedRevision: note.revision, fullVerificationId: currentVerification.fullVerificationId, reviewerLabel: reviewer });
       await review.refetch();
@@ -106,18 +122,20 @@ export function ReviewWorkspace() {
 
   return <>
     <WorkspaceHeader eyebrow="02 · HUMAN REVIEW" title="Resolve findings and approve safely" description="Resolve the findings identified in Documentation & Verification. Edits create successor revisions and preserve the linked source, note, and evidence." />
+    {demo && <section className="guided-demo" aria-label="Guided demo review progress"><span className="eyebrow">GUIDED DEMO · {demoStep === "COMPLETE" ? "COMPLETE" : `STEP ${demoStep}`}</span><h3>{demoStep === "COMPLETE" ? "Synthetic note approved" : demo.steps.find((step) => step.id === demoStep)?.title}</h3><p>{demoStep === "COMPLETE" ? "The audit history below records the explicit human approval for the corrected revision." : demo.steps.find((step) => step.id === demoStep)?.instruction}</p>{demoStep === "CORRECT" && <div className="button-row"><button className="secondary-button" onClick={() => { setContent(demo.correctedNote); setDraftContent(demo.correctedNote); }}>Apply evidence-supported demo correction</button></div>}</section>}
     {firstError && <div className="error-banner" role="alert">{safeMutationError(firstError).message}</div>}
     {staleContext && <div className="error-banner" role="status">This review result is stale for the current note revision. Refresh before taking an approval or decision action.</div>}
     <div className="workspace-grid">
       <StateCard title={`Current persisted revision · ${note.revision}`}>
         <label>Reviewer label<input value={reviewer} onChange={(event) => setReviewer(event.target.value)} /></label>
         <textarea aria-label="Editable nursing note" value={content} onChange={(event) => { setContent(event.target.value); setDraftContent(event.target.value); }} />
-        <div className="button-row"><button onClick={saveRevision} disabled={save.isPending || content === note.content}>{save.isPending ? "Saving …" : "Save successor revision"}</button><button className="secondary-button" onClick={fullVerify} disabled={verify.isPending || save.isPending}>{verify.isPending ? "Verifying …" : "Run full verification"}</button></div>
-        <p className="muted">Unsaved edits are not verified. Saving creates an immutable successor and invalidates prior findings for approval.</p>
+        <div className="button-row"><button onClick={saveRevision} disabled={save.isPending || !hasUnsavedChanges}>{save.isPending ? "Saving …" : "Save successor revision"}</button><button className="secondary-button" onClick={fullVerify} disabled={verify.isPending || save.isPending || hasUnsavedChanges} aria-describedby={hasUnsavedChanges ? "verification-save-required" : undefined}>{verify.isPending ? "Verifying …" : "Run full verification"}</button></div>
+        <p id="verification-save-required" className="muted">{hasUnsavedChanges ? "Save the edited note as a new revision before running full verification." : "Full verification runs against this exact saved note revision. Saving creates an immutable successor and invalidates prior findings for approval."}</p>
       </StateCard>
       <StateCard title="Approval eligibility" tone={approvalEligible ? "neutral" : "warning"}>
         <div className="eligibility">{approvalEligible ? "Human approval required" : "Approval blocked"}</div>
         <p>{currentVerification ? (currentVerification.status !== "VALID" ? "Verification failed. Approval blocked." : approvalEligible ? "No issues detected. A successful verification process does not establish that the nursing note is correct or approved." : "Review required. Unresolved issues must be resolved or adjudicated before approval.") : "A complete verification is required before approval."}</p>
+        {hasUnsavedChanges && <p role="status" className="muted">Unsaved changes are present. Save them as a new revision and run verification before approval.</p>}
         {verify.isPending && <p className="muted">Verification is in progress; approval is disabled.</p>}
         {currentVerification?.failureMessage && <p className="muted">{userFacingFailureMessage(currentVerification.failureCode, currentVerification.failureMessage)}</p>}
         <div className="button-row"><button onClick={approveNote} disabled={!approvalEligible || approve.isPending}>{approve.isPending ? "Approving …" : "Approve"}</button><button className="danger-button" onClick={rejectNote} disabled={reject.isPending || reason.trim().length < 3}>Reject</button></div>

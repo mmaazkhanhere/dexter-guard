@@ -1,8 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { safeMutationError, useCreateSource, useFullVerification, useGenerateNote, useImportNote, useReview, useSavedExamples, useSource } from "../../api/hooks";
+import { safeMutationError, useCreateSource, useFullVerification, useGenerateNote, useHealth, useImportNote, useReview, useSavedExamples, useSource } from "../../api/hooks";
 import { userFacingFailureMessage } from "../../api/errors";
-import type { NoteResponse, SourceDocument } from "../../api/types";
+import type { Health, NoteResponse, SourceDocument } from "../../api/types";
 import { LoadingIndicator } from "../../components/shared/LoadingIndicator";
 import { StateCard } from "../../components/shared/StateCard";
 import { useToast } from "../../components/shared/Toaster";
@@ -20,14 +20,30 @@ import {
 
 type Mode = "generate" | "existing";
 
+export function verificationModeCopy(provider?: Health["verificationProvider"]) {
+  if (provider === "LIVE_AI") return {
+    label: "Live LLM verification",
+    detail: "A configured live LLM processes the claim evidence for this verification run.",
+  };
+  if (provider === "OFFLINE_DEMO") return {
+    label: "Offline replay",
+    detail: "The local demo verifier is running; no live LLM request or setup is required.",
+  };
+  return {
+    label: "Verification mode loading",
+    detail: "Checking whether verification uses the local demo verifier or a configured live LLM.",
+  };
+}
+
 export function DocumentationVerificationWorkspace() {
   const navigate = useNavigate();
   const { notify } = useToast();
-  const { source, note, transcript: savedTranscript, residentId: savedResidentId, setSource, setNote, setTranscript: saveTranscript, setResidentId: saveResidentId, applyNoteRevision, setDraftContent } = useWorkspace();
+  const { source, note, transcript: savedTranscript, residentId: savedResidentId, demo, setSource, setNote, setTranscript: saveTranscript, setResidentId: saveResidentId, applyNoteRevision, setDraftContent } = useWorkspace();
   const createSource = useCreateSource();
   const generate = useGenerateNote();
   const importNote = useImportNote();
   const fullVerification = useFullVerification();
+  const health = useHealth();
   const review = useReview(note?.noteId, note?.revision);
   const examples = useSavedExamples();
   const [mode, setMode] = useState<Mode>("generate");
@@ -41,12 +57,21 @@ export function DocumentationVerificationWorkspace() {
   const scenarioSource = useSource(selectedScenario?.sourceId, selectedScenario?.sourceVersion);
   const error = createSource.error ?? generate.error ?? importNote.error ?? fullVerification.error;
   const isWorking = createSource.isPending || generate.isPending || importNote.isPending || fullVerification.isPending;
-  const activeResult = note && (mode === "generate" ? note.origin === "GENERATED" : note.origin === "IMPORTED") ? note : undefined;
+  const activeResult = note && (demo || (mode === "generate" ? note.origin === "GENERATED" : note.origin === "IMPORTED")) ? note : undefined;
+  const demoVerification = review.data?.fullVerification?.noteRevision === note?.revision ? review.data?.fullVerification : undefined;
+  const demoStep = note?.content === demo?.correctedNote
+    ? (demoVerification?.status === "VALID" ? "APPROVE" : "REVERIFY")
+    : (!demoVerification ? "VERIFY" : "CORRECT");
+  const verificationMode = verificationModeCopy(health.data?.verificationProvider);
 
   useEffect(() => {
     if (!transcript && savedTranscript) setTranscript(savedTranscript);
     if (residentId === "synthetic-resident-demo" && savedResidentId) setResidentId(savedResidentId);
   }, [residentId, savedResidentId, savedTranscript, transcript]);
+
+  useEffect(() => {
+    if (demo) setMode("existing");
+  }, [demo]);
 
   function updateTranscript(value: string) {
     setTranscript(value);
@@ -133,6 +158,8 @@ export function DocumentationVerificationWorkspace() {
 
   return <>
     <WorkspaceHeader eyebrow="01 · DOCUMENTATION & VERIFICATION" title="Nursing note verification" description="Synthetic data only. Select one workflow, provide the original caregiver transcript, then inspect evidence-linked verification results." />
+    {demo && <section className="guided-demo" aria-label="Guided demo progress"><span className="eyebrow">GUIDED DEMO · STEP {demoStep}</span><h3>{demo.steps.find((step) => step.id === demoStep)?.title}</h3><p>{demo.steps.find((step) => step.id === demoStep)?.instruction}</p><ol>{demo.steps.map((step) => <li className={step.id === demoStep ? "current" : ""} key={step.id}>{step.title}</li>)}</ol>{(demoStep === "VERIFY" || demoStep === "REVERIFY") && <div className="button-row"><button onClick={() => note && void verify(note)} disabled={isWorking}>{demoStep === "REVERIFY" ? "Re-verify corrected revision" : "Run guided verification"}</button></div>}{(demoStep === "CORRECT" || demoStep === "APPROVE") && <div className="button-row"><button className="secondary-button" onClick={() => navigate("/review")}>{demoStep === "APPROVE" ? "Continue to human approval" : "Inspect and correct findings"}</button></div>}</section>}
+    <section className="verification-mode" role="status" aria-label="Verification mode"><strong>Verification mode: {verificationMode.label}</strong><p>{health.isError ? "Verification configuration could not be loaded. The result screen will still show whether each verification run completed." : verificationMode.detail}</p></section>
     {error && <div className="error-banner" role="alert">{safeMutationError(error).message}</div>}
     <section className="documentation-verification-section" aria-label="Documentation and verification workflow">
       <div className="segmented primary-mode-switch" role="tablist" aria-label="Nursing note workflow">

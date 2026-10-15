@@ -6,6 +6,7 @@ export type Severity = "CRITICAL" | "MAJOR" | "MINOR";
 export type SourceDocument = Schema["SourceDocument"];
 export type Health = Schema["Health"];
 export type SavedExample = Schema["SavedExample"];
+export type FounderDemoScenario = Schema["FounderDemoScenario"];
 export type NursingFact = Schema["NursingFact"];
 export type NoteResponse = Schema["NoteResponse"];
 export type SourceSpan = Schema["SourceSpan"];
@@ -29,6 +30,9 @@ export type EvaluationSummary = {
   falseNegativeCaseIds?: string[];
   missedCriticalCases?: unknown[];
   historicalOrLive?: string;
+  evaluationEvidence?: string;
+  annotationReviewStatus?: string;
 };
 export type EvaluationCase = Schema["EvaluationCaseResult"];
 export type EvaluationRun = Schema["EvaluationRun"];
+export type EvaluationCaseInspection = Schema["EvaluationCaseInspection"];

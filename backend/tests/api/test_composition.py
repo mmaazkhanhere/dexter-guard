@@ -19,8 +19,17 @@ def test_composed_app_exposes_safe_health_and_synthetic_examples() -> None:
     assert health.json() == {
         "status": "degraded",
         "database": "unavailable",
-        "generationProvider": "OFFLINE_DEMO",
+        "generationProvider": "UNAVAILABLE",
         "verificationProvider": "OFFLINE_DEMO",
+        "generation": {
+            "mode": "unavailable",
+            "provider": None,
+            "model": None,
+            "configured": False,
+            "available": False,
+            "reason": "LLM provider configuration is missing.",
+        },
+        "verification": {"configured": False, "available": False},
     }
     assert examples.status_code == 200
     assert examples.json()
@@ -30,6 +39,69 @@ def test_composed_app_exposes_safe_health_and_synthetic_examples() -> None:
     assert cached_examples.json() == examples.json()
     assert app.state.source_service.repository.count() == len(examples.json())
     version_exists.assert_not_called()
+
+
+def test_founder_demo_creates_a_normal_synthetic_source_and_flawed_imported_note() -> None:
+    client = TestClient(create_app())
+
+    response = client.post("/api/v1/demo-scenarios/founder-walkthrough/start")
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["scenarioId"] == "founder-walkthrough-v1"
+    assert body["syntheticOnly"] is True
+    assert body["source"]["resident_test_id"].startswith("synthetic-founder-demo-")
+    assert body["note"]["origin"] == "IMPORTED"
+    assert body["note"]["sourceId"] == body["source"]["source_id"]
+    assert body["note"]["content"] != body["correctedNote"]
+    assert [step["id"] for step in body["steps"]] == ["INSPECT", "VERIFY", "CORRECT", "REVERIFY", "APPROVE"]
+
+
+def test_founder_demo_completes_only_after_correction_reverification_and_human_approval() -> None:
+    client = TestClient(create_app())
+    demo = client.post("/api/v1/demo-scenarios/founder-walkthrough/start").json()
+    note_id = demo["note"]["noteId"]
+
+    initial = client.post(f"/api/v1/reviews/{note_id}/full-verifications", json={"expectedRevision": 1, "reviewerLabel": "synthetic-reviewer", "idempotencyKey": "demo-initial"})
+    assert initial.status_code == 200
+    initial_context = client.get(f"/api/v1/reviews/{note_id}?revision=1").json()
+    assert initial_context["approvalEligible"] is False
+    initial_statuses = {finding["upstreamStatus"] for finding in initial_context["findings"]}
+    assert "CONTRADICTED" in initial_statuses
+    assert "UNSUPPORTED" in initial_statuses
+
+    saved = client.post(f"/api/v1/reviews/{note_id}/revisions", json={"expectedRevision": 1, "content": demo["correctedNote"], "reviewerLabel": "synthetic-reviewer", "idempotencyKey": "demo-correction"})
+    assert saved.status_code == 201
+    assert saved.json()["revision"] == 2
+
+    verified = client.post(f"/api/v1/reviews/{note_id}/full-verifications", json={"expectedRevision": 2, "reviewerLabel": "synthetic-reviewer", "idempotencyKey": "demo-reverify"})
+    assert verified.status_code == 200
+    corrected_context = client.get(f"/api/v1/reviews/{note_id}?revision=2").json()
+    assert corrected_context["approvalEligible"] is True
+
+    approval = client.post(f"/api/v1/reviews/{note_id}/approve", json={"expectedRevision": 2, "fullVerificationId": verified.json()["fullVerificationId"], "reviewerLabel": "synthetic-reviewer", "idempotencyKey": "demo-approve"})
+    assert approval.status_code == 201
+    assert approval.json()["kind"] == "APPROVED"
+
+
+def test_health_reports_loaded_generation_configuration_without_exposing_credentials() -> None:
+    with patch.dict(
+        "os.environ",
+        {"LLM_API_KEY": "synthetic-secret", "LLM_MODEL": "synthetic-model", "LLM_BASE_URL": "https://llm.example.test/v1"},
+        clear=False,
+    ):
+        health = TestClient(create_app()).get("/api/v1/health")
+
+    assert health.status_code == 200
+    assert health.json()["generation"] == {
+        "mode": "live",
+        "provider": "configured",
+        "model": "synthetic-model",
+        "configured": True,
+        "available": True,
+        "reason": None,
+    }
+    assert "synthetic-secret" not in health.text
 
 
 def test_composed_app_preserves_source_and_note_routes() -> None:
@@ -103,4 +175,7 @@ def test_composed_app_exposes_evaluation_run_collection() -> None:
     response = client.get("/api/v1/evaluation-runs")
 
     assert response.status_code == 200
-    assert response.json() == []
+    runs = response.json()
+    assert len(runs) == 1
+    assert runs[0]["evaluationEvidence"] == "SAVED_FIXTURE"
+    assert runs[0]["dataset"]["selectedSplit"] == "HELD_OUT"

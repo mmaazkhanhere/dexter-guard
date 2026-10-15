@@ -131,9 +131,11 @@ class EvaluationRunner:
             version=str(getattr(verifier, "prompt_version", "unknown")),
             hash=str(getattr(verifier, "prompt_hash", "")) or None,
         ),) if verifier is not None else ()
+        statuses = {case.annotation_provenance.review_status for case in self.dataset.scenarios}
+        annotation_review_status = "INDEPENDENTLY_REVIEWED" if statuses == {"INDEPENDENTLY_REVIEWED"} else "PENDING" if statuses == {"PENDING"} else "MIXED" if statuses else "UNKNOWN"
         return RunConfiguration(codeVersion=self.code_version, environmentId="local-synthetic", modelProvider=model_provider, modelId=model_id, modelVersion=model_version, promptVersionsAndHashes=prompts, inferenceParameters=InferenceParameters(), ruleVersionsAndRulesetVersions=(), upstreamContractVersions=(
             {"name": "SPEC_004", "version": "EVIDENCE_STATUS-v1"}, {"name": "SPEC_006", "version": "SOURCE_COVERAGE-v1"},
-        ), fixtureMode=request.execution_mode, pricingAssumptionsVersion=None if is_live else "SYNTHETIC_FIXTURE-v1", matchingPolicyVersion="EVALUATION_MATCHING-v1", randomSeed=0)
+        ), fixtureMode=request.execution_mode, pricingAssumptionsVersion=None if is_live else "SYNTHETIC_FIXTURE-v1", matchingPolicyVersion="EVALUATION_MATCHING-v1", randomSeed=0, annotationReviewStatus=annotation_review_status)
 
     def _invalid_run(self, request, run_id: str, reason: str) -> EvaluationRun:
         now = datetime.now(timezone.utc)

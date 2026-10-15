@@ -125,6 +125,7 @@ As an operator, I need bad provenance, evidence, or verifier output to be unmist
 2. Timeout, malformed structured output, unknown status, duplicate result, or missing result for a valid claim produces a non-successful run.
 3. A successful run records source ID/version, note ID/revision, claim-set identity, model/version, prompt version, annotation-policy version, timestamps, and execution status.
 4. Failure information is separate from evidence status and must not present findings as authoritative.
+5. A compound claim MUST NOT receive <code>SUPPORTED</code> when any material assertion in it lacks source evidence. Atomic assertions are evaluated independently; if a compound claim contains both supported and unestablished assertions, its aggregate status is <code>UNCERTAIN</code> or <code>UNSUPPORTED</code>.
 
 ## Functional requirements
 
@@ -134,6 +135,7 @@ As an operator, I need bad provenance, evidence, or verifier output to be unmist
 - **FR-10:** Use <code>CONTRADICTED</code> where source information explicitly conflicts.
 - **FR-12:** Evaluate and expose material negation, certainty, and attribution changes.
 - **FR-13:** Use <code>UNSUPPORTED</code> for clinical conclusions the transcript does not establish.
+- **FR-14:** Evaluate material assertions within a compound claim independently and never classify the entire claim as <code>SUPPORTED</code> from partial semantic overlap.
 - Use only the requested source transcript as evidence.
 - Preserve one-and-only-one primary classification per claim in every successful run.
 - Never silently repair source text, claim text, note text, source versions, or evidence offsets.

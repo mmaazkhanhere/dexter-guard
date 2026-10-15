@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, useRef, useState, type PropsWithChildren } from "react";
-import type { NoteResponse, SourceDocument } from "../api/types";
+import type { FounderDemoScenario, NoteResponse, SourceDocument } from "../api/types";
 
 export function shouldApplyNoteRevision(current: NoteResponse | undefined, candidate: NoteResponse): boolean {
   if (!current) return true;
@@ -13,11 +13,13 @@ type WorkspaceState = {
   draftContent?: string;
   transcript?: string;
   residentId?: string;
+  demo?: FounderDemoScenario;
   setSource: (source?: SourceDocument) => void;
   setNote: (note?: NoteResponse) => void;
   setDraftContent: (content?: string) => void;
   setTranscript: (transcript?: string) => void;
   setResidentId: (residentId?: string) => void;
+  setDemo: (demo?: FounderDemoScenario) => void;
   applyNoteRevision: (note: NoteResponse) => boolean;
 };
 const WorkspaceContext = createContext<WorkspaceState | null>(null);
@@ -28,6 +30,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
   const [draftContent, setDraftContent] = useState<string>();
   const [transcript, setTranscript] = useState<string>();
   const [residentId, setResidentId] = useState<string>();
+  const [demo, setDemo] = useState<FounderDemoScenario>();
   const noteRef = useRef(note);
   noteRef.current = note;
   const setSourceAndIdentity = (candidate?: SourceDocument) => {
@@ -47,7 +50,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     setDraftContent(candidate.content);
     return true;
   };
-  const value = useMemo(() => ({ source, note, draftContent, transcript, residentId, setSource: setSourceAndIdentity, setNote, setDraftContent, setTranscript, setResidentId, applyNoteRevision }), [source, note, draftContent, transcript, residentId]);
+  const value = useMemo(() => ({ source, note, draftContent, transcript, residentId, demo, setSource: setSourceAndIdentity, setNote, setDraftContent, setTranscript, setResidentId, setDemo, applyNoteRevision }), [source, note, draftContent, transcript, residentId, demo]);
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
 }
 

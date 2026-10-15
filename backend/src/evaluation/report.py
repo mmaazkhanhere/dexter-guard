@@ -38,7 +38,11 @@ def build_report(run: EvaluationRun) -> dict[str, object]:
         "falseNegativeCaseIds": [result.case_execution_id for result in run.case_results if any(match.disposition.value == "FALSE_NEGATIVE" for match in result.match_results)],
         "missedCriticalCases": missed,
         "incorrectDetections": incorrect,
-        "diagnosticNote": "Synthetic benchmark measurement only; this report makes no clinical-safety claim.",
+        "diagnosticNote": "Live verifier benchmark measurement; this report makes no clinical-safety claim." if run.configuration.fixture_mode == "LIVE" else "Synthetic fixture benchmark measurement only; this report makes no clinical-safety claim.",
         "historicalOrLive": "HISTORICAL_SAVED_RESULT" if run.origin.value == "HISTORICAL_SAVED_RESULT" else "NEWLY_EXECUTED",
+        "evaluationEvidence": "LIVE_MODEL" if run.configuration.fixture_mode == "LIVE" else "SAVED_FIXTURE" if run.configuration.fixture_mode == "SAVED_FIXTURE" else "MOCKED_PROVIDER",
+        "interpretation": "Live verifier measurement; interpret with the reported sample size, confidence intervals, provider failures, latency, and cost." if run.configuration.fixture_mode == "LIVE" else "Fixture or mocked-provider measurement; this does not establish live verifier accuracy.",
+        "annotationReviewStatus": run.configuration.annotation_review_status,
+        "annotationWarning": None if run.configuration.annotation_review_status == "INDEPENDENTLY_REVIEWED" else "Ground-truth annotations are not independently reviewed; do not treat this run as validated model reliability.",
     }
 

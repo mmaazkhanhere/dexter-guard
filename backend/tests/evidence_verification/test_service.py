@@ -99,6 +99,29 @@ def test_supported_finding_is_source_grounded_and_quote_is_derived() -> None:
     assert result.findings[0].evidence_quotes[0].text == "verneint Schmerzen"
 
 
+def test_compound_supported_provider_result_is_downgraded_without_subclaim_evidence() -> None:
+    source = SourceRepo("Die Bewohnerin berichtet über Schwindel.")
+    claims = ClaimRepo("Die Bewohnerin berichtet über Schwindel und starke Brustschmerzen.")
+    verifier = FakeVerifier(
+        lambda source_text: {
+            "findings": [{
+                "claimId": "claim-1",
+                "status": "SUPPORTED",
+                "explanation": "Teilweise überlappend.",
+                "sourceSpans": [span("berichtet über Schwindel", source_text)],
+                "discrepancies": [],
+            }]
+        }
+    )
+
+    result = service(verifier, source=source, claims=claims).verify(request())
+
+    assert result.status == "SUCCEEDED"
+    assert result.findings[0].status is EvidenceStatus.UNCERTAIN
+    assert "OTHER" in result.findings[0].discrepancies
+    assert result.findings[0].deterministic_rule_findings[0].code == "COMPOUND_ASSERTION_GUARD"
+
+
 @pytest.mark.parametrize(
     ("text", "status", "discrepancy"),
     [

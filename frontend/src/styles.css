@@ -12,6 +12,22 @@ button, textarea { font: inherit; }
 .nav-link:hover, .nav-link.active { color:#e8edf5; background:#1e2c3b; }
 .main-content { padding: 38px 48px; max-width: 1500px; width:100%; min-width:0; }
 .workspace-header { max-width: 780px; margin-bottom: 30px; }
+.demo-landing { max-width: 860px; padding: 46px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.demo-landing h2 { max-width: 740px; margin: 10px 0 16px; font-size: clamp(32px, 5vw, 54px); letter-spacing: -.05em; line-height: 1.02; }
+.demo-landing > p { max-width: 680px; color: var(--muted); line-height: 1.6; }
+.demo-steps-preview { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 0; margin: 28px 0; list-style: none; }
+.demo-steps-preview li { padding: 14px; border: 1px solid var(--line); border-radius: 8px; }
+.demo-steps-preview strong, .demo-steps-preview span { display: block; }
+.demo-steps-preview span { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.4; }
+.guided-demo { margin-bottom: 22px; padding: 18px; border: 2px solid var(--ink); border-radius: 10px; background: var(--surface); }
+.guided-demo h3 { margin: 0 0 8px; }
+.guided-demo p { margin: 0; color: var(--muted); line-height: 1.5; }
+.guided-demo ol { display: flex; flex-wrap: wrap; gap: 8px; margin: 15px 0 0; padding: 0; list-style: none; }
+.guided-demo li { padding: 6px 8px; border: 1px solid var(--line); border-radius: 999px; font-size: 12px; }
+.guided-demo li.current { background: var(--ink); color: var(--accent-contrast); border-color: var(--ink); }
+.verification-mode { margin: -8px 0 22px; padding: 12px 14px; border: 1px solid var(--line); border-left: 4px solid var(--ink); border-radius: 6px; background: var(--surface); }
+.verification-mode strong { font-size: 13px; }
+.verification-mode p { margin: 5px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
 .verification-results { margin-top: 30px; }
 .documentation-verification-section { padding: 24px; border: 1px solid #2b3a4a; border-radius: 12px; background: rgba(20,29,40,.55); }
 .workspace-mode-switch { display:flex; gap:6px; margin-bottom:8px; }
@@ -125,6 +141,8 @@ button.finding { cursor:pointer; }
   .segmented button { min-height:44px; padding:10px 8px; }
   .verification-summary { grid-template-columns:repeat(2, minmax(0, 1fr)); }
   .state-card { padding:16px; }
+  .demo-landing { padding: 28px 20px; }
+  .demo-steps-preview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .state-card textarea { min-height:180px; }
   .verification-results-header h3 { font-size:19px; }
 }

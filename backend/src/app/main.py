@@ -17,12 +17,14 @@ from uuid import uuid4
 from fastapi import FastAPI, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 
-from evaluation.adapters import ReliabilityEngineEvaluationAdapter
+from evaluation.adapters import DeterministicFixtureAdapter, ReliabilityEngineEvaluationAdapter
 from evaluation.api import create_router as create_evaluation_router
 from evaluation.benchmark import default_dataset
 from evaluation.repository import SQLiteEvaluationRepository
 from evaluation.runner import EvaluationRunner
+from evaluation.contracts import EvaluationRunRequest
 from .llm_config import evidence_verifier_from_environment, generation_adapter_from_environment
+from .demo import DemoStep, FounderDemoScenario
 from .observability import workflow_log
 from human_review.api import create_router as create_review_router
 from human_review.contracts import ClaimReverificationRequest
@@ -30,6 +32,7 @@ from human_review.repository import InMemoryReviewRepository
 from human_review.service import ReviewService
 from nursing_notes.repository import InMemoryNoteRepository
 from nursing_notes.service import NursingNoteService
+from nursing_notes.contracts import ImportRequest
 from nursing_notes.adapters import UnavailableGenerationAdapter
 from .postgres import PostgresPersistence, create_postgres_persistence
 from source_ingestion.app import create_app as create_source_app
@@ -112,6 +115,16 @@ _DOCUMENTATION_EXAMPLES = (
         "Die Bewohnerin geht mit Unterstützung zum Tisch im Zimmer. Sie setzt die Füße sicher auf und benötigt nur eine kurze verbale Anleitung. Nach dem Hinsetzen bleibt sie stabil sitzen und nimmt dort ihr Frühstück ein.",
     ),
 )
+
+_FOUNDER_DEMO_TRANSCRIPT = (
+    "Bei der morgendlichen Kontrolle beträgt die Temperatur der Bewohnerin 37,4 Grad Celsius. "
+    "Die Bewohnerin verneint Übelkeit."
+)
+_FOUNDER_DEMO_FLAWED_NOTE = (
+    "Bei der morgendlichen Kontrolle beträgt die Temperatur der Bewohnerin 38,4 Grad Celsius. "
+    "Die Bewohnerin berichtet über Übelkeit. Eine deutliche Hautrötung wurde beobachtet."
+)
+_FOUNDER_DEMO_CORRECTED_NOTE = _FOUNDER_DEMO_TRANSCRIPT
 
 
 def _saved_examples(source_service: SourceIngestionService) -> list[dict[str, object]]:
@@ -236,13 +249,28 @@ def create_app() -> FastAPI:
     saved_examples_lock = Lock()
 
     @app.get("/api/v1/health", tags=["health"])
-    def health() -> dict[str, str]:
+    def health() -> dict[str, object]:
         database_ready = persistence.check() if persistence is not None else False
+        generation_configured = not isinstance(generation_adapter, UnavailableGenerationAdapter)
+        generation_model = getattr(generation_adapter, "model_id", None)
+        generation_mode = "live" if generation_configured else "unavailable"
         return {
             "status": "ok" if database_ready else "degraded",
             "database": "ready" if database_ready else "unavailable",
-            "generationProvider": "OFFLINE_DEMO" if isinstance(generation_adapter, UnavailableGenerationAdapter) else "LIVE_AI",
+            "generationProvider": "UNAVAILABLE" if isinstance(generation_adapter, UnavailableGenerationAdapter) else "LIVE_AI",
             "verificationProvider": "OFFLINE_DEMO" if evidence_verifier is None else "LIVE_AI",
+            "generation": {
+                "mode": generation_mode,
+                "provider": "configured" if generation_configured else None,
+                "model": generation_model,
+                "configured": generation_configured,
+                "available": generation_configured,
+                "reason": None if generation_configured else "LLM provider configuration is missing.",
+            },
+            "verification": {
+                "configured": evidence_verifier is not None,
+                "available": evidence_verifier is not None,
+            },
         }
 
     @app.post("/api/v1/sources", response_model=SourceDocument, status_code=status.HTTP_201_CREATED)
@@ -261,6 +289,44 @@ def create_app() -> FastAPI:
                 if saved_examples_cache is None:
                     saved_examples_cache = _saved_examples(source_service)
         return saved_examples_cache
+
+    @app.post("/api/v1/demo-scenarios/founder-walkthrough/start", response_model=FounderDemoScenario, status_code=status.HTTP_201_CREATED, tags=["demo"])
+    def start_founder_demo() -> FounderDemoScenario:
+        """Create a normal persisted review workflow for the first-time demo.
+
+        The source and imported candidate are deliberately synthetic.  The
+        endpoint creates no verification, decision, or approval: visitors must
+        perform those human-review steps themselves.
+        """
+        source = source_service.create_source(
+            CreateSourceRequest(
+                resident_test_id=f"synthetic-founder-demo-{uuid4().hex[:12]}",
+                language="de-DE",
+                transcript_text=_FOUNDER_DEMO_TRANSCRIPT,
+            )
+        )
+        note = note_service.import_note(
+            ImportRequest(
+                sourceId=source.source_id,
+                sourceVersion=source.source_version,
+                content=_FOUNDER_DEMO_FLAWED_NOTE,
+                externalOrigin={"system": "dexter-guard-founder-demo", "externalNoteId": f"founder-walkthrough-{uuid4()}"},
+                requestedBy="synthetic-founder-demo",
+                facts=(),
+            )
+        )
+        return FounderDemoScenario(
+            source=source,
+            note=note,
+            correctedNote=_FOUNDER_DEMO_CORRECTED_NOTE,
+            steps=(
+                DemoStep(id="INSPECT", title="Inspect the source", instruction="Compare the original synthetic transcript with the imported candidate note."),
+                DemoStep(id="VERIFY", title="Run verification", instruction="Run full verification to reveal the altered measurement, negation error, and source-absent observation."),
+                DemoStep(id="CORRECT", title="Correct the note", instruction="Replace the candidate text with the evidence-supported version and save a successor revision."),
+                DemoStep(id="REVERIFY", title="Re-verify the new revision", instruction="Run full verification again for the exact saved successor revision."),
+                DemoStep(id="APPROVE", title="Approve as a human", instruction="When the corrected revision is eligible, record an explicit human approval."),
+            ),
+        )
 
     def _note_revision(note_id: str, revision: int) -> Any:
         try:
@@ -310,8 +376,24 @@ def create_app() -> FastAPI:
         adapter=ReliabilityEngineEvaluationAdapter(evidence_verifier=evidence_verifier),
         repository=evaluation_repository,
     )
+    if not evaluation_repository.list_runs():
+        fixture_runner = EvaluationRunner(
+            dataset=default_dataset(),
+            adapter=DeterministicFixtureAdapter(),
+            repository=evaluation_repository,
+        )
+        fixture_dataset = default_dataset()
+        fixture_runner.execute(EvaluationRunRequest(
+            subjectKind="BENCHMARK",
+            datasetId=fixture_dataset.dataset_id,
+            datasetVersion=fixture_dataset.dataset_version,
+            datasetHash=fixture_dataset.content_hash,
+            selectedSplit="HELD_OUT",
+            executionMode="SAVED_FIXTURE",
+            idempotencyKey="preloaded-heldout-fixture-v1",
+        ))
     app.state.evaluation_runner = evaluation_runner
-    app.include_router(create_evaluation_router(evaluation_runner))
+    app.include_router(create_evaluation_router(evaluation_runner, allow_live=os.getenv("EVALUATION_ALLOW_LIVE_API", "false").strip().lower() == "true"))
     return app
 
 

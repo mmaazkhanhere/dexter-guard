@@ -102,3 +102,17 @@ def test_offline_fallback_handles_numeric_changes_and_supported_paraphrases(
     )["findings"][0]
 
     assert finding["status"] == expected_status
+
+
+def test_offline_fallback_does_not_support_a_compound_claim_from_partial_overlap() -> None:
+    result = OfflineSemanticEvidenceProvider().verify(
+        claims=(_claim("claim-compound", "Die Bewohnerin berichtet über Schwindel und starke Brustschmerzen."),),
+        source_text="Die Bewohnerin berichtet über Schwindel.",
+        run_id="run-compound",
+        source_id="source-1",
+        source_version=1,
+    )
+
+    finding = result["findings"][0]
+    assert finding["status"] == "UNCERTAIN"
+    assert "OTHER" in finding["discrepancies"]

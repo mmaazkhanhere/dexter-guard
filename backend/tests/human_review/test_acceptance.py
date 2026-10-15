@@ -85,6 +85,27 @@ def test_acceptance_stale_edit_blocks_old_verification_and_writes_no_disposition
     assert service.context("note-1", "synthetisch")["noteStatus"] == "AWAITING_FULL_VERIFICATION"
 
 
+def test_acceptance_stale_approval_request_is_rejected_without_writing_disposition():
+    service = _service()
+    client = TestClient(create_app(service, verification_ports=Ports()))
+
+    verification = _full_verify(client, key="verify-before-edit")
+    assert verification.status_code == 200
+    assert client.post("/api/v1/reviews/note-1/revisions", json={
+        "expectedRevision": 1, "content": "Korrigierte synthetische Notiz.",
+        "reviewerLabel": "synthetic-reviewer", "idempotencyKey": "edit-before-approval",
+    }).status_code == 201
+
+    stale_approval = client.post("/api/v1/reviews/note-1/approve", json={
+        "expectedRevision": 1, "fullVerificationId": verification.json()["fullVerificationId"],
+        "reviewerLabel": "synthetic-reviewer", "idempotencyKey": "stale-approval",
+    })
+
+    assert stale_approval.status_code == 409
+    assert stale_approval.json()["code"] == "STALE_REVISION"
+    assert service.repository.dispositions == []
+
+
 def test_acceptance_failed_and_unresolved_coverage_verifications_are_not_approvable_but_rejection_is():
     failed_service = _service()
     failed_client = TestClient(create_app(failed_service, verification_ports=Ports(status="FAILED")))

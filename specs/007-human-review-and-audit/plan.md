@@ -136,8 +136,8 @@ Highlight renderer inputs are typed spans with explicit coordinate system. Candi
 | Contract | Pydantic/OpenAPI schemas, enums/version fields, required rationales, immutable identity references, common error body, and conditional approved/full-run constraints. |
 | Repository | SQLite append-only behaviour, revision conflict, constraints, atomic approval, historical retrieval, and idempotency binding. |
 | Service/integration | Ports/adapters for Specs 001–006; invalid/missing evidence, failed/malformed upstream runs, exact provenance, no algorithm duplication, and concurrent edit/approval race. |
-| UI | Finding selection/evidence availability states, non-colour severity cue, suggestion acceptance, stale feedback, disabled/misleading-action prevention, and audit timeline. |
-| Acceptance | HR-001 through HR-018 against synthetic German fixtures, including direct API bypass attempts and unresolved-source-item approval blocking. |
+| UI | Finding selection/evidence availability states, non-colour severity cue, suggestion acceptance, stale feedback, dirty-editor save-and-verify gating, disabled/misleading-action prevention, and audit timeline. |
+| Acceptance | HR-001 through HR-021 against synthetic German fixtures, including direct API bypass attempts, unresolved-source-item approval blocking, the unsaved-edit approval transition, and automatic audit refresh after reviewer actions. |
 | Regression | Existing source/note/claim/004/005/006 contract/API suites plus full configured test suite, compile check, and `git diff --check`. |
 
 ## Engineering trade-offs

@@ -86,8 +86,8 @@ task in the listed range:
 | [US4] Record independent finding decisions | T013–T015 | Append-only acknowledgement, dispute, and adjudication |
 | [US2] Correct and re-verify a note | T016–T025 | Immutable revisions and claim/full-note verification |
 | [US6] Use a suggested correction safely | T018–T020 | Validated explicit-acceptance correction flow |
-| [US3] Safely approve or reject | T026–T029, T036 | Atomic approval guards and rejection disposition |
-| [US5] Inspect an audit trail | T030–T034 | Ordered audit history, integration, and regression evidence |
+| [US3] Safely approve or reject | T026–T029, T036, T043 | Atomic approval guards, rejection disposition, and dirty-editor prevention |
+| [US5] Inspect an audit trail | T030–T034, T044 | Ordered audit history, integration, and regression evidence |
 
 ## Governance closure
 
@@ -98,6 +98,8 @@ task in the listed range:
 - [x] T040 [US5] Persist all review-owned entities (revisions, findings, decisions, suggestions, verification aggregates, dispositions, claim feedback, and audit events) through the SQLite repository with append-only constraints, foreign-reference checks, and restart/retrieval coverage. **Target:** `src/human_review/repository.py`, `tests/human_review/test_repository.py`. **Depends on:** T005–T008, T030. **Requirements:** FR-19, FR-24, FR-25. **Done when:** a repository restart preserves complete history and no review action can silently overwrite or delete an entity.
 - [x] T041 [P] [US1] [US2] [US3] [US4] [US5] [US6] Add OpenAPI/schema and end-to-end synthetic German acceptance coverage for every documented backend endpoint and HR-001–HR-018, including direct API bypass, evidence validation, full verification, suggestions, approval/rejection, audit retrieval, and stale conflicts. **Target:** `tests/human_review/test_contracts.py`, `tests/human_review/test_acceptance.py`. **Depends on:** T003, T004, T015, T020, T025, T029, T037–T040. **Requirements:** all. **Done when:** the contract, API, and backend acceptance suites cover every route and scenario using synthetic German data only.
 - [x] T042 [P] [US2] [US3] Add bounded timeout/retry, idempotency-digest, and content-minimized observability tests for every upstream adapter and review command. **Target:** `src/human_review/ports.py`, `src/human_review/verification.py`, `tests/human_review/test_observability.py`. **Depends on:** T002, T021, T032, T037. **Requirements:** constitution Principles IV, VI, VII; FR-21, FR-22, FR-25. **Done when:** unavailable/malformed providers produce typed terminal outcomes, retries do not duplicate actions, and telemetry contains no full source/note/prompt text.
+- [x] T043 [US3] Add the frontend dirty-editor approval guard and regression coverage for immediate approval/full-verification disablement, save-before-verify messaging, and successor re-verification. **Target:** `frontend/src/features/review/ReviewWorkspace.tsx`, `frontend/tests/review-approval.test.tsx`. **Depends on:** T026, T028. **Requirements:** FR-26, HR-020. **Done when:** a verified note cannot be approved while editor content differs from the persisted revision, and the UI explains the required save-and-verify transition.
+- [x] T044 [US5] Refresh the active audit history after every successful review mutation (revision save, full verification, finding/correction decision, approval, and rejection), with frontend regression coverage for each action and failed/stale no-event behavior. **Target:** `frontend/src/api/hooks.ts`, `frontend/tests/audit-invalidation.test.tsx`. **Depends on:** T030, T034. **Requirements:** FR-27, HR-021. **Done when:** the audit panel refetches automatically and displays the newest backend event after each successful auditable action.
 
 ## Requirement traceability
 
@@ -113,3 +115,5 @@ task in the listed range:
 | FR-23 | HR-008, HR-014 | T026, T028 | Direct bypass guard tests |
 | FR-24 | HR-008, HR-009, HR-013, HR-015, HR-016 | T013–T015, T026–T029 | Atomic disposition and rejection tests |
 | FR-25 | HR-003, HR-010, HR-017 | T005–T008, T030–T032 | Append-only/audit history tests |
+| FR-26 | HR-020 | T043 | Frontend approval/full-verification dirty-state regression tests |
+| FR-27 | HR-021 | T044 | Audit query invalidation after successful review mutations and regression tests |
