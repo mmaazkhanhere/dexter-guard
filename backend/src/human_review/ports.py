@@ -14,6 +14,14 @@ class UpstreamRun:
     note_revision: int
     claim_set_id: str
     unresolved_source_items: int = 0
+    # Upstream services return stable, safe terminal failure codes.  Preserve
+    # them for the review aggregate; do not collapse a provider timeout or a
+    # malformed response into an opaque generic failure.
+    failure_code: str | None = None
+    failure_reason: str | None = None
+    # Only extraction supplies this.  It lets the review aggregate distinguish
+    # a successful non-empty claim set from Spec 003's valid EMPTY result.
+    claim_count: int | None = None
 
 
 class ClaimExtractionPort(Protocol):
@@ -54,6 +62,7 @@ class ReferenceOnlyVerificationPorts:
         required = ("run_id", "status", "source_id", "source_version", "note_id", "note_revision", "claim_set_id")
         if any(not hasattr(run, name) for name in required):
             raise ValueError("MALFORMED_UPSTREAM_RESULT")
+        failure = getattr(run, "failure", None)
         return UpstreamRun(
             run_id=run.run_id,
             status=run.status,
@@ -63,6 +72,9 @@ class ReferenceOnlyVerificationPorts:
             note_revision=run.note_revision,
             claim_set_id=run.claim_set_id,
             unresolved_source_items=getattr(run, "unresolved_source_items", 0),
+            claim_count=getattr(run, "claim_count", None),
+            failure_code=getattr(failure, "code", None),
+            failure_reason=getattr(failure, "reason", None),
         )
 
     def extract(self, note_id: str, revision: int) -> UpstreamRun:

@@ -193,7 +193,7 @@ All scenarios use synthetic German nursing documentation and synthetic resident 
 - Missing claim spans, missing source spans, invalid offsets, text mismatches, or source-version mismatches are visible integrity failures; no fallback search/highlight is attempted.
 - `UNSUPPORTED` means no source support was established; it is not displayed as a direct contradiction.
 - Source excerpts are always derived from validated `SourceSpan`; candidate note text is never evidence for itself.
-- A failed upstream run produces an explicit critical operational review finding and preserves the upstream failure record; it never creates partial authoritative findings.
+- A failed upstream run produces an explicit critical operational review finding and preserves its stable safe failure code (for example `PROVIDER_TIMEOUT`, `PROVIDER_UNAVAILABLE`, or `MALFORMED_VERIFIER_OUTPUT`) in the full-note result; the caregiver sees an actionable explanation, never an upstream exception. It never creates partial authoritative findings.
 - A malformed suggestion, stale decision command, unknown finding, foreign note/revision reference, or duplicate idempotency key returns a typed error and writes no partial event.
 - A source revision after note creation does not silently retarget the note. The note remains tied to its existing source version; any source migration is outside this feature.
 

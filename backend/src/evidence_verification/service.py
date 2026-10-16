@@ -424,9 +424,27 @@ class VerificationService:
 
     @staticmethod
     def _has_compound_assertion(claim_text: str) -> bool:
-        """Detect common German assertion boundaries for conservative fallback."""
+        """Detect independently checkable assertions, not harmless noun lists.
 
-        return bool(re.search(r"\s+(?:und|aber|doch|sowie)\s+|,\s+(?=[A-Za-zÄÖÜäöüß])", claim_text, re.IGNORECASE))
+        A conjunction alone is not evidence of a compound claim: ``Wasser und
+        Tee`` is one intake assertion. The guard remains conservative for two
+        predicates, two measurements, or independently named symptoms, where a
+        single evidence span could otherwise mask a material mismatch.
+        """
+        if not re.search(r"\s+(?:und|aber|doch|sowie)\s+|,\s+(?=[A-Za-zÄÖÜäöüß])", claim_text, re.IGNORECASE):
+            return False
+        predicates = re.findall(
+            r"\b(?:ist|sind|war|waren|hat|haben|zeigt|zeigen|berichtet|berichtete|klagt|klagte|"
+            r"wurde|wurden|erhielt|verabreicht|beträgt|betrug|liegt|lag|trinkt|trank|nimmt|nahm|bittet|bat)\b",
+            claim_text,
+            re.IGNORECASE,
+        )
+        if len(predicates) >= 2:
+            return True
+        if len(re.findall(r"\d+(?:[.,]\d+)?\s*(?:°?C|mmHg|kg|cm|ml|bpm|g|l)\b", claim_text, re.IGNORECASE)) >= 2:
+            return True
+        symptoms = re.findall(r"\b(?:\w*schmerz\w*|schwindel\w*|übelkeit|uebelkeit|atemnot|husten)\b", claim_text, re.IGNORECASE)
+        return len(set(item.casefold() for item in symptoms)) >= 2
 
     def _quotes_for(self, candidate: VerifierCandidateFinding, spans: tuple[object, ...], source_text: str) -> tuple[dict[str, object], ...]:
         supplied = list(candidate.evidence_quotes)

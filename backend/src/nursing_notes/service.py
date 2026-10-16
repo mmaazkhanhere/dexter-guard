@@ -190,6 +190,16 @@ class NursingNoteService:
                 )
             except NoteError as error:
                 last_error = error
+            except (ValueError, TypeError) as error:
+                # The provider responded, but its payload could not be decoded or
+                # validated as a GenerationResult. This is a model-output issue,
+                # not a provider outage, and should not be retried as one.
+                raise NoteError(
+                    NoteErrorCode.GENERATION_REJECTED,
+                    "The generation provider returned output that could not be understood or validated.",
+                    "providerOutput",
+                    {"reason": type(error).__name__},
+                ) from error
             except Exception as error:  # provider-specific failures must not leak
                 last_error = NoteError(
                     NoteErrorCode.GENERATION_PROVIDER_FAILURE,

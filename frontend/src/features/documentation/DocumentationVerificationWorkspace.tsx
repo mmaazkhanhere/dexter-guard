@@ -47,6 +47,7 @@ export function DocumentationVerificationWorkspace() {
   const review = useReview(note?.noteId, note?.revision);
   const examples = useSavedExamples();
   const [mode, setMode] = useState<Mode>("generate");
+  const [showResults, setShowResults] = useState(false);
   const [transcript, setTranscript] = useState(savedTranscript ?? "");
   const [residentId, setResidentId] = useState(savedResidentId ?? "synthetic-resident-demo");
   const [existingNote, setExistingNote] = useState("");
@@ -112,6 +113,7 @@ export function DocumentationVerificationWorkspace() {
   }
 
   async function verify(candidate: NoteResponse) {
+    setShowResults(true);
     const result = await fullVerification.mutateAsync({ noteId: candidate.noteId, expectedRevision: candidate.revision, reviewerLabel: "synthetic-reviewer" });
     if (result.status === "VALID") {
       notify({ tone: "info", title: "Verification run recorded", message: "Inspect the current findings and approval eligibility before Human Review." });
@@ -183,7 +185,7 @@ export function DocumentationVerificationWorkspace() {
         <button role="tab" type="button" aria-selected={mode === "existing"} aria-controls="verify-existing-note-panel" className={mode === "existing" ? "selected" : ""} onClick={() => setMode("existing")}>Verify Existing Note</button>
       </div>
       {mode === "generate" ? <ModePanel id={panelId} mode="generate" transcript={transcript} residentId={residentId} sourceLocked={sourceLocked} transcriptError={transcriptValidationMessage(transcript)} residentError={residentIdValidationMessage(residentId.trim())} onTranscript={updateTranscript} onResident={updateResidentId} onEditSource={() => setEditingSource(true)} onCancelEdit={() => { updateTranscript(source?.transcript_text ?? transcript); updateResidentId(source?.resident_test_id ?? residentId); setEditingSource(false); }} source={source} scenarios={examples.data?.map((example) => ({ id: example.exampleId, title: example.title }))} selectedScenario={selectedExample} onScenarioChange={setSelectedExample} onLoadScenario={loadScenario} scenarioLoading={scenarioSource.isFetching} action={<button onClick={generateAndVerify} disabled={isWorking || !isTranscriptValid(transcript) || !isResidentIdValid(residentId.trim())}>{isWorking ? <LoadingIndicator label={busyLabel} /> : "Generate note & verify"}</button>} /> : <ModePanel id={panelId} mode="existing" transcript={transcript} residentId={residentId} sourceLocked={sourceLocked} transcriptError={transcriptValidationMessage(transcript)} residentError={residentIdValidationMessage(residentId.trim())} noteError={existingNoteValidationMessage(existingNote)} onTranscript={updateTranscript} onResident={updateResidentId} onEditSource={() => setEditingSource(true)} onCancelEdit={() => { updateTranscript(source?.transcript_text ?? transcript); updateResidentId(source?.resident_test_id ?? residentId); setEditingSource(false); }} source={source} existingNote={existingNote} onExistingNote={setExistingNote} action={<button onClick={verifyExistingNote} disabled={isWorking || !isTranscriptValid(transcript) || !isResidentIdValid(residentId.trim()) || !isExternalNoteValid(existingNote)}>{isWorking ? <LoadingIndicator label={busyLabel} /> : "Verify Note"}</button>} />}
-      {activeResult && <section className="verification-results" aria-label="Verification results">
+      {showResults && activeResult && <section className="verification-results" aria-label="Verification results">
         <div className="verification-results-header"><span className="eyebrow">VERIFICATION RESULTS</span><h3>Review the note against its evidence</h3><p>A completed run is not a factual pass. Select a finding to highlight the affected statement in the note and the supporting or contradicting source evidence.</p></div>
         <VerificationResults note={activeResult} source={source} context={review.data} isLoading={review.isLoading || review.isFetching || fullVerification.isPending} loadError={review.error} onRetry={() => { void review.refetch(); }} />
         <div className="button-row"><button className="secondary-button" onClick={() => navigate("/review")}>Continue to Human Review</button></div>

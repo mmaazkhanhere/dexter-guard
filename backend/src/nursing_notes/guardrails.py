@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from decimal import Decimal, InvalidOperation
 from collections.abc import Iterable
 from typing import Any
 
@@ -22,12 +23,13 @@ _RESIDENT_REPORT = re.compile(
 )
 _CAREGIVER_OBSERVATION = re.compile(r"\b(?:pflegekraft|beobachtet)\b", re.IGNORECASE)
 _TOKEN = re.compile(r"[\wÄÖÜäöüß]+", re.UNICODE)
-_MEASUREMENT = re.compile(r"\d+(?:[.,]\d+)?\s*(?:°C|mmHg|kg|cm|ml|bpm|g|l|%)", re.IGNORECASE)
+_MEASUREMENT = re.compile(r"(?P<value>\d+(?:[.,]\d+)?)\s*(?P<unit>°C|mmHg|kg|cm|ml|bpm|g|l|%)", re.IGNORECASE)
 _TEMPORAL = re.compile(
-    r"\b(?:heute|gestern|morgen|seit\s+\w+|vor\s+\w+|nach\s+\w+|nachts|morgens|abends|aktuell|derzeit|momentan|(?:bis|um|ab)\s+\d{1,2}(?::\d{2})?\s*uhr)\b",
+    r"\b(?:heute|gestern|morgen|seit\s+\w+|vor\s+\w+|nach\s+\w+|nachts|morgens|abends|aktuell|derzeit|momentan|(?:(?:bis|um|ab)\s+)?\d{1,2}(?::\d{2})?\s*uhr)\b",
     re.IGNORECASE,
 )
 _MULTI_SENTENCE = re.compile(r"[.!?].*[.!?]|[\r\n;]", re.DOTALL)
+_STOPWORDS = {"die", "der", "das", "den", "dem", "ein", "eine", "einer", "und", "oder", "ist", "sind", "wird", "werden", "mit", "von", "zu", "im", "in"}
 
 
 def _reject(message: str, field: str | None = None) -> None:
@@ -45,7 +47,20 @@ def _canonical_temporal(value: str) -> str:
 
 
 def _temporal_supported(qualifier: str | None, text: str) -> bool:
-    return qualifier is None or _canonical_temporal(qualifier) in _canonical_temporal(text)
+    if qualifier is None:
+        return not _temporal_expressions(text)
+    return _canonical_temporal(qualifier) in _canonical_temporal(text)
+
+
+def _temporal_expressions(text: str) -> list[str]:
+    return [match.group(0) for match in _TEMPORAL.finditer(text)]
+
+
+def _measurement(value: str, unit: str) -> tuple[Decimal, str] | None:
+    try:
+        return Decimal(value.replace(",", ".")), unit.casefold().replace("°", "")
+    except InvalidOperation:
+        return None
 
 
 class GenerationGuardrails:
@@ -80,6 +95,13 @@ class GenerationGuardrails:
             return fact
         text = source.transcript_text
         excerpt = text[anchor.start : anchor.end]
+        sentence = next((match.group(0) for match in re.finditer(r"[^.!?\r\n]+(?:[.!?]|$)", text) if match.start() <= anchor.start and anchor.end <= match.end()), excerpt)
+        if qualifier is None:
+            candidates = _temporal_expressions(sentence)
+            statement_temporals = _temporal_expressions(fact.statement)
+            if len(candidates) == 1 and statement_temporals and _temporal_supported(candidates[0], fact.statement):
+                fact = fact.model_copy(update={"temporal_qualifier": candidates[0]})
+                qualifier = candidates[0]
         temporal_missing = not _temporal_supported(qualifier, excerpt)
         attribution_missing = (
             attribution == "RESIDENT_REPORTED"
@@ -104,7 +126,10 @@ class GenerationGuardrails:
             if not temporal_supported or not attribution_supported:
                 continue
             anchor_matches = sentence_start <= anchor.start and anchor.end <= sentence_end
-            statement_matches = bool(statement_tokens) and statement_tokens.issubset(_tokens(sentence))
+            sentence_tokens = _tokens(sentence) - _STOPWORDS
+            meaningful_statement_tokens = statement_tokens - _STOPWORDS
+            overlap = meaningful_statement_tokens & sentence_tokens
+            statement_matches = bool(meaningful_statement_tokens) and len(overlap) * 2 >= len(meaningful_statement_tokens)
             if not anchor_matches and not statement_matches:
                 continue
             trimmed_start = sentence_start + len(sentence) - len(sentence.lstrip())
@@ -169,7 +194,9 @@ class GenerationGuardrails:
                 "A candidate fact must be bounded to one source sentence.",
                 f"facts.{index}.sourceAnchor",
             )
-        if not _tokens(fact.statement).intersection(_tokens(excerpt)):
+        statement_tokens = _tokens(fact.statement) - _STOPWORDS
+        excerpt_tokens = _tokens(excerpt) - _STOPWORDS
+        if not statement_tokens or len(statement_tokens & excerpt_tokens) * 2 < len(statement_tokens):
             _reject("A generated fact is not anchored to its stated source text.", f"facts.{index}.statement")
 
         lower = excerpt.casefold()
@@ -206,7 +233,9 @@ class GenerationGuardrails:
         if source_measurement:
             if fact.numeric_value is None or fact.unit is None:
                 _reject("A source measurement must retain its value and unit.", f"facts.{index}")
-            if fact.numeric_value not in source_measurement.group(0) or fact.unit not in source_measurement.group(0):
+            expected = _measurement(source_measurement.group("value"), source_measurement.group("unit"))
+            actual = _measurement(fact.numeric_value, fact.unit)
+            if expected is None or actual is None or expected != actual:
                 _reject("A generated measurement changed its source value or unit.", f"facts.{index}")
         elif fact.numeric_value is not None or fact.unit is not None:
             _reject("A numeric value or unit is not present in the source anchor.", f"facts.{index}")

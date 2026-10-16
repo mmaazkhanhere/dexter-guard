@@ -327,10 +327,18 @@ components:
         supportSpans: { type: array, items: { $ref: '#/components/schemas/SourceSpan' } }
         generatedBy: { enum: [REVIEWER, SPEC_007_CORRECTION_ADAPTER] }
         createdAt: { type: string, format: date-time }
+    ExtractedClaimDisplay:
+      type: object
+      additionalProperties: false
+      required: [claimId, claimText, statementSpan]
+      properties:
+        claimId: { type: string, minLength: 1 }
+        claimText: { type: string, minLength: 1 }
+        statementSpan: { $ref: '#/components/schemas/NoteSpan' }
     ReviewContext:
       type: object
       additionalProperties: false
-      required: [contractVersion, noteId, revision, latestRevision, noteStatus, source, transcriptText, candidateNote, findings, decisions, suggestions, fullVerification, approvalEligible]
+      required: [contractVersion, noteId, revision, latestRevision, noteStatus, source, transcriptText, candidateNote, extractedClaims, findings, decisions, suggestions, fullVerification, approvalEligible]
       properties:
         contractVersion: { const: REVIEW-AUDIT-CONTRACT-v1 }
         noteId: { type: string, minLength: 1 }
@@ -340,6 +348,7 @@ components:
         source: { $ref: '#/components/schemas/SourceReference' }
         transcriptText: { type: string, minLength: 1 }
         candidateNote: { type: string, minLength: 1 }
+        extractedClaims: { type: array, items: { $ref: '#/components/schemas/ExtractedClaimDisplay' } }
         findings: { type: array, items: { $ref: '#/components/schemas/ReviewFinding' } }
         decisions: { type: array, items: { $ref: '#/components/schemas/ReviewDecision' } }
         suggestions: { type: array, items: { $ref: '#/components/schemas/SuggestedCorrection' } }

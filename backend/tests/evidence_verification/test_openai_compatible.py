@@ -35,6 +35,19 @@ def test_openai_compatible_verifier_captures_usage_and_cost() -> None:
     assert provider.last_inference_cost == 0.0018
     assert completions.kwargs["model"] == "verifier-model"
     assert "Compare claim meaning, not wording" in completions.kwargs["messages"][0]["content"]
+    assert completions.kwargs["max_tokens"] == 4096
+
+
+def test_groq_verifier_uses_json_mode() -> None:
+    completions = FakeCompletions()
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+    provider = OpenAICompatibleEvidenceVerifier(
+        api_key="secret", base_url="https://api.groq.com/openai/v1", model="verifier-model", client=client,
+    )
+
+    provider.verify(claims=(), source_text="Transcript", run_id="run-1")
+
+    assert completions.kwargs["response_format"] == {"type": "json_object"}
 
 
 def test_verifier_configuration_is_optional_and_uses_verification_overrides() -> None:
@@ -43,6 +56,7 @@ def test_verifier_configuration_is_optional_and_uses_verification_overrides() ->
         "VERIFICATION_LLM_API_KEY": "secret",
         "VERIFICATION_LLM_MODEL": "verification-model",
         "VERIFICATION_LLM_BASE_URL": "https://example.test/v1",
+        "LLM_TIMEOUT_SECONDS": "30",
         "VERIFICATION_LLM_INPUT_COST_PER_1K": "0.01",
         "VERIFICATION_LLM_OUTPUT_COST_PER_1K": "0.02",
     })
@@ -51,3 +65,5 @@ def test_verifier_configuration_is_optional_and_uses_verification_overrides() ->
     assert provider.model_id == "verification-model"
     assert provider.input_cost_per_1k == 0.01
     assert provider.output_cost_per_1k == 0.02
+    assert provider.timeout_seconds == 45
+    assert provider.max_output_tokens == 4096

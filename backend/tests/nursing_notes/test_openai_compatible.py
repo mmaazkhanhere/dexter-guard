@@ -42,12 +42,7 @@ def payload() -> dict[str, object]:
                 "type": "SYMPTOM",
                 "statement": "Schmerzen",
                 "residentSubject": "resident-1",
-                "sourceAnchor": {
-                    "sourceId": "source-1",
-                    "sourceVersion": 1,
-                    "start": 19,
-                    "end": 28,
-                },
+                "sourceQuote": "Schmerzen",
                 "polarity": "AFFIRMED",
                 "certainty": "CERTAIN",
                 "provenance": "GENERATED_FROM_SOURCE",
@@ -71,8 +66,11 @@ def test_openai_compatible_adapter_uses_common_chat_contract_and_metadata() -> N
     assert result.model_id == "demo-model"
     assert result.generation_run_id == "generation-1"
     assert result.schema_version == "nursing-fact-v1"
+    assert result.facts[0].source_anchor.start == 19
+    assert result.facts[0].source_anchor.end == 28
     assert call["model"] == "demo-model"
     assert call["temperature"] == 0
+    assert call["response_format"] == {"type": "json_object"}
     assert call["messages"][0]["role"] == "system"
     assert "source-1" in call["messages"][1]["content"]
 
@@ -87,6 +85,20 @@ def test_openai_compatible_adapter_rejects_malformed_provider_payloads(content: 
     )
 
     with pytest.raises(ValueError):
+        adapter.generate(source())
+
+
+def test_openai_compatible_adapter_rejects_non_exact_or_ambiguous_source_quotes() -> None:
+    invalid = payload()
+    invalid["facts"][0]["sourceQuote"] = "nicht im Transkript"
+    adapter = OpenAICompatibleGenerationAdapter(
+        api_key="secret",
+        base_url="https://api.groq.com/openai/v1",
+        model="demo-model",
+        client=FakeClient(json.dumps(invalid)),
+    )
+
+    with pytest.raises(ValueError, match="not an exact transcript substring"):
         adapter.generate(source())
 
 

@@ -206,12 +206,50 @@ def test_temporal_qualifier_is_preserved_and_not_invented(note_context):
 
     missing = fact(source_model, text, fact_type="SYMPTOM", attribution="RESIDENT_REPORTED")
     note_context["adapter"].factory = result_factory(missing)
-    rejected = client.post(
+    normalized = client.post(
         "/api/v1/notes/generate",
         json={"sourceId": source["source_id"], "sourceVersion": 1, "requestedBy": "tester"},
     )
-    assert rejected.status_code == 422
-    assert rejected.json()["code"] == "GENERATION_REJECTED"
+    assert normalized.status_code == 201
+    assert normalized.json()["facts"][0]["temporalQualifier"] == "seit gestern"
+
+
+def test_temporal_clock_change_is_rejected(note_context):
+    client = note_context["client"]
+    text = "Bis 10:00 Uhr trinkt die Bewohnerin insgesamt 500 ml Wasser."
+    source = create_source(client, text)
+    source_model = note_context["source_service"].get_source_version(source["source_id"], 1)
+    candidate = fact(source_model, text, fact_type="MEASUREMENT", temporalQualifier="bis 11 Uhr", numericValue="500", unit="ml")
+    candidate["statement"] = "Bis 11:00 Uhr trinkt die Bewohnerin insgesamt 500 ml Wasser."
+    note_context["adapter"].factory = result_factory(candidate)
+    response = client.post("/api/v1/notes/generate", json={"sourceId": source["source_id"], "sourceVersion": 1, "requestedBy": "tester"})
+    assert response.status_code == 422
+    assert response.json()["code"] == "GENERATION_REJECTED"
+
+
+def test_temporal_operator_change_is_rejected(note_context):
+    client = note_context["client"]
+    text = "Bis 10:00 Uhr trinkt die Bewohnerin insgesamt 500 ml Wasser."
+    source = create_source(client, text)
+    source_model = note_context["source_service"].get_source_version(source["source_id"], 1)
+    candidate = fact(source_model, text, fact_type="MEASUREMENT", temporalQualifier="um 10 Uhr", numericValue="500", unit="ml")
+    candidate["statement"] = "Um 10 Uhr trinkt die Bewohnerin insgesamt 500 ml Wasser."
+    note_context["adapter"].factory = result_factory(candidate)
+    response = client.post("/api/v1/notes/generate", json={"sourceId": source["source_id"], "sourceVersion": 1, "requestedBy": "tester"})
+    assert response.status_code == 422
+    assert response.json()["code"] == "GENERATION_REJECTED"
+
+
+def test_measurement_prefix_is_not_accepted_as_exact_value(note_context):
+    client = note_context["client"]
+    text = "Die Bewohnerin trinkt insgesamt 500 ml Wasser."
+    source = create_source(client, text)
+    source_model = note_context["source_service"].get_source_version(source["source_id"], 1)
+    candidate = fact(source_model, text, fact_type="MEASUREMENT", numericValue="50", unit="ml")
+    note_context["adapter"].factory = result_factory(candidate)
+    response = client.post("/api/v1/notes/generate", json={"sourceId": source["source_id"], "sourceVersion": 1, "requestedBy": "tester"})
+    assert response.status_code == 422
+    assert response.json()["code"] == "GENERATION_REJECTED"
 
 
 def test_temporal_qualifier_expands_a_narrow_anchor_within_one_source_sentence(note_context):
@@ -470,6 +508,15 @@ def test_provider_failure_and_empty_output_are_controlled(note_context):
     )
     assert failed.status_code == 422
     assert failed.json()["code"] == "GENERATION_PROVIDER_FAILURE"
+
+    note_context["adapter"].error = ValueError("provider returned invalid JSON")
+    malformed = client.post(
+        "/api/v1/notes/generate",
+        json={"sourceId": source["source_id"], "sourceVersion": 1, "requestedBy": "tester"},
+    )
+    assert malformed.status_code == 422
+    assert malformed.json()["code"] == "GENERATION_REJECTED"
+    assert malformed.json()["field"] == "providerOutput"
 
     note_context["adapter"].error = None
     note_context["adapter"].factory = lambda _: {"content": "", "facts": []}

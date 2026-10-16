@@ -88,3 +88,29 @@ def test_contrastive_negated_symptoms_keep_independent_negation_scopes() -> None
     assert [claim["polarity"] for claim in claims] == ["NEGATED", "NEGATED"]
     assert [claim["negationCue"]["text"] for claim in claims] == ["Keine", "keine"]
     assert all(note[claim["statementSpan"]["startCodePoint"]:claim["statementSpan"]["endCodePointExclusive"]] == claim["claimText"] for claim in claims)
+
+
+def test_fluid_intake_with_time_boundary_and_assistance_is_extracted_as_scoped_atomic_claims() -> None:
+    note = (
+        "Bis 10:00 Uhr trank die Bewohnerin insgesamt 500ml Wasser und Tee. "
+        "Sie nahm die Getränke selbstständig zu sich und bat einmal um Unterstützung beim Öffnen des Bechers. "
+        "Übelkeit oder Erbrechen wurden nicht beobachtet."
+    )
+
+    claims = HeuristicClaimProvider().extract(
+        note,
+        note_revision_id="note-1:r1",
+        resident_test_id="resident-1",
+    )["claims"]
+
+    assert [claim["claimText"] for claim in claims] == [
+        "Bis 10:00 Uhr",
+        "Bis 10:00 Uhr trank die Bewohnerin insgesamt 500ml Wasser und Tee.",
+        "Wasser und Tee",
+        "Sie nahm die Getränke selbstständig zu sich",
+        "bat einmal um Unterstützung beim Öffnen des Bechers.",
+        "Übelkeit oder Erbrechen wurden nicht beobachtet.",
+    ]
+    assert claims[0]["temporalText"] == "Bis 10:00 Uhr"
+    assert claims[1]["numericValues"][0]["normalizedDecimal"] == "500"
+    assert all(note[claim["statementSpan"]["startCodePoint"]:claim["statementSpan"]["endCodePointExclusive"]] == claim["claimText"] for claim in claims)

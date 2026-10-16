@@ -116,3 +116,48 @@ def test_offline_fallback_does_not_support_a_compound_claim_from_partial_overlap
     finding = result["findings"][0]
     assert finding["status"] == "UNCERTAIN"
     assert "OTHER" in finding["discrepancies"]
+
+
+@pytest.mark.parametrize(
+    ("transcript", "claim", "expected_status"),
+    [
+        (
+            "Bis 10:00 Uhr trinkt die Bewohnerin insgesamt 500 ml Wasser und Tee.",
+            "Bis 10:00 Uhr trank die Bewohnerin insgesamt 500ml Wasser und Tee.",
+            "SUPPORTED",
+        ),
+        (
+            "Bis 10:00 Uhr trinkt die Bewohnerin insgesamt 500 ml Wasser und Tee.",
+            "Bis 10:00 Uhr trank die Bewohnerin insgesamt 700 ml Wasser und Tee.",
+            "CONTRADICTED",
+        ),
+        (
+            "Bis 10:00 Uhr trinkt die Bewohnerin insgesamt 500 ml Wasser.",
+            "Um 10:00 Uhr trank die Bewohnerin insgesamt 500 ml Wasser.",
+            "CONTRADICTED",
+        ),
+        (
+            "Sie nimmt die Getränke selbstständig zu sich und bittet einmal um Unterstützung beim Öffnen des Bechers.",
+            "Sie benötigte vollständige Unterstützung beim Trinken.",
+            "CONTRADICTED",
+        ),
+        (
+            "Übelkeit oder Erbrechen werden nicht beobachtet.",
+            "Übelkeit wurde beobachtet.",
+            "CONTRADICTED",
+        ),
+    ],
+)
+def test_offline_fallback_keeps_strict_numeric_temporal_negation_and_assistance_differences(
+    transcript: str, claim: str, expected_status: str,
+) -> None:
+    finding = OfflineSemanticEvidenceProvider().verify(
+        claims=(_claim("claim-strict", claim),),
+        source_text=transcript,
+        run_id="run-strict",
+        source_id="source-1",
+        source_version=1,
+    )["findings"][0]
+
+    assert finding["status"] == expected_status
+    assert finding["sourceSpans"]

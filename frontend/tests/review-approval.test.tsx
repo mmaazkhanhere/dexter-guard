@@ -61,20 +61,15 @@ describe("human review approval guard", () => {
 
     await user.type(editor, " Ergänzung");
 
-    expect(verifyButton).toBeDisabled();
-    expect(screen.getByText("Save the edited note as a new revision before running full verification.")).toBeInTheDocument();
+    expect(verifyButton).toBeEnabled();
     expect(fetchMock.mock.calls.some(([input, request]) => String(input).includes("/full-verifications") && request?.method === "POST")).toBe(false);
 
     const auditReadsBeforeSave = fetchMock.mock.calls.filter(([input]) => String(input).endsWith(`/reviews/${note.noteId}/audit`)).length;
-    await user.click(screen.getByRole("button", { name: "Save successor revision" }));
+    await user.click(verifyButton);
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input, request]) => String(input).includes("/full-verifications") && request?.method === "POST")).toBe(true));
     await waitFor(() => expect(verifyButton).toBeEnabled());
     expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled();
     await waitFor(() => expect(fetchMock.mock.calls.filter(([input]) => String(input).endsWith(`/reviews/${note.noteId}/audit`)).length).toBeGreaterThan(auditReadsBeforeSave));
-
-    const auditReadsBeforeVerification = fetchMock.mock.calls.filter(([input]) => String(input).endsWith(`/reviews/${note.noteId}/audit`)).length;
-    await user.click(verifyButton);
-    await waitFor(() => expect(fetchMock.mock.calls.some(([input, request]) => String(input).includes("/full-verifications") && request?.method === "POST")).toBe(true));
-    await waitFor(() => expect(fetchMock.mock.calls.filter(([input]) => String(input).endsWith(`/reviews/${note.noteId}/audit`)).length).toBeGreaterThan(auditReadsBeforeVerification));
     const verificationRequest = fetchMock.mock.calls.find(([input, request]) => String(input).includes("/full-verifications") && request?.method === "POST");
     expect(JSON.parse(String(verificationRequest?.[1]?.body)).expectedRevision).toBe(2);
   });
@@ -97,7 +92,7 @@ describe("human review approval guard", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Unsaved changes are present");
   });
 
-  it("ignores an older verification result that completes after a successor revision is saved", async () => {
+  it("does not allow a successor revision to be saved while verification is in progress", async () => {
     let resolveVerification!: (response: Response) => void;
     const pendingVerification = new Promise<Response>((resolve) => { resolveVerification = resolve; });
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -117,11 +112,11 @@ describe("human review approval guard", () => {
     await user.click(verifyButton);
     await waitFor(() => expect(fetchMock.mock.calls.some(([input, request]) => String(input).includes("/full-verifications") && request?.method === "POST")).toBe(true));
     await user.type(screen.getByRole("textbox", { name: "Editable nursing note" }), " Zusatz");
-    await user.click(screen.getByRole("button", { name: "Save successor revision" }));
-    await waitFor(() => expect(screen.getByText(/Current persisted revision .* 2/)).toBeInTheDocument());
+    expect(verifyButton).toBeDisabled();
+    expect(fetchMock.mock.calls.filter(([input, request]) => String(input).includes("/revisions") && request?.method === "POST")).toHaveLength(0);
 
     resolveVerification(new Response(JSON.stringify({ ...verification, noteRevision: 1 }), { status: 200 }));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(screen.queryByText("Verification run recorded")).not.toBeInTheDocument();
+    await waitFor(() => expect(verifyButton).toBeEnabled());
+    expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled();
   });
 });

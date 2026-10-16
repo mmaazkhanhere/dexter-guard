@@ -297,7 +297,15 @@ class ReviewService:
                 approval_eligible = True
             except ReviewServiceError:
                 pass
-        return {"contractVersion": "REVIEW-AUDIT-CONTRACT-v1", "noteId": note_id, "revision": note.revision, "latestRevision": self.repository.latest[note_id], "noteStatus": status, "source": {"sourceId": note.source_id, "sourceVersion": note.source_version}, "transcriptText": transcript_text, "candidateNote": note.content, "findings": [f.model_dump(mode="json", by_alias=True) for f in findings], "decisions": [d.model_dump(mode="json", by_alias=True) for d in decisions], "suggestions": [s.model_dump(mode="json", by_alias=True) for s in suggestions], "fullVerification": verification.model_dump(mode="json", by_alias=True) if verification else None, "approvalEligible": approval_eligible}
+        claim_result = None
+        claim_reader = getattr(self, "claim_reader", None)
+        if claim_reader is not None:
+            claim_result = claim_reader(note_id, note.revision)
+        extracted_claims = [
+            {"claimId": claim.id, "claimText": claim.claim_text, "statementSpan": {"startCodePoint": claim.statement_span.start_code_point, "endCodePointExclusive": claim.statement_span.end_code_point_exclusive, "text": claim.statement_span.text}}
+            for claim in getattr(claim_result, "claims", ())
+        ]
+        return {"contractVersion": "REVIEW-AUDIT-CONTRACT-v1", "noteId": note_id, "revision": note.revision, "latestRevision": self.repository.latest[note_id], "noteStatus": status, "source": {"sourceId": note.source_id, "sourceVersion": note.source_version}, "transcriptText": transcript_text, "candidateNote": note.content, "extractedClaims": extracted_claims, "findings": [f.model_dump(mode="json", by_alias=True) for f in findings], "decisions": [d.model_dump(mode="json", by_alias=True) for d in decisions], "suggestions": [s.model_dump(mode="json", by_alias=True) for s in suggestions], "fullVerification": verification.model_dump(mode="json", by_alias=True) if verification else None, "approvalEligible": approval_eligible}
 
     def _bind_idempotency(self, operation: str, key: str, payload: str) -> str:
         try:

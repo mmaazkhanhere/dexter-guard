@@ -108,6 +108,14 @@ class SuggestedCorrection(Contract):
         return self
 
 
+class ExtractedClaimDisplay(Contract):
+    """Read-only claim text and note span shown after claim extraction."""
+
+    claim_id: StrictStr = Field(alias="claimId", min_length=1)
+    claim_text: StrictStr = Field(alias="claimText", min_length=1)
+    statement_span: NoteSpan = Field(alias="statementSpan")
+
+
 class ReviewDecision(Contract):
     review_decision_id: StrictStr = Field(alias="reviewDecisionId", min_length=1)
     finding_id: StrictStr = Field(alias="findingId", min_length=1)

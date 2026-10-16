@@ -66,20 +66,36 @@ class FullNoteVerificationService:
                 return "INVALID", "MALFORMED_UPSTREAM_RESULT"
             if upstream_status is None:
                 return "INVALID", "MALFORMED_UPSTREAM_RESULT"
-            return "FAILED", "UPSTREAM_FAILURE"
+            return "FAILED", getattr(run, "failure_code", None) or "UPSTREAM_FAILURE"
 
         statuses = tuple(ComponentStatus(component=component, runId=getattr(run, "run_id", None), status=component_status(run)[0], failureCode=component_status(run)[1]) for component, run in runs)
         complete = len(runs) == 4 and all(run is not None for _, run in runs)
         provenance_ok = complete and all(run and (getattr(run, "source_id", None), getattr(run, "source_version", None), getattr(run, "note_id", None), getattr(run, "note_revision", None), getattr(run, "claim_set_id", None)) == (note.source_id, note.source_version, note_id, expected_revision, claim_set_id) for _, run in runs)
         all_success = complete and all(status.status == "SUCCEEDED" for status in statuses)
         unresolved_source_items = next((getattr(r, "unresolved_source_items", 0) for c, r in runs if c == "SOURCE_COVERAGE" and r), 0)
-        status = "VALID" if all_success and provenance_ok and claim_set_id != "unavailable" and unresolved_source_items == 0 else ("INVALID" if complete and (not provenance_ok or unresolved_source_items > 0 or claim_set_id == "unavailable") else "FAILED")
-        failure_code = None if status == "VALID" else ("PROVENANCE_CONFLICT" if complete and not provenance_ok else ("UNRESOLVED_SOURCE_ITEM" if unresolved_source_items else ("EMPTY_CLAIM_SET_REQUIRES_REVIEW" if claim_set_id == "unavailable" else next((item.failure_code for item in statuses if item.failure_code), "DEPENDENCY_FAILURE"))))
+        empty_claim_set = extraction is not None and getattr(extraction, "claim_count", None) == 0
+        status = "VALID" if all_success and provenance_ok and claim_set_id != "unavailable" and not empty_claim_set and unresolved_source_items == 0 else ("INVALID" if complete and (not provenance_ok or unresolved_source_items > 0 or claim_set_id == "unavailable" or empty_claim_set) else "FAILED")
+        failure_code = None if status == "VALID" else ("PROVENANCE_CONFLICT" if complete and not provenance_ok else ("UNRESOLVED_SOURCE_ITEM" if unresolved_source_items else ("EMPTY_CLAIM_SET_REQUIRES_REVIEW" if claim_set_id == "unavailable" or empty_claim_set else next((item.failure_code for item in statuses if item.failure_code), "DEPENDENCY_FAILURE"))))
+        failure_message = None if status == "VALID" else self._safe_failure_message(failure_code, runs)
         now = self.review_service.clock()
-        verification = FullNoteVerification(fullVerificationId=f"full-{uuid4()}", noteId=note_id, noteRevision=expected_revision, source={"sourceId": note.source_id, "sourceVersion": note.source_version}, claimSetId=claim_set_id, evidenceRunId=next((r.run_id for c, r in runs if c == "EVIDENCE_VERIFICATION" and r), "unavailable"), deterministicValidationRunId=next((r.run_id for c, r in runs if c == "DETERMINISTIC_VALIDATION" and r), "unavailable"), coverageRunId=next((r.run_id for c, r in runs if c == "SOURCE_COVERAGE" and r), "unavailable"), coverageUnresolvedSourceItems=unresolved_source_items, componentStatuses=statuses, status=status, idempotencyKey=idempotency_key, requestDigest=digest, correlationId=f"full-{note_id}-{expected_revision}", failureCode=failure_code, failureMessage=None if status == "VALID" else "Full-note verification did not complete with exact current provenance.", createdAt=now, completedAt=now)
+        verification = FullNoteVerification(fullVerificationId=f"full-{uuid4()}", noteId=note_id, noteRevision=expected_revision, source={"sourceId": note.source_id, "sourceVersion": note.source_version}, claimSetId=claim_set_id, evidenceRunId=next((r.run_id for c, r in runs if c == "EVIDENCE_VERIFICATION" and r), "unavailable"), deterministicValidationRunId=next((r.run_id for c, r in runs if c == "DETERMINISTIC_VALIDATION" and r), "unavailable"), coverageRunId=next((r.run_id for c, r in runs if c == "SOURCE_COVERAGE" and r), "unavailable"), coverageUnresolvedSourceItems=unresolved_source_items, componentStatuses=statuses, status=status, idempotencyKey=idempotency_key, requestDigest=digest, correlationId=f"full-{note_id}-{expected_revision}", failureCode=failure_code, failureMessage=failure_message, createdAt=now, completedAt=now)
         self.review_service.persist_verification(verification)
         if self.metrics:
             self.metrics.record_verification(status=verification.status, latency_ms=(perf_counter() - started) * 1000.0, failure_code=verification.failure_code)
         if self.logger:
             self.logger.event("FULL_VERIFICATION_COMPLETED", noteId=note_id, noteRevision=expected_revision, status=verification.status, failureCode=verification.failure_code, idempotencyKey=idempotency_key)
         return verification
+
+    @staticmethod
+    def _safe_failure_message(failure_code: str | None, runs: list[tuple[str, UpstreamRun | None]]) -> str:
+        """Return a caregiver-safe action message, never an upstream exception."""
+        evidence_run = next((run for component, run in runs if component == "EVIDENCE_VERIFICATION"), None)
+        if failure_code == "PROVIDER_TIMEOUT":
+            return "Evidence verification took too long. The note was not approved; try verification again."
+        if failure_code == "PROVIDER_UNAVAILABLE":
+            return "Evidence verification is temporarily unavailable. The note was not approved; try verification again."
+        if failure_code == "MALFORMED_VERIFIER_OUTPUT":
+            return "Evidence verification returned an invalid response. The note was not approved; try verification again."
+        if evidence_run is not None and getattr(evidence_run, "failure_reason", None):
+            return "Evidence verification did not complete. The note was not approved; try verification again."
+        return "Full-note verification did not complete. The note was not approved; try verification again."

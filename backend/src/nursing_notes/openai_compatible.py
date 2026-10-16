@@ -6,6 +6,7 @@ import json
 import re
 from collections.abc import Mapping
 from typing import Any, Protocol
+from urllib.parse import urlparse
 
 from openai import OpenAI
 
@@ -32,7 +33,7 @@ class OpenAICompatibleGenerationAdapter:
     and model remain outside the application and are never sent to the browser.
     """
 
-    prompt_version = "nursing-note-openai-compatible-v1"
+    prompt_version = "nursing-note-openai-compatible-v2"
     schema_version = "nursing-fact-v1"
     ruleset_version = "generation-guardrails-v1"
 
@@ -56,6 +57,7 @@ class OpenAICompatibleGenerationAdapter:
         self.model_id = model
         self.base_url = base_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
+        self._uses_groq_json_mode = urlparse(self.base_url).hostname == "api.groq.com"
         self.client = client or OpenAI(
             api_key=api_key,
             base_url=self.base_url,
@@ -64,17 +66,23 @@ class OpenAICompatibleGenerationAdapter:
         )
 
     def generate(self, source: Any, *, generation_run_id: str | None = None) -> GenerationResult:
-        response = self.client.chat.completions.create(
-            model=self.model_id,
-            temperature=0,
-            timeout=self.timeout_seconds,
-            messages=[
+        request: dict[str, Any] = {
+            "model": self.model_id,
+            "temperature": 0,
+            "timeout": self.timeout_seconds,
+            "messages": [
                 {"role": "system", "content": _SYSTEM_PROMPT},
                 {"role": "user", "content": _user_prompt(source)},
             ],
-        )
+        }
+        # Groq JSON Object Mode prevents prose, Markdown fences, and truncated
+        # non-JSON preambles from reaching the schema boundary. Other
+        # OpenAI-compatible providers retain the existing portable request.
+        if self._uses_groq_json_mode:
+            request["response_format"] = {"type": "json_object"}
+        response = self.client.chat.completions.create(**request)
         content = _response_content(response)
-        payload = _parse_json_object(content)
+        payload = _materialize_source_anchors(_parse_json_object(content), source)
         payload["generationRunId"] = generation_run_id
         payload["modelId"] = self.model_id
         payload["promptVersion"] = self.prompt_version
@@ -83,36 +91,53 @@ class OpenAICompatibleGenerationAdapter:
         return GenerationResult.model_validate(payload)
 
 
-_SYSTEM_PROMPT = """You generate professional German nursing documentation from one synthetic German transcript.
-Return only one JSON object. Do not use Markdown fences or explanatory text.
+_SYSTEM_PROMPT = """You are an AI assistant that transforms synthetic German caregiver transcripts into professional nursing documentation.
+
+Return only a valid JSON object. No Markdown or explanations.
+
+OBJECTIVE:
+Transform informal caregiver speech into concise, professional, natural German nursing documentation while preserving all facts.
+
+GENERATION RULES:
+1. Rewrite the transcript into professional nursing language.
+2. Do not simply copy the transcript unless it is already written in appropriate documentation style.
+3. Preserve all clinically relevant information, including measurements and units, times and temporal relationships, negations, uncertainty, resident-reported information, caregiver observations, actions, and assistance provided.
+4. Never invent observations, diagnoses, treatments, medication details, or clinical conclusions.
+5. Do not convert observations into medical diagnoses.
+6. Do not remove important contextual information.
+7. Do not invent resident identities or assignments.
+8. Use neutral, factual German documentation language.
+
+STRUCTURED FACTS:
+Extract all relevant factual claims from the generated note. Each fact must include sourceQuote: an exact supporting substring from the original transcript. Do not calculate source offsets; the backend derives them deterministically from sourceQuote.
+
 The JSON object must have this shape:
 {
   "content": "German nursing note",
   "facts": [
     {
       "type": "OBSERVATION|SYMPTOM|MEASUREMENT|ACTION",
-      "statement": "exactly source-grounded German statement",
+      "statement": "factual claim expressed in the generated note",
       "residentSubject": "the supplied resident ID",
-      "sourceAnchor": {"sourceId": "the supplied source ID", "sourceVersion": 1, "start": 0, "end": 1},
+      "sourceQuote": "exact excerpt from transcript",
       "polarity": "AFFIRMED|NEGATED",
       "certainty": "CERTAIN|UNCERTAIN",
       "attribution": "RESIDENT_REPORTED|CAREGIVER_OBSERVED or omit",
-      "temporalQualifier": "source wording or omit",
-      "numericValue": "source value or omit",
-      "unit": "source unit or omit",
+      "temporalQualifier": "exact source wording when applicable",
+      "numericValue": "source value when applicable",
+      "unit": "source unit when applicable",
       "provenance": "GENERATED_FROM_SOURCE"
     }
   ]
 }
-Rules:
-- Use only information explicitly present in the transcript.
-- Preserve negation, uncertainty, attribution, time, measurements, and units.
-- Only provide temporalQualifier when the exact temporal wording is inside the sourceAnchor span; otherwise omit it. Never add words such as today, currently, or this morning when they are absent from the transcript.
-- For RESIDENT_REPORTED, include the exact resident/reporting wording in sourceAnchor. For CAREGIVER_OBSERVED, include the exact caregiver/observation wording. Otherwise omit attribution.
-- Use exact UTF-8 Python string character offsets for each sourceAnchor.
-- Keep every sourceAnchor inside one source sentence and within the supplied transcript.
-- Do not diagnose, recommend treatment, or add clinical conclusions.
-- Every fact statement must be represented in content.
+
+SOURCE EVIDENCE:
+- Every factual claim must have supporting transcript evidence.
+- sourceQuote must be an exact, non-empty substring of the original transcript.
+- Never invent evidence or quotations.
+- Preserve the complete temporal phrase when applicable. For example, if the transcript says "Bis 10:00 Uhr", the fact must use "Bis 10:00 Uhr" as temporalQualifier; do not omit "Bis" or reduce it to only "10:00 Uhr".
+- If source evidence is insufficient, do not invent the fact.
+- Ensure every factual statement in content is represented by the structured facts.
 """
 
 
@@ -160,4 +185,44 @@ def _parse_json_object(content: str) -> dict[str, object]:
     if not isinstance(payload, dict):
         raise ValueError("provider response must be a JSON object")
     return payload
+
+
+def _materialize_source_anchors(payload: dict[str, object], source: Any) -> dict[str, object]:
+    """Replace model-supplied exact quotations with deterministic source spans.
+
+    Character offsets are easy for an LLM to miscount, especially around German
+    Unicode characters. The public nursing-fact contract still uses sourceAnchor,
+    but the provider supplies sourceQuote and this adapter resolves it against the
+    immutable transcript before Pydantic validation.
+    """
+    facts = payload.get("facts")
+    if not isinstance(facts, list):
+        return payload
+
+    transcript = source.transcript_text
+    materialized: list[object] = []
+    for index, raw_fact in enumerate(facts):
+        if not isinstance(raw_fact, Mapping):
+            materialized.append(raw_fact)
+            continue
+        fact = dict(raw_fact)
+        quote = fact.pop("sourceQuote", None)
+        if quote is None:
+            materialized.append(fact)
+            continue
+        if not isinstance(quote, str) or not quote:
+            raise ValueError(f"facts[{index}].sourceQuote must be a non-empty string")
+        start = transcript.find(quote)
+        if start < 0:
+            raise ValueError(f"facts[{index}].sourceQuote is not an exact transcript substring")
+        if transcript.find(quote, start + 1) >= 0:
+            raise ValueError(f"facts[{index}].sourceQuote is ambiguous in the transcript")
+        fact["sourceAnchor"] = {
+            "sourceId": source.source_id,
+            "sourceVersion": source.source_version,
+            "start": start,
+            "end": start + len(quote),
+        }
+        materialized.append(fact)
+    return {**payload, "facts": materialized}
 

@@ -916,6 +916,11 @@ export interface components {
             endCodePointExclusive: number;
             text: string;
         };
+        ExtractedClaimDisplay: {
+            claimId: string;
+            claimText: string;
+            statementSpan: components["schemas"]["NoteSpan"];
+        };
         EvidenceDisplay: {
             /** @enum {unknown} */
             availability: "AVAILABLE" | "MISSING" | "INVALID";
@@ -1022,6 +1027,7 @@ export interface components {
             source: components["schemas"]["schemas-SourceReference"];
             transcriptText: string;
             candidateNote: string;
+            extractedClaims: components["schemas"]["ExtractedClaimDisplay"][];
             findings: components["schemas"]["ReviewFinding"][];
             decisions: components["schemas"]["ReviewDecision"][];
             suggestions: components["schemas"]["SuggestedCorrection"][];

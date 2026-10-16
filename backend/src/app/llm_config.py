@@ -59,16 +59,21 @@ def evidence_verifier_from_environment(values: Mapping[str, str] | None = None) 
     if not api_key or not model or not base_url:
         return None
     try:
-        timeout_seconds = float(environment.get("VERIFICATION_LLM_TIMEOUT_SECONDS", environment.get("LLM_TIMEOUT_SECONDS", "30")))
+        # Verification may evaluate several extracted claims in one response.
+        # Keep its bounded allowance independent from note generation's shorter
+        # timeout unless an explicit verification override is supplied.
+        timeout_seconds = float(environment.get("VERIFICATION_LLM_TIMEOUT_SECONDS", "45"))
+        max_output_tokens = int(environment.get("VERIFICATION_LLM_MAX_TOKENS", "4096"))
         input_cost = _optional_float(environment.get("VERIFICATION_LLM_INPUT_COST_PER_1K"))
         output_cost = _optional_float(environment.get("VERIFICATION_LLM_OUTPUT_COST_PER_1K"))
     except ValueError as error:
-        raise ValueError("verification LLM timeout and pricing values must be numeric") from error
+        raise ValueError("verification LLM timeout, output limit, and pricing values must be numeric") from error
     return OpenAICompatibleEvidenceVerifier(
         api_key=api_key,
         base_url=base_url,
         model=model,
         timeout_seconds=timeout_seconds,
+        max_output_tokens=max_output_tokens,
         input_cost_per_1k=input_cost,
         output_cost_per_1k=output_cost,
     )

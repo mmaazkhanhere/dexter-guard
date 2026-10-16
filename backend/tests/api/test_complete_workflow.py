@@ -196,6 +196,36 @@ def test_generated_note_flows_from_ai_generation_through_review_approval() -> No
     assert approval.status_code == 201
 
 
+def test_faithful_german_tense_rewrite_is_extracted_as_supported_atomic_claims() -> None:
+    app = create_app()
+    client = TestClient(app)
+    transcript = (
+        "Bis 10:00 Uhr trinkt die Bewohnerin insgesamt 500 ml Wasser und Tee. "
+        "Sie nimmt die Getränke selbstständig zu sich und bittet einmal um Unterstützung beim Öffnen des Bechers. "
+        "Übelkeit oder Erbrechen werden nicht beobachtet."
+    )
+    note_text = (
+        "Bis 10:00 Uhr trank die Bewohnerin insgesamt 500ml Wasser und Tee. "
+        "Sie nahm die Getränke selbstständig zu sich und bat einmal um Unterstützung beim Öffnen des Bechers. "
+        "Übelkeit oder Erbrechen wurden nicht beobachtet."
+    )
+    _, note = _import_note(client, transcript, "faithful-tense-rewrite", content=note_text)
+
+    verification = _verify(client, note, "faithful-tense-rewrite")
+    extraction = app.state.workflow.claim_service.repository.get_current_result(f"{note['noteId']}:r1")
+    evidence_run = app.state.workflow.evidence_runs.get(verification["evidenceRunId"])
+    context = client.get(f"/api/v1/reviews/{note['noteId']}").json()
+
+    assert verification["status"] == "VALID"
+    assert extraction is not None
+    assert len(extraction.claims) == 6
+    assert evidence_run is not None
+    assert {finding.status.value for finding in evidence_run.findings} == {"SUPPORTED"}
+    assert not [finding for finding in context["findings"] if finding["origin"] == "SPEC_004"]
+    assert not [finding for finding in context["findings"] if finding["severity"] == "MAJOR"]
+    assert context["approvalEligible"] is True
+
+
 def test_caregiver_revision_is_saved_to_main_store_and_can_be_reverified_and_approved() -> None:
     app = create_app()
     client = TestClient(app)

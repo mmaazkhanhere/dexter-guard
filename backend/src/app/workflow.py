@@ -66,7 +66,7 @@ class HeuristicClaimProvider:
     without changing the orchestration ports.
     """
 
-    provider_version = "heuristic-claim-provider-v2"
+    provider_version = "heuristic-claim-provider-v3"
     model_version = None
     prompt_version = "claim-extraction-heuristic-v1"
 
@@ -76,8 +76,10 @@ class HeuristicClaimProvider:
         re.IGNORECASE,
     )
     _coordinator = re.compile(r"(?:,\s*|\s+)(?P<word>und|sowie|aber)\s+", re.IGNORECASE)
-    _predicate = re.compile(r"\b(?:ist|sind|war|waren|hat|haben|zeigt|zeigen|berichtet|klagt|wurde|wurden|erhielt|verabreicht|beträgt|liegt)\b", re.IGNORECASE)
+    _predicate = re.compile(r"\b(?:ist|sind|war|waren|hat|haben|zeigt|zeigen|berichtet|berichtete|klagt|klagte|wurde|wurden|erhielt|verabreicht|beträgt|betrug|liegt|lag|trinkt|trank|nimmt|nahm|bittet|bat)\b", re.IGNORECASE)
     _atomic_continuation = re.compile(r"\b(?:wach|orientiert|ruhig|unruhig|schmerz|schwindel|übelkeit|uebelkeit|atemnot|husten|gewaschen|gelagert|unterstützt|unterstuetzt)\w*\b", re.IGNORECASE)
+    _temporal = re.compile(r"\b(?:bis|um|ab)\s+\d{1,2}(?::\d{2})?\s*uhr\b", re.IGNORECASE)
+    _beverages = re.compile(r"\b(?:wasser|tee|kaffee|saft|milch)(?:\s*(?:,|und|sowie)\s*(?:wasser|tee|kaffee|saft|milch))+\b", re.IGNORECASE)
 
     def extract(
         self,
@@ -119,6 +121,20 @@ class HeuristicClaimProvider:
         symptom or measurement clauses are split when each side is independently
         checkable, preserving each clause's local negation scope.
         """
+        # Fluid intake with a time boundary carries three independently
+        # reviewable facts: the deadline, the documented amount, and the drink
+        # types. The amount claim keeps the complete sentence as its evidence
+        # span; the two overlapping qualifier claims make later findings precise.
+        temporal = cls._temporal.search(statement)
+        measurement = cls._number.search(statement)
+        beverages = cls._beverages.search(statement)
+        if temporal and measurement and beverages:
+            return [
+                (start + temporal.start(), start + temporal.end(), temporal.group(0)),
+                (start, start + len(statement), statement),
+                (start + beverages.start(), start + beverages.end(), beverages.group(0)),
+            ]
+
         separators = list(cls._coordinator.finditer(statement))
         if not separators:
             return [(start, start + len(statement), statement)]
@@ -206,6 +222,12 @@ class HeuristicClaimProvider:
                 cue = re.search(certainty_match.group(0), statement, re.IGNORECASE)
                 if cue:
                     claim["certaintyCue"] = make_text_span(note_text, start + cue.start(), start + cue.end()).model_dump(by_alias=True)
+            temporal = cls._temporal.search(statement)
+            if temporal:
+                temporal_start = start + temporal.start()
+                temporal_end = start + temporal.end()
+                claim["temporalText"] = temporal.group(0)
+                claim["temporalSpan"] = make_text_span(note_text, temporal_start, temporal_end).model_dump(by_alias=True)
             return claim
 
 
@@ -237,6 +259,10 @@ class OfflineSemanticEvidenceProvider:
         "berichtet": "reported", "gibt": "reported", "an": "reported", "sagt": "reported", "klagt": "reported",
         "wirkt": "observed", "beobachtet": "observed", "erscheint": "observed",
         "fieber": "fever", "temperatur": "temperature", "trinkt": "drinks", "trank": "drinks", "wasser": "drinks",
+        "tee": "tea", "nimmt": "intake", "nahm": "intake", "bittet": "request", "bat": "request",
+        "selbstständig": "independent", "selbststaendig": "independent", "unterstützung": "assistance", "unterstuetzung": "assistance",
+        "benötigte": "dependent", "benoetigte": "dependent", "vollständige": "dependent", "vollstaendige": "dependent",
+        "öffnen": "opening", "oeffnen": "opening", "becher": "cup", "erbrechen": "vomiting",
         "schläft": "sleep", "geschlafen": "sleep", "schlief": "sleep", "ruhig": "calm", "entspannt": "calm",
         "schwindel": "dizziness", "übelkeit": "nausea", "uebelkeit": "nausea",
         "übel": "nausea", "uebel": "nausea", "husten": "cough", "rötung": "redness", "roetung": "redness",
@@ -247,6 +273,8 @@ class OfflineSemanticEvidenceProvider:
     }
 
     _attribution_markers = re.compile(r"\b(?:bericht(?:et|ete)?|sagt(?:e)?|beobachtet(?:e)?|bat|bot)\b", re.IGNORECASE)
+    _measurement_values = re.compile(r"-?\d+(?:[,.]\d+)?\s*(?:ml|l|mg|g|mmhg|°?c|grad\s+celsius)\b", re.IGNORECASE)
+    _temporal = re.compile(r"\b(?:bis|um|ab)\s+\d{1,2}(?::\d{2})?\s*uhr\b", re.IGNORECASE)
 
     @staticmethod
     def _attribution_role(text: str) -> str | None:
@@ -262,6 +290,20 @@ class OfflineSemanticEvidenceProvider:
     @classmethod
     def _numeric_values(cls, text: str) -> tuple[str, ...]:
         return tuple(value.replace(",", ".") for value in cls._numbers.findall(text))
+
+    @classmethod
+    def _measured_values(cls, text: str) -> tuple[str, ...]:
+        return tuple(
+            match.group(0).casefold().replace(" ", "").replace(",", ".")
+            for match in cls._measurement_values.finditer(text)
+        )
+
+    @classmethod
+    def _temporal_values(cls, text: str) -> tuple[str, ...]:
+        return tuple(
+            re.sub(r"\s+", " ", match.group(0).casefold()).replace(":00 uhr", " uhr")
+            for match in cls._temporal.finditer(text)
+        )
 
     def verify(self, *, claims, source_text: str, run_id: str, source_id: str | None = None, source_version: int | None = None):
         findings = []
@@ -351,10 +393,21 @@ class OfflineSemanticEvidenceProvider:
         best_score: tuple[int, int, int] = (-1, -1, -1)
         for match in cls._sentences.finditer(source_text):
             sentence = match.group(0)
-            scope_start = 0
             boundaries = list(cls._scopes.finditer(sentence))
+            # Consider the whole source sentence as well as locally bounded
+            # clauses. Whole-sentence evidence is necessary for safe lists such
+            # as "Wasser und Tee"; narrower clauses still win when they carry a
+            # more specific negation or assertion scope.
+            scopes: list[tuple[int, int]] = []
+            scope_start = 0
             for boundary in boundaries + [None]:
                 scope_end = boundary.start() if boundary is not None else len(sentence)
+                scopes.append((scope_start, scope_end))
+                if boundary is None:
+                    break
+                scope_start = boundary.end()
+            scopes.append((0, len(sentence)))
+            for scope_start, scope_end in scopes:
                 raw_scope = sentence[scope_start:scope_end]
                 scope = raw_scope.strip()
                 leading_trim = len(raw_scope) - len(raw_scope.lstrip())
@@ -368,9 +421,6 @@ class OfflineSemanticEvidenceProvider:
                 if best is None or score > best_score:
                     best = (overlap, absolute_start, absolute_end, scope)
                     best_score = score
-                if boundary is None:
-                    break
-                scope_start = boundary.end()
         if best is None or not best[0]:
             return "UNSUPPORTED", "No source statement establishes the claim's meaning.", None, None, []
 
@@ -383,10 +433,18 @@ class OfflineSemanticEvidenceProvider:
         source_negated = "negated" in source_tokens
         if claim_negated != source_negated and overlap - {"negated"}:
             return "CONTRADICTED", "The source expresses the opposite polarity for the same subject matter.", start, end, ["NEGATION"]
-        claim_numbers = cls._numeric_values(claim_text)
-        source_numbers = cls._numeric_values(sentence)
-        if claim_numbers and source_numbers and claim_numbers != source_numbers and overlap:
+        if ("independent" in claim_tokens and "dependent" in source_tokens) or (
+            "dependent" in claim_tokens and "independent" in source_tokens
+        ):
+            return "CONTRADICTED", "The source gives an incompatible level of independence or assistance.", start, end, ["OTHER"]
+        claim_measurements = cls._measured_values(claim_text)
+        source_measurements = cls._measured_values(sentence)
+        if claim_measurements and source_measurements and claim_measurements != source_measurements and overlap:
             return "CONTRADICTED", "The source gives a different numeric value for the same subject matter.", start, end, ["OTHER"]
+        claim_temporals = cls._temporal_values(claim_text)
+        source_temporals = cls._temporal_values(sentence)
+        if claim_temporals and source_temporals and claim_temporals != source_temporals and overlap:
+            return "CONTRADICTED", "The source gives a different temporal relationship for the same subject matter.", start, end, ["OTHER"]
         claim_role = cls._attribution_role(claim_text)
         source_role = cls._attribution_role(sentence)
         if (
@@ -455,6 +513,7 @@ class WorkflowVerificationPorts:
             status="SUCCEEDED" if result.status in {ExtractionStatus.SUCCEEDED, ExtractionStatus.EMPTY} else "FAILED",
             source_id=source.source_id, source_version=source.source_version,
             note_id=note_id, note_revision=revision, claim_set_id=claim_set_id,
+            claim_count=len(result.claims),
         )
         workflow_log("CLAIM_EXTRACTION", "CLAIM_EXTRACTION_RESULT", outcome="SUCCESS" if run.status == "SUCCEEDED" else "ERROR", noteId=note_id, noteRevision=revision, runId=run.run_id, status=run.status, claimCount=len(result.claims))
         return run
@@ -496,8 +555,9 @@ class WorkflowVerificationPorts:
         run = self.evidence_service.verify(request)
         self._persist_evidence_findings(run, result.claims, source)
         status = "SUCCEEDED" if getattr(run, "status", None) == "SUCCEEDED" else "FAILED"
-        upstream = UpstreamRun(run_id=run.verification_run_id, status=status, source_id=source.source_id, source_version=source.source_version, note_id=note_id, note_revision=revision, claim_set_id=claim_set_id)
-        workflow_log("EVIDENCE_VERIFICATION", "EVIDENCE_VERIFICATION_RESULT", outcome="SUCCESS" if status == "SUCCEEDED" else "ERROR", noteId=note_id, noteRevision=revision, runId=upstream.run_id, status=status, findingCount=len(getattr(run, "findings", ())))
+        failure = getattr(run, "failure", None)
+        upstream = UpstreamRun(run_id=run.verification_run_id, status=status, source_id=source.source_id, source_version=source.source_version, note_id=note_id, note_revision=revision, claim_set_id=claim_set_id, failure_code=getattr(failure, "code", None), failure_reason=getattr(failure, "reason", None))
+        workflow_log("EVIDENCE_VERIFICATION", "EVIDENCE_VERIFICATION_RESULT", outcome="SUCCESS" if status == "SUCCEEDED" else "ERROR", noteId=note_id, noteRevision=revision, runId=upstream.run_id, status=status, failureCode=upstream.failure_code, findingCount=len(getattr(run, "findings", ())))
         return upstream
 
     def _claim_span(self, claims, claim_id: str | None) -> NoteSpan | None:
@@ -775,6 +835,7 @@ class ReliabilityWorkflow:
         self.source_service = source_service
         self.note_repository = note_service.repository
         self.claim_repository = InMemoryClaimRepository()
+        review_service.claim_reader = lambda note_id, revision: self.claim_repository.get_current_result(f"{note_id}:r{revision}")
         self.claim_results: dict[str, object] = {}
         self.claim_service = ClaimExtractionService(
             NursingNoteRevisionReader(self.note_repository, source_service),
@@ -799,6 +860,7 @@ class ReliabilityWorkflow:
             claim_resolver=lambda claim_set_id: self.claim_repository.get_current_result_by_extraction_run_id(claim_set_id) if hasattr(self.claim_repository, "get_current_result_by_extraction_run_id") else self._claim_result(claim_set_id),
             verifier=evidence_verifier or OfflineSemanticEvidenceProvider(),
             repository=self.evidence_runs,
+            provider_timeout_seconds=getattr(evidence_verifier, "timeout_seconds", 30.0),
         )
         self.validation_runs = InMemoryValidationRunRepository()
         self.validation_transcripts = InMemoryTranscriptRepository()

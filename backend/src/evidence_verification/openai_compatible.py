@@ -5,10 +5,12 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping, Sequence
 from typing import Any, Protocol
+from urllib.parse import urlparse
 
 from openai import OpenAI
 
 from nursing_notes.openai_compatible import _parse_json_object, _response_content
+from .provider import MalformedVerifierOutputError
 
 
 class ChatCompletionsClient(Protocol):
@@ -35,6 +37,7 @@ class OpenAICompatibleEvidenceVerifier:
         base_url: str,
         model: str,
         timeout_seconds: float = 30.0,
+        max_output_tokens: int = 4096,
         input_cost_per_1k: float | None = None,
         output_cost_per_1k: float | None = None,
         client: ChatCompletionsClient | None = None,
@@ -43,6 +46,8 @@ class OpenAICompatibleEvidenceVerifier:
             raise ValueError("api_key, base_url, and model must not be blank")
         if timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be positive")
+        if max_output_tokens <= 0:
+            raise ValueError("max_output_tokens must be positive")
         if input_cost_per_1k is not None and input_cost_per_1k < 0:
             raise ValueError("input_cost_per_1k must not be negative")
         if output_cost_per_1k is not None and output_cost_per_1k < 0:
@@ -50,6 +55,8 @@ class OpenAICompatibleEvidenceVerifier:
         self.model_id = model
         self.base_url = base_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
+        self.max_output_tokens = max_output_tokens
+        self._uses_groq_json_mode = urlparse(self.base_url).hostname == "api.groq.com"
         self.input_cost_per_1k = input_cost_per_1k
         self.output_cost_per_1k = output_cost_per_1k
         self.client = client or OpenAI(api_key=api_key, base_url=self.base_url, timeout=timeout_seconds, max_retries=0)
@@ -69,15 +76,30 @@ class OpenAICompatibleEvidenceVerifier:
         self.last_input_tokens = None
         self.last_output_tokens = None
         self.last_inference_cost = None
-        response = self.client.chat.completions.create(
-            model=self.model_id,
-            temperature=0,
-            timeout=self.timeout_seconds,
-            messages=[
+        request: dict[str, Any] = {
+            "model": self.model_id,
+            "temperature": 0,
+            "timeout": self.timeout_seconds,
+            "max_tokens": self.max_output_tokens,
+            "messages": [
                 {"role": "system", "content": _SYSTEM_PROMPT},
                 {"role": "user", "content": _user_prompt(claims, source_text, run_id, source_id, source_version)},
             ],
-        )
+        }
+        # Groq JSON Object Mode prevents explanatory prose and Markdown from
+        # consuming the bounded response budget before the required findings.
+        if self._uses_groq_json_mode:
+            request["response_format"] = {"type": "json_object"}
+        try:
+            response = self.client.chat.completions.create(**request)
+        except Exception as error:
+            # Groq reports JSON-mode generation failures as a 400 with
+            # ``json_validate_failed``. It is a malformed model response, not
+            # an unavailable provider; preserve that distinction upstream.
+            message = str(error).casefold()
+            if "json_validate_failed" in message or "failed to validate json" in message:
+                raise MalformedVerifierOutputError("Verifier response could not be validated as JSON.") from error
+            raise
         self._capture_usage(getattr(response, "usage", None) or (response.get("usage") if isinstance(response, Mapping) else None))
         payload = _parse_json_object(_response_content(response))
         return payload
@@ -115,7 +137,7 @@ quantities and units are independently checked by deterministic rules, but an
 explicit semantic conflict must still be reported.
 Example: "Frau Müller verneint Schmerzen" versus "Frau Müller klagt über
 Schmerzen" is CONTRADICTED with a NEGATION discrepancy, never UNSUPPORTED.
-Each finding must contain:
+Keep each explanation under 20 words and return no extra commentary. Each finding must contain:
 {
   "claimId": "submitted claim ID",
   "status": "SUPPORTED|UNSUPPORTED|CONTRADICTED|UNCERTAIN",
@@ -124,7 +146,8 @@ Each finding must contain:
   "evidenceQuotes": [],
   "discrepancies": ["NEGATION|CERTAINTY|ATTRIBUTION|CLINICAL_INFERENCE|OTHER"]
 }
-Use an empty sourceSpans array only for UNSUPPORTED claims. Character offsets
+Use an empty sourceSpans array only for UNSUPPORTED claims. Keep evidenceQuotes
+empty; the backend derives authoritative quotations from sourceSpans. Character offsets
 must be exact Python end-exclusive offsets into the supplied transcript.
 """
 

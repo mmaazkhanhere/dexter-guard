@@ -59,37 +59,31 @@ export function ReviewWorkspace() {
       : note.content === demo?.correctedNote
         ? "REVERIFY"
         : "CORRECT";
+  const progress = [
+    { label: "Review flagged issues", done: !unresolvedFindings },
+    { label: "Correct the note", done: !hasUnsavedChanges },
+    { label: "Save and re-verify", done: currentVerification?.status === "VALID" },
+    { label: "Approve or reject", done: context?.noteStatus === "APPROVED" || context?.noteStatus === "REJECTED" },
+  ];
 
-  async function saveRevision() {
-    if (!content.trim() || content === note.content) return;
-    try {
-      const result = await save.mutateAsync({ noteId: note.noteId, expectedRevision: note.revision, content, reviewerLabel: reviewer });
-      applyNoteRevision({ ...note, revision: result.revision, content });
-      setDraftContent(content);
-      await review.refetch();
-      notify({ tone: "success", title: "New version saved", message: "Your changes were saved as a new note version. Check it again before approval." });
-    } catch (actionError) {
-      notifyFailure(notify, "Revision was not saved", actionError, "The current persisted revision was not changed.");
-    }
-  }
 
-  async function fullVerify() {
-    if (hasUnsavedChanges) {
-      notify({ tone: "error", title: "Save the note before verification", message: "Full verification only runs against the exact saved note revision. Save your edits as a successor revision first." });
-      return;
-    }
-    const verificationRevision = note.revision;
+  async function saveAndReverify() {
+    if (!content.trim()) return;
     try {
-      const result = await verify.mutateAsync({ noteId: note.noteId, expectedRevision: note.revision, reviewerLabel: reviewer });
-      if (latestRevisionRef.current !== verificationRevision) return;
-      void review.refetch();
-      if (result.status === "VALID") {
-        notify({ tone: "info", title: "Verification run recorded", message: "Inspect the current findings and approval eligibility before approval." });
-      } else {
-        notify({ tone: "error", title: "The note needs attention", message: `${userFacingFailureMessage(result.failureCode, result.failureMessage)} Approval remains unavailable until the issues are resolved.` });
+      let revision = note;
+      if (hasUnsavedChanges) {
+        const saved = await save.mutateAsync({ noteId: note.noteId, expectedRevision: note.revision, content, reviewerLabel: reviewer });
+        revision = { ...note, revision: saved.revision, content };
+        applyNoteRevision(revision);
+        setDraftContent(content);
+        await review.refetch();
       }
+      const result = await verify.mutateAsync({ noteId: revision.noteId, expectedRevision: revision.revision, reviewerLabel: reviewer });
+      await review.refetch();
+      if (result.status === "VALID") notify({ tone: "success", title: "Note saved and re-verified", message: "Review the findings before approving or rejecting this revision." });
+      else notify({ tone: "error", title: "Verification needs attention", message: `${userFacingFailureMessage(result.failureCode, result.failureMessage)} The draft remains visible and approval is disabled.` });
     } catch (actionError) {
-      notifyFailure(notify, "Full verification could not run", actionError, "The note remains in its prior verification state and approval eligibility was not changed.");
+      notifyFailure(notify, "Save and re-verify could not finish", actionError, "The saved revision and approval state were not silently changed.");
     }
   }
 
@@ -134,6 +128,7 @@ export function ReviewWorkspace() {
   return <>
     <WorkspaceHeader eyebrow="02 · HUMAN REVIEW" title="Resolve findings and approve safely" description="Resolve the findings identified in Documentation & Verification. Edits create successor revisions and preserve the linked source, note, and evidence." />
     <section className="review-next-step" aria-live="polite" aria-label="What to do next"><span className="eyebrow">WHAT TO DO NEXT</span><h3>{nextStep.title}</h3><p>{nextStep.detail}</p></section>
+    <ol className="review-progress" aria-label="Review progress">{progress.map((step) => <li className={step.done ? "complete" : ""} key={step.label}><span aria-hidden="true">{step.done ? "✓" : "○"}</span>{step.label}</li>)}</ol>
     {demo && <section className="guided-demo" aria-label="Guided demo review progress"><span className="eyebrow">GUIDED DEMO · {demoStep === "COMPLETE" ? "COMPLETE" : `STEP ${demoStep}`}</span><h3>{demoStep === "COMPLETE" ? "Synthetic note approved" : demo.steps.find((step) => step.id === demoStep)?.title}</h3><p>{demoStep === "COMPLETE" ? "The audit history below records the explicit human approval for the corrected revision." : demo.steps.find((step) => step.id === demoStep)?.instruction}</p>{demoStep === "CORRECT" && <div className="button-row"><button className="secondary-button" onClick={() => { setContent(demo.correctedNote); setDraftContent(demo.correctedNote); }}>Apply evidence-supported demo correction</button></div>}</section>}
     {firstError && <div className="error-banner" role="alert">{safeMutationError(firstError).message}</div>}
     {staleContext && <div className="error-banner" role="status">This review result is stale for the current note revision. Refresh before taking an approval or decision action.</div>}
@@ -143,8 +138,8 @@ export function ReviewWorkspace() {
         <label><strong>Reviewer label</strong><input aria-describedby="reviewer-label-help" value={reviewer} onChange={(event) => setReviewer(event.target.value)} /></label><span id="reviewer-label-help" className="field-description">The name recorded in the audit history for your edits and decisions.</span>
         <label><strong>Candidate nursing note</strong><textarea aria-label="Editable nursing note" value={content} onChange={(event) => { setContent(event.target.value); setDraftContent(event.target.value); }} /></label>
         <p className="review-help">Edit this note only when a finding needs correction. The original version is preserved when you save.</p>
-        <div className="button-row"><button onClick={saveRevision} disabled={save.isPending || !hasUnsavedChanges}>{save.isPending ? "Saving …" : "Save successor revision"}</button><button className="secondary-button" onClick={fullVerify} disabled={verify.isPending || save.isPending || hasUnsavedChanges} aria-describedby={hasUnsavedChanges ? "verification-save-required" : undefined}>{verify.isPending ? "Verifying …" : "Run full verification"}</button></div>
-        <p className="review-help">Save successor revision creates a new version after an edit. Run full verification checks the currently saved version against the transcript.</p>
+        <div className="button-row"><button aria-label="Run full verification" onClick={saveAndReverify} disabled={save.isPending || verify.isPending}>{save.isPending || verify.isPending ? "Saving and re-verifying …" : "Save & re-verify"}</button></div>
+        <p className="review-help">This saves a new revision when needed, then verifies that exact revision.</p>
         <p id="verification-save-required" className="muted">{hasUnsavedChanges ? "Save the edited note as a new revision before running full verification." : "After saving an edit, run verification again before approval."}</p>
       </StateCard>
       <StateCard title="Approval eligibility" tone={approvalEligible ? "neutral" : "warning"}>
@@ -161,17 +156,17 @@ export function ReviewWorkspace() {
       <StateCard title="Evidence for the selected finding" description="Select a finding below to see the affected note text and matching transcript evidence.">
         <ReviewEvidence finding={selectedFinding} transcript={context?.transcriptText ?? ""} candidateNote={context?.candidateNote ?? note.content} />
       </StateCard>
-      <StateCard title="Finding decisions">
+      <StateCard title="Verified claims" description="These are the claims extracted from this saved note revision and checked during verification.">
+        {context?.extractedClaims?.length ? <div className="finding-list">{context.extractedClaims.map((claim) => <div className="finding" key={claim.claimId}><strong>{claim.claimId}</strong><p>{claim.claimText}</p><p className="muted">Extracted from the note at characters {claim.statementSpan.startCodePoint}–{claim.statementSpan.endCodePointExclusive}.</p></div>)}</div> : <p className="muted">No extracted claims are available for this revision. Run verification again if this is unexpected.</p>}
+      </StateCard>
+      <details className="secondary-section"><summary>Advanced: individual finding decisions</summary>
         <div className="review-help" role="note"><p><b>Acknowledge</b> accepts the finding. <b>Dispute</b> flags it as incorrect; add a rationale. Neither action approves the note.</p></div>
-        <div className="finding-list">{context?.findings.length ? context.findings.map((finding) => { const decision = [...(context.decisions ?? [])].reverse().find((item) => item.findingId === finding.reviewFindingId); const decisionState = decision?.kind === "ACKNOWLEDGED" ? "ACKNOWLEDGED" : decision?.kind === "DISPUTED" ? "DISPUTED" : finding.state; return <div className={`finding ${selectedFinding?.reviewFindingId === finding.reviewFindingId ? "selected" : ""}`} key={finding.reviewFindingId}><button className="finding-select" onClick={() => setSelectedFindingId(finding.reviewFindingId)} aria-pressed={selectedFinding?.reviewFindingId === finding.reviewFindingId}><span>{finding.reviewFindingId}</span><strong>{decisionState} · {finding.severity}</strong><p>{finding.explanation}</p></button><div className="button-row"><button className="secondary-button" onClick={() => recordDecision(finding.reviewFindingId, "ACKNOWLEDGED")} disabled={Boolean(decision)}>Acknowledge</button><button className="secondary-button" onClick={() => recordDecision(finding.reviewFindingId, "DISPUTED")} disabled={Boolean(decision) || reason.trim().length < 3}>Dispute</button></div></div>}) : <div className="review-help"><strong>No findings for this revision.</strong><p>After a successful verification, this means the verifier recorded no issues. If verification failed, retry it before treating the note as clear.</p></div>}</div>
-      </StateCard>
-      <StateCard title="Suggested corrections">
+        <div className="finding-list">{context?.findings.length ? context.findings.map((finding) => { const decision = [...(context.decisions ?? [])].reverse().find((item) => item.findingId === finding.reviewFindingId); const decisionState = decision?.kind === "ACKNOWLEDGED" ? "ACKNOWLEDGED" : decision?.kind === "DISPUTED" ? "DISPUTED" : finding.state; return <div className={`finding ${selectedFinding?.reviewFindingId === finding.reviewFindingId ? "selected" : ""}`} key={finding.reviewFindingId}><button className="finding-select" onClick={() => setSelectedFindingId(finding.reviewFindingId)} aria-pressed={selectedFinding?.reviewFindingId === finding.reviewFindingId}><span>{finding.reviewFindingId}</span><strong>{decisionState} · {finding.severity}</strong><p>{finding.explanation}</p></button><div className="finding-evidence-preview"><ReviewEvidence finding={finding} transcript={context?.transcriptText ?? ""} candidateNote={context?.candidateNote ?? note.content} /></div><div className="button-row"><button className="secondary-button" onClick={() => recordDecision(finding.reviewFindingId, "ACKNOWLEDGED")} disabled={Boolean(decision)}>Acknowledge</button><button className="secondary-button" onClick={() => recordDecision(finding.reviewFindingId, "DISPUTED")} disabled={Boolean(decision) || reason.trim().length < 3}>Dispute</button></div></div>}) : <div className="review-help"><strong>No findings for this revision.</strong><p>After a successful verification, this means the verifier recorded no issues. If verification failed, retry it before treating the note as clear.</p></div>}</div>
+      </details>
+      <details className="secondary-section"><summary>Advanced: suggested corrections</summary>
         <div className="finding-list">{context?.suggestions.length ? context.suggestions.map((suggestion) => <div className="finding" key={suggestion.suggestionId}><span>{suggestion.suggestionId}</span><strong>{suggestion.supportStatus}</strong><p>Replace the backend-provided span with: {suggestion.replacement}</p><div className="button-row"><button onClick={() => suggestionDecision(suggestion.findingId, suggestion.suggestionId, "SUGGESTION_ACCEPTED")} disabled={suggestion.supportStatus !== "USABLE" || decide.isPending}>Accept explicitly</button><button className="secondary-button" onClick={() => suggestionDecision(suggestion.findingId, suggestion.suggestionId, "SUGGESTION_REJECTED")} disabled={suggestion.supportStatus !== "USABLE" || decide.isPending || reason.trim().length < 3}>Reject with rationale</button></div></div>) : <div className="review-help"><strong>No suggested corrections are available.</strong><p>Suggestions appear only when the backend has source-supported replacement wording. You can always correct the note manually above.</p></div>}</div>
-      </StateCard>
-      <StateCard title="Persisted audit history">
-        <p className="review-help">This append-only history records saved revisions, verification runs, decisions, and final approval or rejection. It lets you see what happened and which revision each action affected.</p>
-        <div className="finding-list">{audit.data?.events.length ? audit.data.events.map((event) => <div className="finding" key={event.eventId}><span>#{event.sequence} · {event.occurredAt}</span><strong>{event.eventType}</strong><p>{event.actorLabel} · revision {event.noteRevision}{event.rationale ? ` · ${event.rationale}` : ""}</p></div>) : <p className="muted">No audit events have been recorded for this note yet.</p>}</div>
-      </StateCard>
+      </details>
+      <details className="secondary-section"><summary>Review history</summary><p className="review-help">Saved revisions, checks, decisions, and approval history.</p><div className="finding-list">{audit.data?.events.length ? audit.data.events.map((event) => <div className="finding" key={event.eventId}><span>#{event.sequence} · {event.occurredAt}</span><strong>{event.eventType}</strong><p>{event.actorLabel} · revision {event.noteRevision}{event.rationale ? ` · ${event.rationale}` : ""}</p></div>) : <p className="muted">No review history yet.</p>}</div></details>
     </div>
   </>;
 }
@@ -183,7 +178,8 @@ function ReviewEvidence({ finding, transcript, candidateNote }: { finding?: Find
     .filter((span) => span.sourceId === finding.sourceId && span.sourceVersion === finding.sourceVersion)
     .map((span) => projectSourceSpan(transcript, span))
     .filter((excerpt): excerpt is string => Boolean(excerpt)) : [];
-  return <div className="review-evidence"><div className="finding-summary"><span className="status-label">{finding.upstreamStatus ?? "REVIEW FINDING"}</span><span className="status-label">{finding.severity}</span><span className="status-label">{finding.origin}</span></div><p>{finding.explanation}</p><h4>Candidate note reference</h4><p className="evidence-note">{claimText ?? "No valid candidate-note span is available for this finding."}</p><h4>Source evidence</h4>{excerpts.length ? excerpts.map((excerpt, index) => <p className="evidence-note" key={`${finding.reviewFindingId}-${index}`}>{excerpt}</p>) : <p className="muted">Evidence is {finding.evidence.availability.toLowerCase()}; no source excerpt is shown.</p>}</div>;
+  const isCompoundEvidence = finding.origin === "SPEC_004" || /compound claim|separate subclaim/i.test(finding.explanation);
+  return <div className="review-evidence"><div className="finding-summary"><span className="status-label">Review finding</span><span className="status-label">{finding.severity === "CRITICAL" ? "Urgent" : finding.severity === "MAJOR" ? "Important" : "Minor"}</span></div><p>{finding.explanation}</p>{isCompoundEvidence && <div className="review-guidance" role="note"><strong>What this means</strong><p>The note combines several statements, but the verifier could not match each statement to its own source evidence. This does not necessarily mean the time or amount is wrong.</p><strong>What to do</strong><p>Split the combined sentence into separate facts, keeping the wording and source meaning unchanged. Then select <b>Save &amp; re-verify</b>. Approval stays blocked until the corrected revision passes verification.</p></div>}<h4>Candidate note reference</h4><p className="evidence-note">{claimText ?? "No matching note text was found."}</p><h4>Source evidence</h4>{excerpts.length ? excerpts.map((excerpt, index) => <p className="evidence-note" key={`${finding.reviewFindingId}-${index}`}>{excerpt}</p>) : <p className="muted">No matching transcript evidence is available.</p>}</div>;
 }
 
 function projectNoteSpan(text: string, start: number, end: number): string | undefined {

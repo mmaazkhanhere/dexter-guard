@@ -11,6 +11,10 @@ export function userFacingApiMessage(code: string, message: string, field?: stri
   if (code === "EMPTY_MODEL_OUTPUT") return "The AI did not produce a nursing note. Please try again.";
   if (code === "GENERATION_REJECTED") return "The AI could not create a note that is fully supported by the transcript. Please check the transcript and try again.";
   if (["NETWORK_UNAVAILABLE", "DEPENDENCY_UNAVAILABLE"].includes(code)) return "The service is temporarily unavailable. Please try again.";
+  if (code === "PROVIDER_TIMEOUT") return "Evidence verification took too long. The note was not approved; try verification again.";
+  if (code === "PROVIDER_UNAVAILABLE") return "Evidence verification is temporarily unavailable. The note was not approved; try verification again.";
+  if (code === "MALFORMED_VERIFIER_OUTPUT") return "Evidence verification returned an invalid response. The note was not approved; try verification again.";
+  if (code === "UPSTREAM_FAILURE") return "Evidence verification did not complete. The note was not approved; try verification again.";
   if (code === "MALFORMED_RESPONSE") return "The service returned an unexpected response. Please try again.";
   if (code === "NOTE_VERSION_CONFLICT" || code === "STALE_REVISION") return "This note changed before your action finished. Refresh the page and try again.";
   if (kind === "timeout") return "The action took too long to finish. Please try again.";
