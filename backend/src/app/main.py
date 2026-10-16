@@ -376,12 +376,12 @@ def create_app() -> FastAPI:
         adapter=ReliabilityEngineEvaluationAdapter(evidence_verifier=evidence_verifier),
         repository=evaluation_repository,
     )
+    fixture_runner = EvaluationRunner(
+        dataset=default_dataset(),
+        adapter=DeterministicFixtureAdapter(),
+        repository=evaluation_repository,
+    )
     if not evaluation_repository.list_runs():
-        fixture_runner = EvaluationRunner(
-            dataset=default_dataset(),
-            adapter=DeterministicFixtureAdapter(),
-            repository=evaluation_repository,
-        )
         fixture_dataset = default_dataset()
         fixture_runner.execute(EvaluationRunRequest(
             subjectKind="BENCHMARK",
@@ -393,7 +393,7 @@ def create_app() -> FastAPI:
             idempotencyKey="preloaded-heldout-fixture-v1",
         ))
     app.state.evaluation_runner = evaluation_runner
-    app.include_router(create_evaluation_router(evaluation_runner, allow_live=os.getenv("EVALUATION_ALLOW_LIVE_API", "false").strip().lower() == "true"))
+    app.include_router(create_evaluation_router(evaluation_runner, allow_live=os.getenv("EVALUATION_ALLOW_LIVE_API", "false").strip().lower() == "true", fixture_runner=fixture_runner))
     return app
 
 

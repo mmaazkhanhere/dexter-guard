@@ -8,7 +8,7 @@ from .repository import SQLiteEvaluationRepository
 from .runner import EvaluationRunner
 
 
-def create_router(runner: EvaluationRunner, repository: SQLiteEvaluationRepository | None = None, *, allow_live: bool = False) -> APIRouter:
+def create_router(runner: EvaluationRunner, repository: SQLiteEvaluationRepository | None = None, *, allow_live: bool = False, fixture_runner: EvaluationRunner | None = None) -> APIRouter:
     router = APIRouter(prefix="/api/v1/evaluation-runs", tags=["evaluation"])
     store = repository or runner.repository
 
@@ -16,7 +16,8 @@ def create_router(runner: EvaluationRunner, repository: SQLiteEvaluationReposito
     def execute(request: EvaluationRunRequest):
         if request.execution_mode == "LIVE" and not allow_live:
             raise HTTPException(status_code=403, detail={"code": "LIVE_EVALUATION_DISABLED", "message": "Live benchmark execution is disabled on the public API; use the controlled evaluation CLI."})
-        return runner.execute(request).model_dump(mode="json", by_alias=True)
+        selected_runner = fixture_runner if request.execution_mode == "SAVED_FIXTURE" and fixture_runner is not None else runner
+        return selected_runner.execute(request).model_dump(mode="json", by_alias=True)
 
     @router.get("")
     def list_runs():
