@@ -916,17 +916,25 @@ export interface components {
             endCodePointExclusive: number;
             text: string;
         };
-        ExtractedClaimDisplay: {
-            claimId: string;
-            claimText: string;
-            statementSpan: components["schemas"]["NoteSpan"];
-        };
         EvidenceDisplay: {
             /** @enum {unknown} */
             availability: "AVAILABLE" | "MISSING" | "INVALID";
             spans: components["schemas"]["SourceSpan"][];
             excerpts: string[];
         } & (unknown & unknown);
+        ExtractedClaimDisplay: {
+            claimId: string;
+            claimText: string;
+            statementSpan: components["schemas"]["NoteSpan"];
+            /** @enum {unknown} */
+            verificationState: "NOT_VERIFIED" | "VERIFIED" | "FAILED";
+            /** @enum {unknown} */
+            evidenceStatus?: "SUPPORTED" | "UNSUPPORTED" | "CONTRADICTED" | "UNCERTAIN" | "null";
+            explanation?: string | null;
+            evidence?: components["schemas"]["EvidenceDisplay"] | null;
+            verificationRunId?: string | null;
+            findingIds: string[];
+        };
         ReviewFinding: {
             reviewFindingId: string;
             /** @enum {unknown} */
@@ -1016,6 +1024,17 @@ export interface components {
             /** Format: date-time */
             completedAt?: string;
         } & unknown;
+        ApprovalRecord: {
+            dispositionId: string;
+            noteId: string;
+            noteRevision: number;
+            reviewerLabel: string;
+            /** Format: date-time */
+            decidedAt: string;
+            fullVerificationId: string;
+            auditEventId: string;
+            meaning: string;
+        };
         ReviewContext: {
             /** @constant */
             contractVersion: "REVIEW-AUDIT-CONTRACT-v1";
@@ -1033,6 +1052,7 @@ export interface components {
             suggestions: components["schemas"]["SuggestedCorrection"][];
             fullVerification: components["schemas"]["FullNoteVerification"] | null;
             approvalEligible: boolean;
+            approval: components["schemas"]["ApprovalRecord"] | null;
         };
         SaveRevisionRequest: {
             expectedRevision: number;

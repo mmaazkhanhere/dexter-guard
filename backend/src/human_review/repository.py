@@ -89,6 +89,8 @@ class InMemoryReviewRepository:
     def persist_disposition(self, disposition: NoteDisposition) -> None:
         if any(existing.disposition_id == disposition.disposition_id and existing != disposition for existing in self.dispositions):
             raise ReviewRepositoryError("IMMUTABLE_RECORD_CONFLICT")
+        if any(existing.note_id == disposition.note_id and existing.note_revision == disposition.note_revision and existing.kind == disposition.kind and existing.disposition_id != disposition.disposition_id for existing in self.dispositions):
+            raise ReviewRepositoryError("REVISION_ALREADY_APPROVED" if disposition.kind == "APPROVED" else "FINAL_DISPOSITION_IMMUTABLE")
 
     def persist_claim_feedback(self, feedback: ClaimReverificationResponse) -> None:
         existing = self.claim_feedback.get(feedback.review_verification_id)
@@ -203,8 +205,8 @@ class SQLiteReviewRepository(InMemoryReviewRepository):
 
     def persist_disposition(self, disposition: NoteDisposition) -> None:
         self._require_note(disposition.note_id, disposition.note_revision)
-        if any(existing.note_id == disposition.note_id for existing in self.dispositions if existing.disposition_id != disposition.disposition_id):
-            raise ReviewRepositoryError("FINAL_DISPOSITION_IMMUTABLE")
+        if any(existing.note_id == disposition.note_id and existing.note_revision == disposition.note_revision and existing.kind == disposition.kind and existing.disposition_id != disposition.disposition_id for existing in self.dispositions):
+            raise ReviewRepositoryError("REVISION_ALREADY_APPROVED" if disposition.kind == "APPROVED" else "FINAL_DISPOSITION_IMMUTABLE")
         if disposition.kind == "APPROVED" and disposition.full_verification_id not in self.verifications:
             raise ReviewRepositoryError("APPROVAL_PRECONDITION_FAILED")
         self._persist_json("dispositions", "disposition_id", disposition.disposition_id, disposition.model_dump_json(by_alias=True))

@@ -161,3 +161,34 @@ def test_offline_fallback_keeps_strict_numeric_temporal_negation_and_assistance_
 
     assert finding["status"] == expected_status
     assert finding["sourceSpans"]
+
+
+def test_oder_and_bzw_are_supported_as_alternative_drink_wording() -> None:
+    source = "Bis 10:00 Uhr trank die Bewohnerin insgesamt 500ml Wasser oder Tee."
+    claim = "Bis 10:00 Uhr wurde von der Bewohnerin insgesamt 500 ml Wasser bzw. Tee oral eingenommen."
+
+    finding = OfflineSemanticEvidenceProvider().verify(
+        claims=(_claim("claim-alternative-drinks", claim),),
+        source_text=source,
+        run_id="run-alternative-drinks",
+        source_id="source-1",
+        source_version=1,
+    )["findings"][0]
+
+    assert finding["status"] == "SUPPORTED"
+    assert finding["sourceSpans"]
+
+
+def test_und_and_oder_remain_a_meaningful_difference() -> None:
+    source = "Bis 10:00 Uhr trank die Bewohnerin insgesamt 500ml Wasser und Tee."
+    claim = "Bis 10:00 Uhr trank die Bewohnerin insgesamt 500 ml Wasser oder Tee."
+
+    finding = OfflineSemanticEvidenceProvider().verify(
+        claims=(_claim("claim-conjunction-change", claim),),
+        source_text=source,
+        run_id="run-conjunction-change",
+        source_id="source-1",
+        source_version=1,
+    )["findings"][0]
+
+    assert finding["status"] in {"CONTRADICTED", "UNCERTAIN"}

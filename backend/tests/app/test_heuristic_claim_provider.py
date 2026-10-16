@@ -1,6 +1,27 @@
 from app.workflow import HeuristicClaimProvider
 
 
+def test_german_abbreviations_do_not_break_claim_boundaries_or_offsets() -> None:
+    note = (
+        "Bis 10:00 Uhr wurde von der Bewohnerin insgesamt 500 ml Wasser bzw. Tee oral eingenommen. "
+        "Die Bewohnerin erhielt z. B. Tee und u. a. Wasser. Danach blieb sie ruhig usw."
+    )
+
+    claims = HeuristicClaimProvider().extract(
+        note, note_revision_id="note-1:r1", resident_test_id="resident-1",
+    )["claims"]
+
+    assert [claim["claimText"] for claim in claims] == [
+        "Bis 10:00 Uhr wurde von der Bewohnerin insgesamt 500 ml Wasser bzw. Tee oral eingenommen.",
+        "Die Bewohnerin erhielt z. B. Tee und u. a. Wasser.",
+        "Danach blieb sie ruhig usw.",
+    ]
+    assert all(
+        note[claim["statementSpan"]["startCodePoint"]:claim["statementSpan"]["endCodePointExclusive"]] == claim["claimText"]
+        for claim in claims
+    )
+
+
 def test_compound_vital_signs_become_independent_numeric_claims() -> None:
     note = "Die Temperatur betr\u00e4gt 37,2 C und der Puls liegt bei 83 Schl\u00e4gen pro Minute."
 

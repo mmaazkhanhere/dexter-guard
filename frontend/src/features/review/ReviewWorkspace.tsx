@@ -38,6 +38,9 @@ export function ReviewWorkspace() {
   const hasUnsavedChanges = content !== note.content;
   const staleContext = Boolean(context && context.latestRevision > note.revision);
   const unresolvedFindings = context?.findings.some((finding) => isFindingUnresolved(finding, context.decisions)) ?? false;
+  const unresolvedCount = context?.findings.filter((finding) => isFindingUnresolved(finding, context.decisions)).length ?? 0;
+  const resolvedCount = context?.findings.filter((finding) => !isFindingUnresolved(finding, context.decisions)).length ?? 0;
+  const criticalUnresolvedCount = context?.findings.filter((finding) => finding.severity === "CRITICAL" && isFindingUnresolved(finding, context.decisions)).length ?? 0;
   const approvalEligible = Boolean(context?.approvalEligible && currentVerification?.status === "VALID" && !hasUnsavedChanges && !unresolvedFindings && !review.error && !verify.isPending && !save.isPending);
   const firstError = review.error ?? save.error ?? verify.error ?? decide.error ?? approve.error ?? reject.error;
   const selectedFinding = context?.findings.find((finding) => finding.reviewFindingId === selectedFindingId) ?? context?.findings[0];
@@ -59,11 +62,13 @@ export function ReviewWorkspace() {
       : note.content === demo?.correctedNote
         ? "REVERIFY"
         : "CORRECT";
+  const workflowState = context?.noteStatus === "APPROVED" ? "Approved" : context?.noteStatus === "REJECTED" ? "Rejected" : currentVerification?.status === "VALID" ? "Human Review" : "Verification";
+  const nextAction = context?.noteStatus === "APPROVED" ? "Start a new revision or view the approved revision" : context?.noteStatus === "REJECTED" ? "Review the rejection reason" : hasUnsavedChanges ? "Save the new revision, then re-verify" : !currentVerification || currentVerification.status !== "VALID" ? "Run full verification" : unresolvedFindings ? `Resolve ${unresolvedCount} open finding${unresolvedCount === 1 ? "" : "s"}` : approvalEligible ? "Make the human approval decision" : "Complete the remaining review requirements";
   const progress = [
-    { label: "Review flagged issues", done: !unresolvedFindings },
-    { label: "Correct the note", done: !hasUnsavedChanges },
-    { label: "Save and re-verify", done: currentVerification?.status === "VALID" },
-    { label: "Approve or reject", done: context?.noteStatus === "APPROVED" || context?.noteStatus === "REJECTED" },
+    { label: "Draft", done: Boolean(note.content) },
+    { label: "Verification", done: currentVerification?.status === "VALID" },
+    { label: "Human review", done: !unresolvedFindings && Boolean(currentVerification?.status === "VALID") },
+    { label: "Approved / rejected", done: context?.noteStatus === "APPROVED" || context?.noteStatus === "REJECTED" },
   ];
 
 
@@ -127,7 +132,7 @@ export function ReviewWorkspace() {
 
   return <>
     <WorkspaceHeader eyebrow="02 · HUMAN REVIEW" title="Resolve findings and approve safely" description="Resolve the findings identified in Documentation & Verification. Edits create successor revisions and preserve the linked source, note, and evidence." />
-    <section className="review-next-step" aria-live="polite" aria-label="What to do next"><span className="eyebrow">WHAT TO DO NEXT</span><h3>{nextStep.title}</h3><p>{nextStep.detail}</p></section>
+    <section className="review-next-step" aria-live="polite" aria-label="Review status and next action"><span className="eyebrow">HUMAN REVIEW · {workflowState.toUpperCase()}</span><h3>{nextAction}</h3><p>{nextStep.detail}</p><p className="review-help">Revision {note.revision} · {resolvedCount} reviewed · {unresolvedCount} unresolved{criticalUnresolvedCount ? ` · ${criticalUnresolvedCount} critical` : ""}</p></section>
     <ol className="review-progress" aria-label="Review progress">{progress.map((step) => <li className={step.done ? "complete" : ""} key={step.label}><span aria-hidden="true">{step.done ? "✓" : "○"}</span>{step.label}</li>)}</ol>
     {demo && <section className="guided-demo" aria-label="Guided demo review progress"><span className="eyebrow">GUIDED DEMO · {demoStep === "COMPLETE" ? "COMPLETE" : `STEP ${demoStep}`}</span><h3>{demoStep === "COMPLETE" ? "Synthetic note approved" : demo.steps.find((step) => step.id === demoStep)?.title}</h3><p>{demoStep === "COMPLETE" ? "The audit history below records the explicit human approval for the corrected revision." : demo.steps.find((step) => step.id === demoStep)?.instruction}</p>{demoStep === "CORRECT" && <div className="button-row"><button className="secondary-button" onClick={() => { setContent(demo.correctedNote); setDraftContent(demo.correctedNote); }}>Apply evidence-supported demo correction</button></div>}</section>}
     {firstError && <div className="error-banner" role="alert">{safeMutationError(firstError).message}</div>}
@@ -142,7 +147,17 @@ export function ReviewWorkspace() {
         <p className="review-help">This saves a new revision when needed, then verifies that exact revision.</p>
         <p id="verification-save-required" className="muted">{hasUnsavedChanges ? "Save the edited note as a new revision before running full verification." : "After saving an edit, run verification again before approval."}</p>
       </StateCard>
-      <StateCard title="Approval eligibility" tone={approvalEligible ? "neutral" : "warning"}>
+      <StateCard title="Approval eligibility" tone={context?.noteStatus === "APPROVED" ? "neutral" : approvalEligible ? "neutral" : "warning"}>
+        {context?.noteStatus === "APPROVED" && context.approval ? <div className="approval-confirmation" role="status">
+          <span className="eyebrow">HUMAN-REVIEWED</span>
+          <h2>Nursing note approved</h2>
+          <p><strong>Revision {context.approval.noteRevision}</strong> · Human-reviewed</p>
+          <p><strong>Approved</strong></p>
+          <p>The current revision has been approved and the decision has been recorded in the audit history.</p>
+          <p className="review-help">Approval means: {context.approval.meaning} It does not certify the clinical correctness of the note.</p>
+          <p className="review-help"><strong>Next action:</strong> View the approved note or edit it to start a new revision.</p>
+          <p className="muted">Approved by {context.approval.reviewerLabel} · {new Date(context.approval.decidedAt).toLocaleString()}</p>
+        </div> : <>
         <div className="eligibility">{approvalEligible ? "Human approval required" : "Approval blocked"}</div>
         <p>{currentVerification ? (currentVerification.status !== "VALID" ? "The verification run did not complete successfully. Retry it before approval." : approvalEligible ? "No unresolved issues are recorded. A human must still decide whether to approve this note." : "Review required. Unresolved issues must be resolved or adjudicated before approval.") : "A complete verification is required before approval."}</p>
         {currentVerification?.status !== "VALID" && <p className="review-help">Approval is blocked because the verification process did not complete successfully; an empty findings list is not a successful verification.</p>}
@@ -152,16 +167,24 @@ export function ReviewWorkspace() {
         <div className="button-row"><button onClick={approveNote} disabled={!approvalEligible || approve.isPending}>{approve.isPending ? "Approving …" : "Approve"}</button><button className="danger-button" onClick={rejectNote} disabled={reject.isPending || reason.trim().length < 3}>Reject</button></div>
         <p className="review-help">Approve records human acceptance of this exact verified revision. Reject records that this revision should not be used; rejection remains available when verification fails.</p>
         <label>Reviewer rationale<input aria-describedby="rationale-help" value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Explain a rejection, dispute, or rejected suggestion" /></label><span id="rationale-help" className="field-description">Required for Reject, Dispute, and Reject suggestion actions.</span>
+        </>}
       </StateCard>
       <StateCard title="Evidence for the selected finding" description="Select a finding below to see the affected note text and matching transcript evidence.">
         <ReviewEvidence finding={selectedFinding} transcript={context?.transcriptText ?? ""} candidateNote={context?.candidateNote ?? note.content} />
       </StateCard>
-      <StateCard title="Verified claims" description="These are the claims extracted from this saved note revision and checked during verification.">
-        {context?.extractedClaims?.length ? <div className="finding-list">{context.extractedClaims.map((claim) => <div className="finding" key={claim.claimId}><strong>{claim.claimId}</strong><p>{claim.claimText}</p><p className="muted">Extracted from the note at characters {claim.statementSpan.startCodePoint}–{claim.statementSpan.endCodePointExclusive}.</p></div>)}</div> : <p className="muted">No extracted claims are available for this revision. Run verification again if this is unexpected.</p>}
+      <StateCard title="Extracted Claims" description="Illustrative claim-level verification from this saved note revision.">
+        {context?.extractedClaims?.length ? <div className="finding-list">{context.extractedClaims.map((claim, index) => <div className="finding" key={claim.claimId}>
+          <div className="finding-summary"><strong>Claim {index + 1}</strong><span className="status-label">{claim.evidenceStatus ?? claim.verificationState}</span></div>
+          <button className="finding-select" onClick={() => claim.findingIds[0] && setSelectedFindingId(claim.findingIds[0])} disabled={!claim.findingIds.length} aria-label={`Inspect evidence for claim ${index + 1}`}><strong>{claim.claimText}</strong></button>
+          {claim.explanation && <p>{claim.explanation}</p>}
+          {claim.evidence?.availability === "AVAILABLE" && claim.evidence.excerpts.map((excerpt, evidenceIndex) => <p className="evidence-note" key={`${claim.claimId}-evidence-${evidenceIndex}`}><strong>Evidence:</strong> “{excerpt}”</p>)}
+          {(!claim.evidence || claim.evidence.availability !== "AVAILABLE") && <p className="muted">Evidence unavailable for this claim.</p>}
+          <p className="muted">{claim.verificationState === "VERIFIED" ? "Checked against the source transcript." : claim.verificationState === "FAILED" ? "Verification failed; this claim is not approval evidence." : "Not verified yet."}</p>
+        </div>)}</div> : <p className="muted">No extracted claims are available for this revision. Run verification again if this is unexpected.</p>}
       </StateCard>
       <details className="secondary-section"><summary>Advanced: individual finding decisions</summary>
         <div className="review-help" role="note"><p><b>Acknowledge</b> accepts the finding. <b>Dispute</b> flags it as incorrect; add a rationale. Neither action approves the note.</p></div>
-        <div className="finding-list">{context?.findings.length ? context.findings.map((finding) => { const decision = [...(context.decisions ?? [])].reverse().find((item) => item.findingId === finding.reviewFindingId); const decisionState = decision?.kind === "ACKNOWLEDGED" ? "ACKNOWLEDGED" : decision?.kind === "DISPUTED" ? "DISPUTED" : finding.state; return <div className={`finding ${selectedFinding?.reviewFindingId === finding.reviewFindingId ? "selected" : ""}`} key={finding.reviewFindingId}><button className="finding-select" onClick={() => setSelectedFindingId(finding.reviewFindingId)} aria-pressed={selectedFinding?.reviewFindingId === finding.reviewFindingId}><span>{finding.reviewFindingId}</span><strong>{decisionState} · {finding.severity}</strong><p>{finding.explanation}</p></button><div className="finding-evidence-preview"><ReviewEvidence finding={finding} transcript={context?.transcriptText ?? ""} candidateNote={context?.candidateNote ?? note.content} /></div><div className="button-row"><button className="secondary-button" onClick={() => recordDecision(finding.reviewFindingId, "ACKNOWLEDGED")} disabled={Boolean(decision)}>Acknowledge</button><button className="secondary-button" onClick={() => recordDecision(finding.reviewFindingId, "DISPUTED")} disabled={Boolean(decision) || reason.trim().length < 3}>Dispute</button></div></div>}) : <div className="review-help"><strong>No findings for this revision.</strong><p>After a successful verification, this means the verifier recorded no issues. If verification failed, retry it before treating the note as clear.</p></div>}</div>
+        <div className="finding-list">{context?.findings.length ? context.findings.map((finding) => { const decision = [...(context.decisions ?? [])].reverse().find((item) => item.findingId === finding.reviewFindingId); const decisionState = decision?.kind === "ACKNOWLEDGED" ? "ACKNOWLEDGED" : decision?.kind === "DISPUTED" ? "DISPUTED" : finding.state; const decisionInFlight = decide.isPending && decide.variables?.findingId === finding.reviewFindingId; return <div className={`finding ${selectedFinding?.reviewFindingId === finding.reviewFindingId ? "selected" : ""}`} key={finding.reviewFindingId}><button className="finding-select" onClick={() => setSelectedFindingId(finding.reviewFindingId)} aria-pressed={selectedFinding?.reviewFindingId === finding.reviewFindingId}><span>{finding.reviewFindingId}</span><strong>{decisionState} · {finding.severity}</strong><p>{finding.explanation}</p></button>{decision ? <p className="review-help">{decision.kind === "ACKNOWLEDGED" ? "Acknowledged: reviewer has seen this finding; it remains unresolved for approval." : "Disputed: reviewer rationale has been recorded for adjudication."}</p> : <><p className="review-help">{finding.evidence.availability === "AVAILABLE" ? "Evidence is available in the selected finding panel." : "Evidence is unavailable for this finding."}</p><div className="button-row"><button className="secondary-button" onClick={() => recordDecision(finding.reviewFindingId, "ACKNOWLEDGED")} disabled={decide.isPending} aria-busy={decisionInFlight}>{decisionInFlight ? "Saving…" : "Acknowledge"}</button><button className="secondary-button" onClick={() => recordDecision(finding.reviewFindingId, "DISPUTED")} disabled={decide.isPending || reason.trim().length < 3} aria-busy={decisionInFlight}>{decisionInFlight ? "Saving…" : "Dispute"}</button></div></>}</div>}) : <div className="review-help"><strong>No findings for this revision.</strong><p>After a successful verification, this means the verifier recorded no issues. If verification failed, retry it before treating the note as clear.</p></div>}</div>
       </details>
       <details className="secondary-section"><summary>Advanced: suggested corrections</summary>
         <div className="finding-list">{context?.suggestions.length ? context.suggestions.map((suggestion) => <div className="finding" key={suggestion.suggestionId}><span>{suggestion.suggestionId}</span><strong>{suggestion.supportStatus}</strong><p>Replace the backend-provided span with: {suggestion.replacement}</p><div className="button-row"><button onClick={() => suggestionDecision(suggestion.findingId, suggestion.suggestionId, "SUGGESTION_ACCEPTED")} disabled={suggestion.supportStatus !== "USABLE" || decide.isPending}>Accept explicitly</button><button className="secondary-button" onClick={() => suggestionDecision(suggestion.findingId, suggestion.suggestionId, "SUGGESTION_REJECTED")} disabled={suggestion.supportStatus !== "USABLE" || decide.isPending || reason.trim().length < 3}>Reject with rationale</button></div></div>) : <div className="review-help"><strong>No suggested corrections are available.</strong><p>Suggestions appear only when the backend has source-supported replacement wording. You can always correct the note manually above.</p></div>}</div>

@@ -114,6 +114,23 @@ class ExtractedClaimDisplay(Contract):
     claim_id: StrictStr = Field(alias="claimId", min_length=1)
     claim_text: StrictStr = Field(alias="claimText", min_length=1)
     statement_span: NoteSpan = Field(alias="statementSpan")
+    verification_state: Literal["NOT_VERIFIED", "VERIFIED", "FAILED"] = Field(alias="verificationState")
+    evidence_status: Literal["SUPPORTED", "UNSUPPORTED", "CONTRADICTED", "UNCERTAIN"] | None = Field(default=None, alias="evidenceStatus")
+    explanation: StrictStr | None = None
+    evidence: EvidenceDisplay | None = None
+    verification_run_id: StrictStr | None = Field(default=None, alias="verificationRunId")
+    finding_ids: tuple[StrictStr, ...] = Field(default=(), alias="findingIds")
+
+
+class ApprovalRecord(Contract):
+    disposition_id: StrictStr = Field(alias="dispositionId", min_length=1)
+    note_id: StrictStr = Field(alias="noteId", min_length=1)
+    note_revision: StrictInt = Field(alias="noteRevision", ge=1)
+    reviewer_label: StrictStr = Field(alias="reviewerLabel", min_length=1)
+    decided_at: datetime = Field(alias="decidedAt")
+    full_verification_id: StrictStr = Field(alias="fullVerificationId", min_length=1)
+    audit_event_id: StrictStr = Field(alias="auditEventId", min_length=1)
+    meaning: StrictStr = "A caregiver has reviewed and accepted this specific verified revision of the nursing note."
 
 
 class ReviewDecision(Contract):

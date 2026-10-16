@@ -17,6 +17,8 @@ export function userFacingApiMessage(code: string, message: string, field?: stri
   if (code === "UPSTREAM_FAILURE") return "Evidence verification did not complete. The note was not approved; try verification again.";
   if (code === "MALFORMED_RESPONSE") return "The service returned an unexpected response. Please try again.";
   if (code === "NOTE_VERSION_CONFLICT" || code === "STALE_REVISION") return "This note changed before your action finished. Refresh the page and try again.";
+  if (code === "REVISION_ALREADY_APPROVED") return "This revision is already approved. No duplicate approval was recorded.";
+  if (code === "APPROVAL_PRECONDITION_FAILED") return "This revision is not eligible for approval. Resolve the remaining review requirements and verify it again.";
   if (kind === "timeout") return "The action took too long to finish. Please try again.";
   if (kind === "unavailable" || kind === "network") return "The service is temporarily unavailable. Please try again.";
   if (kind === "validation") return "Please check the information and try again.";

@@ -223,7 +223,28 @@ def test_faithful_german_tense_rewrite_is_extracted_as_supported_atomic_claims()
     assert {finding.status.value for finding in evidence_run.findings} == {"SUPPORTED"}
     assert not [finding for finding in context["findings"] if finding["origin"] == "SPEC_004"]
     assert not [finding for finding in context["findings"] if finding["severity"] == "MAJOR"]
+    assert all(claim["verificationState"] == "VERIFIED" for claim in context["extractedClaims"])
+    assert all(claim["evidence"]["availability"] == "AVAILABLE" for claim in context["extractedClaims"])
     assert context["approvalEligible"] is True
+
+
+def test_bzw_abbreviation_and_oder_alternative_are_verified_as_one_supported_claim() -> None:
+    app = create_app()
+    client = TestClient(app)
+    source_text = "Bis 10:00 Uhr trank die Bewohnerin insgesamt 500ml Wasser oder Tee."
+    note_text = "Bis 10:00 Uhr wurde von der Bewohnerin insgesamt 500 ml Wasser bzw. Tee oral eingenommen."
+    _, note = _import_note(client, source_text, "bzw-alternative", content=note_text)
+
+    verification = _verify(client, note, "bzw-alternative")
+    extraction = app.state.workflow.claim_service.repository.get_current_result(f"{note['noteId']}:r1")
+    context = client.get(f"/api/v1/reviews/{note['noteId']}").json()
+
+    assert extraction is not None
+    assert len(extraction.claims) == 1
+    assert verification["status"] == "VALID"
+    assert {finding["status"] for finding in context["findings"] if finding["origin"] == "SPEC_004"} == set()
+    assert context["extractedClaims"][0]["verificationState"] == "VERIFIED"
+    assert context["extractedClaims"][0]["evidence"]["availability"] == "AVAILABLE"
 
 
 def test_caregiver_revision_is_saved_to_main_store_and_can_be_reverified_and_approved() -> None:

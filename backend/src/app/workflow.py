@@ -58,6 +58,41 @@ from source_coverage.repository import (
 from source_coverage.service import SourceCoverageService
 
 
+_GERMAN_ABBREVIATION = re.compile(r"(?:\bbzw|\busw|\bz\.\s*B|\bu\.\s*a)\.$", re.IGNORECASE)
+_GERMAN_ABBREVIATION_START = re.compile(r"(?:\bbzw|\busw|\bz|\bu)\.\s*(?:B|a)?\.?", re.IGNORECASE)
+_GERMAN_ABBREVIATION_INITIAL = re.compile(r"(?:\bz|\bu)\.$", re.IGNORECASE)
+
+
+def _sentence_spans(text: str) -> tuple[tuple[int, int], ...]:
+    """Return sentence boundaries without treating common German abbreviations as ends."""
+    spans: list[tuple[int, int]] = []
+    start = 0
+    for index, character in enumerate(text):
+        if character not in ".!?\r\n":
+            continue
+        if character in "\r\n":
+            if text[start:index].strip():
+                spans.append((start, index))
+            start = index + 1
+            continue
+        prefix = text[start:index + 1]
+        if character == "." and (
+            _GERMAN_ABBREVIATION.search(prefix)
+            or _GERMAN_ABBREVIATION_START.match(text[index:])
+            or (
+                _GERMAN_ABBREVIATION_INITIAL.search(prefix)
+                and re.match(r"\s*(?:B|a)\.", text[index + 1:], re.IGNORECASE)
+            )
+        ):
+            continue
+        if text[start:index + 1].strip():
+            spans.append((start, index + 1))
+        start = index + 1
+    if text[start:].strip():
+        spans.append((start, len(text)))
+    return tuple(spans)
+
+
 class HeuristicClaimProvider:
     """Deterministic provider for the synthetic PoC claim boundary.
 
@@ -70,7 +105,6 @@ class HeuristicClaimProvider:
     model_version = None
     prompt_version = "claim-extraction-heuristic-v1"
 
-    _sentences = re.compile(r"[^.!?\r\n]+(?:[.!?]|$)")
     _number = re.compile(
         r"(?P<value>\d+(?:[.,]\d+)?)\s*(?P<unit>\u00b0?C|grad\s+celsius|celsius|grad|mmHg|ml|mg|bpm|schl(?:\u00e4|ae)ge[n]?\s+pro\s+minute|l\b|g\b)",
         re.IGNORECASE,
@@ -92,13 +126,13 @@ class HeuristicClaimProvider:
         revision_id = note_revision_id or "note:unknown:r1"
         resident_id = resident_test_id or "synthetic-resident-unknown"
         claims: list[dict[str, object]] = []
-        for match in self._sentences.finditer(note_text):
-            raw = match.group(0)
+        for sentence_start, sentence_end in _sentence_spans(note_text):
+            raw = note_text[sentence_start:sentence_end]
             leading = len(raw) - len(raw.lstrip())
             statement = raw.strip()
             if not statement or statement.casefold().startswith("pflegedokumentation:") and len(statement.split()) == 1:
                 continue
-            start = match.start() + leading
+            start = sentence_start + leading
             end = start + len(statement)
             if statement.casefold().startswith("pflegedokumentation:"):
                 prefix = "Pflegedokumentation:"
@@ -246,7 +280,6 @@ class OfflineSemanticEvidenceProvider:
     prompt_version = "evidence-verification-offline-semantic-v1"
     prompt_hash = "sha256:evidence-verification-offline-semantic-v1"
 
-    _sentences = re.compile(r"[^.!?\r\n]+(?:[.!?]|$)")
     _scopes = re.compile(r"(?:\s+(?:und|aber|doch|sowie)\s+|,\s+(?=[A-Za-zÄÖÜäöüß]))")
     _words = re.compile(r"[\wäöüÄÖÜß]+")
     _numbers = re.compile(r"-?\d+(?:[,.]\d+)?")
@@ -391,8 +424,8 @@ class OfflineSemanticEvidenceProvider:
         claim_tokens = cls._meaning_tokens(claim_text)
         best: tuple[set[str], int, int, str] | None = None
         best_score: tuple[int, int, int] = (-1, -1, -1)
-        for match in cls._sentences.finditer(source_text):
-            sentence = match.group(0)
+        for sentence_start, sentence_end in _sentence_spans(source_text):
+            sentence = source_text[sentence_start:sentence_end]
             boundaries = list(cls._scopes.finditer(sentence))
             # Consider the whole source sentence as well as locally bounded
             # clauses. Whole-sentence evidence is necessary for safe lists such
@@ -411,7 +444,7 @@ class OfflineSemanticEvidenceProvider:
                 raw_scope = sentence[scope_start:scope_end]
                 scope = raw_scope.strip()
                 leading_trim = len(raw_scope) - len(raw_scope.lstrip())
-                absolute_start = match.start() + scope_start + leading_trim
+                absolute_start = sentence_start + scope_start + leading_trim
                 absolute_end = absolute_start + len(scope)
                 scope_tokens = cls._meaning_tokens(scope)
                 overlap = claim_tokens & scope_tokens
@@ -433,6 +466,10 @@ class OfflineSemanticEvidenceProvider:
         source_negated = "negated" in source_tokens
         if claim_negated != source_negated and overlap - {"negated"}:
             return "CONTRADICTED", "The source expresses the opposite polarity for the same subject matter.", start, end, ["NEGATION"]
+        claim_operator = cls._logical_operator(claim_text)
+        source_operator = cls._logical_operator(sentence)
+        if claim_operator and source_operator and claim_operator != source_operator and overlap:
+            return "CONTRADICTED", "The source uses a different relationship between the documented alternatives.", start, end, ["OTHER"]
         if ("independent" in claim_tokens and "dependent" in source_tokens) or (
             "dependent" in claim_tokens and "independent" in source_tokens
         ):
@@ -466,6 +503,14 @@ class OfflineSemanticEvidenceProvider:
         if overlap:
             return "UNCERTAIN", "The source is related but does not establish every material part of the claim.", start, end, ["OTHER"]
         return "UNSUPPORTED", "No source statement establishes the claim's meaning.", None, None, []
+
+    @staticmethod
+    def _logical_operator(text: str) -> str | None:
+        if re.search(r"\b(?:oder|bzw)(?:\.|\b)", text, re.IGNORECASE):
+            return "ALTERNATIVE"
+        if re.search(r"\bund\b", text, re.IGNORECASE):
+            return "CONJUNCTION"
+        return None
 
 
 class WorkflowVerificationPorts:
@@ -595,6 +640,22 @@ class WorkflowVerificationPorts:
         claims_by_id = {claim.id: claim for claim in claims}
         for finding in getattr(run, "findings", ()):
             if finding.status.value == "SUPPORTED":
+                if finding.source_spans:
+                    self.review_service.record_claim_evidence(
+                        run.note_id,
+                        run.note_revision,
+                        finding.claim_id,
+                        EvidenceDisplay(
+                            availability="AVAILABLE",
+                            spans=tuple({
+                                "sourceId": item.source_id,
+                                "sourceVersion": item.source_version,
+                                "start": item.start,
+                                "end": item.end,
+                            } for item in finding.source_spans),
+                            excerpts=tuple(source.transcript_text[item.start:item.end] for item in finding.source_spans),
+                        ),
+                    )
                 continue
             finding_id = f"review-{run.verification_run_id}-{finding.claim_id}"
             if finding_id in self.review_service.repository.findings:

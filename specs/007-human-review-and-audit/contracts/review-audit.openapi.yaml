@@ -200,7 +200,7 @@ components:
               - type: object
                 properties: { code: { const: STALE_REVISION } }
     RevisionConflict:
-      description: The expected revision is stale or the note has a final disposition.
+      description: The expected revision is stale or the note has a final rejection disposition.
       content:
         application/json:
           schema:
@@ -208,7 +208,7 @@ components:
               - $ref: '#/components/schemas/StaleRevisionError'
               - $ref: '#/components/schemas/FinalDispositionImmutableError'
     FinalDispositionImmutable:
-      description: The note already has a final approval or rejection disposition; reopening is out of scope.
+      description: The note already has a final rejection disposition; approved revisions can create successors.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/FinalDispositionImmutableError' }
@@ -221,6 +221,9 @@ components:
               - $ref: '#/components/schemas/ErrorResponse'
               - type: object
                 properties: { code: { const: APPROVAL_PRECONDITION_FAILED } }
+    RevisionAlreadyApproved:
+      description: This exact revision already has an approval disposition.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
     DependencyUnavailable:
       description: A required upstream service or repository was unavailable; it cannot be treated as verified.
       content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
@@ -330,15 +333,21 @@ components:
     ExtractedClaimDisplay:
       type: object
       additionalProperties: false
-      required: [claimId, claimText, statementSpan]
+      required: [claimId, claimText, statementSpan, verificationState, findingIds]
       properties:
         claimId: { type: string, minLength: 1 }
         claimText: { type: string, minLength: 1 }
         statementSpan: { $ref: '#/components/schemas/NoteSpan' }
+        verificationState: { enum: [NOT_VERIFIED, VERIFIED, FAILED] }
+        evidenceStatus: { enum: [SUPPORTED, UNSUPPORTED, CONTRADICTED, UNCERTAIN, 'null'] }
+        explanation: { type: [string, 'null'] }
+        evidence: { anyOf: [ { $ref: '#/components/schemas/EvidenceDisplay' }, { type: 'null' } ] }
+        verificationRunId: { type: [string, 'null'] }
+        findingIds: { type: array, items: { type: string, minLength: 1 } }
     ReviewContext:
       type: object
       additionalProperties: false
-      required: [contractVersion, noteId, revision, latestRevision, noteStatus, source, transcriptText, candidateNote, extractedClaims, findings, decisions, suggestions, fullVerification, approvalEligible]
+      required: [contractVersion, noteId, revision, latestRevision, noteStatus, source, transcriptText, candidateNote, extractedClaims, findings, decisions, suggestions, fullVerification, approvalEligible, approval]
       properties:
         contractVersion: { const: REVIEW-AUDIT-CONTRACT-v1 }
         noteId: { type: string, minLength: 1 }
@@ -354,6 +363,20 @@ components:
         suggestions: { type: array, items: { $ref: '#/components/schemas/SuggestedCorrection' } }
         fullVerification: { anyOf: [ { $ref: '#/components/schemas/FullNoteVerification' }, { type: 'null' } ] }
         approvalEligible: { type: boolean }
+        approval: { anyOf: [ { $ref: '#/components/schemas/ApprovalRecord' }, { type: 'null' } ] }
+    ApprovalRecord:
+      type: object
+      additionalProperties: false
+      required: [dispositionId, noteId, noteRevision, reviewerLabel, decidedAt, fullVerificationId, auditEventId, meaning]
+      properties:
+        dispositionId: { type: string, minLength: 1 }
+        noteId: { type: string, minLength: 1 }
+        noteRevision: { type: integer, minimum: 1 }
+        reviewerLabel: { type: string, minLength: 1 }
+        decidedAt: { type: string, format: date-time }
+        fullVerificationId: { type: string, minLength: 1 }
+        auditEventId: { type: string, minLength: 1 }
+        meaning: { type: string, minLength: 1 }
     SaveRevisionRequest:
       type: object
       additionalProperties: false

@@ -8,7 +8,7 @@ from typing import Any, Callable
 from uuid import uuid4
 
 from .approval import ApprovalEligibilityPolicy, ReviewServiceError
-from .contracts import AuditEvent, ClaimReverificationResponse, FullNoteVerification, NoteDisposition, ReviewDecision, ReviewFinding, SuggestedCorrection
+from .contracts import AuditEvent, ClaimReverificationResponse, EvidenceDisplay, FullNoteVerification, NoteDisposition, ReviewDecision, ReviewFinding, SuggestedCorrection
 from .repository import InMemoryReviewRepository, ReviewRepositoryError
 
 
@@ -27,10 +27,15 @@ class ReviewService:
         self.clock = clock or (lambda: datetime.now(timezone.utc))
         self.id_factory = id_factory or (lambda: str(uuid4()))
         self.note_revision_writer = note_revision_writer
+        self.claim_evidence: dict[tuple[str, int, str], EvidenceDisplay] = {}
 
     def attach_note_revision_writer(self, writer: Callable[..., Any]) -> None:
         """Attach the canonical nursing-note revision writer at composition time."""
         self.note_revision_writer = writer
+
+    def record_claim_evidence(self, note_id: str, revision: int, claim_id: str, evidence: EvidenceDisplay) -> None:
+        """Project supported evidence for display without creating a review finding."""
+        self.claim_evidence[(note_id, revision, claim_id)] = evidence
 
     def _event(self, note_id: str, revision: int, actor: str, event_type: str, target_type: str, target_id: str, references=(), rationale=None) -> AuditEvent:
         payload = json.dumps({"eventType": event_type, "targetId": target_id, "references": list(references)}, sort_keys=True)
@@ -61,7 +66,7 @@ class ReviewService:
                 if replay is not None:
                     return replay
             latest = self.get_note(note_id)
-            if any(disposition.note_id == note_id for disposition in self.repository.dispositions):
+            if any(disposition.note_id == note_id and disposition.kind == "REJECTED" for disposition in self.repository.dispositions):
                 raise ReviewServiceError("FINAL_DISPOSITION_IMMUTABLE")
             if latest.revision != expected_revision:
                 raise ReviewServiceError("STALE_REVISION")
@@ -217,8 +222,8 @@ class ReviewService:
             latest = self.get_note(note_id)
             if latest.revision != expected_revision:
                 raise ReviewServiceError("STALE_REVISION")
-            if any(disposition.note_id == note_id for disposition in self.repository.dispositions):
-                raise ReviewServiceError("FINAL_DISPOSITION_IMMUTABLE")
+            if any(disposition.note_id == note_id and disposition.note_revision == expected_revision and disposition.kind == "APPROVED" for disposition in self.repository.dispositions):
+                raise ReviewServiceError("REVISION_ALREADY_APPROVED")
             persisted = self.repository.verifications.get(full_verification.full_verification_id)
             if persisted != full_verification:
                 raise ReviewServiceError("APPROVAL_PRECONDITION_FAILED")
@@ -301,11 +306,27 @@ class ReviewService:
         claim_reader = getattr(self, "claim_reader", None)
         if claim_reader is not None:
             claim_result = claim_reader(note_id, note.revision)
-        extracted_claims = [
-            {"claimId": claim.id, "claimText": claim.claim_text, "statementSpan": {"startCodePoint": claim.statement_span.start_code_point, "endCodePointExclusive": claim.statement_span.end_code_point_exclusive, "text": claim.statement_span.text}}
-            for claim in getattr(claim_result, "claims", ())
-        ]
-        return {"contractVersion": "REVIEW-AUDIT-CONTRACT-v1", "noteId": note_id, "revision": note.revision, "latestRevision": self.repository.latest[note_id], "noteStatus": status, "source": {"sourceId": note.source_id, "sourceVersion": note.source_version}, "transcriptText": transcript_text, "candidateNote": note.content, "extractedClaims": extracted_claims, "findings": [f.model_dump(mode="json", by_alias=True) for f in findings], "decisions": [d.model_dump(mode="json", by_alias=True) for d in decisions], "suggestions": [s.model_dump(mode="json", by_alias=True) for s in suggestions], "fullVerification": verification.model_dump(mode="json", by_alias=True) if verification else None, "approvalEligible": approval_eligible}
+        extracted_claims = []
+        for claim in getattr(claim_result, "claims", ()):
+            claim_findings = [f for f in findings if f.claim_id == claim.id]
+            primary = next((f for f in claim_findings if f.upstream_status in {"SUPPORTED", "UNSUPPORTED", "CONTRADICTED", "UNCERTAIN"}), None)
+            projected_evidence = self.claim_evidence.get((note_id, note.revision, claim.id))
+            extracted_claims.append({
+                "claimId": claim.id,
+                "claimText": claim.claim_text,
+                "statementSpan": {"startCodePoint": claim.statement_span.start_code_point, "endCodePointExclusive": claim.statement_span.end_code_point_exclusive, "text": claim.statement_span.text},
+                "verificationState": "FAILED" if verification and verification.status != "VALID" else ("VERIFIED" if verification else "NOT_VERIFIED"),
+                "evidenceStatus": primary.upstream_status if primary else None,
+                "explanation": primary.explanation if primary else None,
+                "evidence": primary.evidence.model_dump(mode="json", by_alias=True) if primary else (projected_evidence.model_dump(mode="json", by_alias=True) if projected_evidence else None),
+                "verificationRunId": primary.origin_run_id if primary else (verification.evidence_run_id if verification else None),
+                "findingIds": tuple(f.review_finding_id for f in claim_findings),
+            })
+        approval = None
+        if disposition and disposition.kind == "APPROVED":
+            approval_event = next((e for e in reversed(self.repository.audit(note_id)) if e.target_id == disposition.disposition_id), None)
+            approval = {"dispositionId": disposition.disposition_id, "noteId": note_id, "noteRevision": disposition.note_revision, "reviewerLabel": disposition.reviewer_label, "decidedAt": disposition.decided_at, "fullVerificationId": disposition.full_verification_id, "auditEventId": approval_event.event_id if approval_event else "unknown", "meaning": "A caregiver has reviewed and accepted this specific verified revision of the nursing note."}
+        return {"contractVersion": "REVIEW-AUDIT-CONTRACT-v1", "noteId": note_id, "revision": note.revision, "latestRevision": self.repository.latest[note_id], "noteStatus": status, "source": {"sourceId": note.source_id, "sourceVersion": note.source_version}, "transcriptText": transcript_text, "candidateNote": note.content, "extractedClaims": extracted_claims, "findings": [f.model_dump(mode="json", by_alias=True) for f in findings], "decisions": [d.model_dump(mode="json", by_alias=True) for d in decisions], "suggestions": [s.model_dump(mode="json", by_alias=True) for s in suggestions], "fullVerification": verification.model_dump(mode="json", by_alias=True) if verification else None, "approvalEligible": approval_eligible, "approval": approval}
 
     def _bind_idempotency(self, operation: str, key: str, payload: str) -> str:
         try:

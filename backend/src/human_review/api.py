@@ -12,7 +12,7 @@ from .verification import FullNoteVerificationService
 
 def _error(error: ReviewServiceError) -> JSONResponse:
     code = str(error)
-    status = 503 if code == "DEPENDENCY_UNAVAILABLE" else (404 if code in {"NOTE_NOT_FOUND", "FINDING_NOT_FOUND", "SUGGESTION_NOT_FOUND"} else (409 if code in {"STALE_REVISION", "FINAL_DISPOSITION_IMMUTABLE", "APPROVAL_PRECONDITION_FAILED", "PROVENANCE_CONFLICT", "IDEMPOTENCY_KEY_CONFLICT", "SUGGESTION_TARGET_MISMATCH"} else 400))
+    status = 503 if code == "DEPENDENCY_UNAVAILABLE" else (404 if code in {"NOTE_NOT_FOUND", "FINDING_NOT_FOUND", "SUGGESTION_NOT_FOUND"} else (409 if code in {"STALE_REVISION", "FINAL_DISPOSITION_IMMUTABLE", "REVISION_ALREADY_APPROVED", "APPROVAL_PRECONDITION_FAILED", "PROVENANCE_CONFLICT", "IDEMPOTENCY_KEY_CONFLICT", "SUGGESTION_TARGET_MISMATCH"} else 400))
     return JSONResponse(status_code=status, content={"code": code, "message": code})
 
 

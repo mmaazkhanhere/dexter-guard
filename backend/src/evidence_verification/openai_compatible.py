@@ -135,6 +135,10 @@ conflicts as CONTRADICTED; missing support as UNSUPPORTED; and relevant but
 qualified or ambiguous evidence as UNCERTAIN. Do not infer diagnoses. Numeric
 quantities and units are independently checked by deterministic rules, but an
 explicit semantic conflict must still be reported.
+In German, treat "oder" and "bzw." as compatible alternative wording when the
+source and claim describe the same alternatives and quantity. Preserve the
+distinction between "und" (both) and "oder"/"bzw." (alternative); do not merge
+them merely because the same nouns occur.
 Example: "Frau Müller verneint Schmerzen" versus "Frau Müller klagt über
 Schmerzen" is CONTRADICTED with a NEGATION discrepancy, never UNSUPPORTED.
 Keep each explanation under 20 words and return no extra commentary. Each finding must contain:

@@ -13,7 +13,25 @@ export type SourceSpan = Schema["SourceSpan"];
 export type NoteSpan = Schema["NoteSpan"];
 export type Finding = Schema["ReviewFinding"];
 export type Suggestion = Schema["SuggestedCorrection"];
-export type ReviewContext = Schema["ReviewContext"];
+export type ExtractedClaim = Schema["ExtractedClaimDisplay"] & {
+  verificationState: "NOT_VERIFIED" | "VERIFIED" | "FAILED";
+  evidenceStatus?: Classification | null;
+  explanation?: string | null;
+  evidence?: Schema["EvidenceDisplay"] | null;
+  verificationRunId?: string | null;
+  findingIds: string[];
+};
+export type ApprovalRecord = {
+  dispositionId: string;
+  noteId: string;
+  noteRevision: number;
+  reviewerLabel: string;
+  decidedAt: string;
+  fullVerificationId: string;
+  auditEventId: string;
+  meaning: string;
+};
+export type ReviewContext = Omit<Schema["ReviewContext"], "extractedClaims"> & { extractedClaims: ExtractedClaim[]; approval?: ApprovalRecord | null };
 export type ReviewDecision = Schema["ReviewDecision"];
 export type NoteDisposition = Schema["NoteDisposition"];
 export type AuditEvent = Schema["AuditEvent"];
