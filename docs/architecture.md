@@ -185,6 +185,18 @@ Downstream components may add domain-specific behavior while preserving source p
 
 These components must not introduce alternate source identifiers or copy transcript text as an untraceable authority.
 
+### Human review and approval boundary
+
+Human review consumes immutable note revisions, extracted claims, evidence-verification findings, deterministic-validation findings, and source-coverage results. It does not reimplement those upstream algorithms. Its responsibilities are to present claim/evidence relationships, assign review severity, record finding decisions, create immutable successor revisions, enforce approval eligibility, and append audit events.
+
+The review context is revision-specific. Extracted claim displays retain the claim ID, note span, verification state, evidence classification, validated source evidence, and linked finding IDs. Evidence is unavailable when the backend cannot validate a source span; the UI must not fabricate a quote or highlight.
+
+Approval is a human disposition for one exact verified revision. It means that a caregiver reviewed and accepted that revision; it does not mean that the AI certified clinical correctness. Approval requires the latest revision, a valid complete verification bound to the same source/note/claim identities, and no unresolved approval blockers. A second approval of the same revision is rejected or returned through idempotent replay and must not append another decision.
+
+Approval is final for the approved revision, not for the note lineage. Editing an approved revision creates an immutable successor with a new revision number. The successor starts unapproved and must receive fresh claim extraction, full verification, and human approval. Prior revisions, findings, dispositions, and audit events remain historical and are never overwritten.
+
+The review API exposes stable conflict outcomes for stale revisions, failed approval preconditions, duplicate approval of a revision, provenance conflicts, and idempotency-key conflicts. The frontend may disable controls for clarity, but the backend remains the final authority for every state transition.
+
 ## 6. Core data contracts
 
 ### SourceDocument

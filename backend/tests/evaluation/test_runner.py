@@ -23,6 +23,54 @@ def test_headless_runner_scores_selected_split_and_records_real_metrics(tmp_path
     assert repo.get_run(run.evaluation_run_id) == run
 
 
+def test_repeated_deterministic_dataset_runs_reproduce_matches_counts_and_metrics(tmp_path) -> None:
+    """Replay reproducibility excludes wall-clock timing and generated run IDs."""
+    dataset = default_dataset()
+    runner = EvaluationRunner(
+        dataset=dataset,
+        adapter=DeterministicFixtureAdapter(),
+        repository=SQLiteEvaluationRepository(tmp_path / "runs.sqlite3"),
+    )
+
+    def execute(key: str):
+        return runner.execute(EvaluationRunRequest(
+            subjectKind="BENCHMARK",
+            datasetId=dataset.dataset_id,
+            datasetVersion=dataset.dataset_version,
+            datasetHash=dataset.content_hash,
+            selectedSplit="HELD_OUT",
+            executionMode="MOCKED_PROVIDER",
+            idempotencyKey=key,
+        ))
+
+    first = execute("reproducibility-1")
+    second = execute("reproducibility-2")
+
+    def stable_projection(run):
+        cases = []
+        for result in run.case_results:
+            cases.append({
+                "scenarioId": result.scenario_id,
+                "candidateId": result.candidate_id,
+                "status": result.status.value,
+                "matches": sorted((match.error_id, match.finding_key, match.disposition.value, match.reason_code) for match in result.match_results),
+                "findings": sorted((finding.finding_key, finding.affected_claim_id, finding.affected_source_fact_id, finding.primary_status_or_outcome) for finding in result.observed_findings),
+                "coverage": sorted((item.source_fact_id, str(item.status), item.faithfully_covered) for item in result.completeness_results),
+                "failure": result.failure.code if result.failure else None,
+            })
+        metrics = []
+        for metric in run.aggregate_metrics:
+            if metric.metric_id == "verification-latency":
+                continue
+            metrics.append(metric.model_dump(mode="json", by_alias=True))
+        return {"status": run.status.value, "cases": sorted(cases, key=lambda item: (item["scenarioId"], item["candidateId"])), "metrics": sorted(metrics, key=lambda item: item["metricId"]), "failures": run.failure_summary.model_dump(mode="json", by_alias=True)}
+
+    assert stable_projection(first) == stable_projection(second)
+    assert first.evaluation_run_id != second.evaluation_run_id
+    assert first.case_results[0].latency.end_to_end_milliseconds is not None
+    assert second.case_results[0].latency.end_to_end_milliseconds is not None
+
+
 def test_claim_classification_accuracy_uses_actual_verifier_predictions(tmp_path) -> None:
     class AlwaysSupportedAdapter(PipelineAdapter):
         def evaluate(self, case, candidate):

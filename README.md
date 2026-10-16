@@ -28,11 +28,24 @@ The existing [review-workspace image](docs/assets/review-workspace.png) shows an
 - Combine semantic evidence findings with deterministic checks for values, units, spans, versions, and contract integrity.
 - Report source coverage and potential omissions separately from claim verification.
 - Support note revisions, finding adjudication, explicit approval decisions, and audit history.
+- Present an extracted-claims review surface with claim-level status (`SUPPORTED`, `UNSUPPORTED`, `CONTRADICTED`, or `UNCERTAIN`) and validated source evidence.
+- Treat approval as a human decision bound to one verified note revision; approving again is prevented, while editing creates a new unverified successor revision.
+- Show the persisted approval reviewer, timestamp, verification reference, and audit event after refresh; approval does not certify clinical correctness.
 - Run versioned synthetic evaluations with raw counts, denominators, failure accounting, and reproducible adapters.
 - Keep approval unavailable while a verified note has unsaved edits; saving creates a new revision that must be verified again.
 - Refresh audit history after every auditable review action, including saves, verification, finding decisions, approval, and rejection.
 - Provide a founder-guided synthetic demo that works without visitor-supplied API keys when the configured provider is unavailable.
 - Preload reproducible evaluation evidence and allow visitors to inspect individual cases: transcript, generated note, expected and actual findings, evidence spans, disagreement labels, benchmark version, and verifier metadata.
+
+### Human review lifecycle
+
+The review workspace follows the backend's revision-bound lifecycle:
+
+`DRAFT` → `AWAITING_FULL_VERIFICATION` → `IN_REVIEW` → `ELIGIBLE_FOR_APPROVAL` → `APPROVED` or `REJECTED`.
+
+Verification status describes whether the verification process completed successfully; it does not assert clinical correctness. Review findings remain linked to their exact note revision and source version. Acknowledge records that a reviewer saw a finding but does not resolve it or enable approval. Approval requires a valid complete verification, no unresolved approval blockers, and an explicit human action.
+
+An approved revision is immutable as a decision record. If its text is edited, the backend creates an immutable successor revision with fresh claim extraction and verification requirements. The interface restores approval status and its audit record from the backend after refresh.
 
 ## 4. Technical architecture
 
